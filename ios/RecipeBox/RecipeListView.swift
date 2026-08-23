@@ -3,8 +3,9 @@ import UIKit
 
 struct RecipeListView: View {
     @EnvironmentObject private var store: RecipeStore
+    @State private var showFilters = false
 
-    private let meals = [
+    static let meals = [
         ("all", "All meals"),
         ("breakfast", "Breakfast"),
         ("lunch", "Lunch"),
@@ -15,13 +16,29 @@ struct RecipeListView: View {
         ("other", "Other"),
     ]
 
+    private var activeFilterCount: Int {
+        [store.mealFilter != "all", store.cuisineFilter != "all", store.favoritesOnly]
+            .filter { $0 }
+            .count
+    }
+
     var body: some View {
         List {
             Section {
-                DebouncedTextField(
-                    placeholder: "Search recipes or ingredients you have…",
-                    text: $store.query
-                )
+                HStack(spacing: 10) {
+                    DebouncedTextField(
+                        placeholder: "Search recipes or ingredients you have…",
+                        text: $store.query
+                    )
+                    Button {
+                        showFilters = true
+                    } label: {
+                        Image(systemName: activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 20))
+                    }
+                    .foregroundStyle(activeFilterCount > 0 ? Theme.accent : Theme.inkSoft)
+                    .accessibilityLabel("Filters")
+                }
                 ForEach(store.selectedPantryGroups) { group in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(group.category)
@@ -50,33 +67,6 @@ struct RecipeListView: View {
                 }
             } footer: {
                 Text("Type a dish, tag, or ingredient. Tap an ingredient to keep it as something you have.")
-            }
-
-            Section("Meal") {
-                FilterRow(
-                    options: meals,
-                    selection: $store.mealFilter
-                )
-                Button {
-                    store.favoritesOnly.toggle()
-                } label: {
-                    Label(
-                        store.favoritesOnly ? "Showing favorites" : "Favorites only",
-                        systemImage: store.favoritesOnly ? "star.fill" : "star"
-                    )
-                    .font(Theme.mono(12.5, weight: .semibold))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(store.favoritesOnly ? Theme.warm : Theme.inkSoft)
-            }
-
-            if !store.cuisines.isEmpty {
-                Section("Cuisine") {
-                    FilterRow(
-                        options: [("all", "All cuisines")] + store.cuisines.map { ($0, $0) },
-                        selection: $store.cuisineFilter
-                    )
-                }
             }
 
             if let message = store.errorMessage, store.recipes.isEmpty {
@@ -143,6 +133,11 @@ struct RecipeListView: View {
                 ProgressView("Loading recipes…")
             }
         }
+        .sheet(isPresented: $showFilters) {
+            FiltersSheet(meals: Self.meals)
+                .environmentObject(store)
+                .presentationDetents([.medium, .large])
+        }
         .alert(
             "Couldn't save",
             isPresented: Binding(
@@ -154,6 +149,56 @@ struct RecipeListView: View {
             Button("OK", role: .cancel) {}
         } message: { message in
             Text(message)
+        }
+    }
+}
+
+struct FiltersSheet: View {
+    @EnvironmentObject private var store: RecipeStore
+    @Environment(\.dismiss) private var dismiss
+    let meals: [(String, String)]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Meal") {
+                    FilterRow(options: meals, selection: $store.mealFilter)
+                    Button {
+                        store.favoritesOnly.toggle()
+                    } label: {
+                        Label(
+                            store.favoritesOnly ? "Showing favorites" : "Favorites only",
+                            systemImage: store.favoritesOnly ? "star.fill" : "star"
+                        )
+                        .font(Theme.mono(12.5, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(store.favoritesOnly ? Theme.warm : Theme.inkSoft)
+                }
+
+                if !store.cuisines.isEmpty {
+                    Section("Cuisine") {
+                        FilterRow(
+                            options: [("all", "All cuisines")] + store.cuisines.map { ($0, $0) },
+                            selection: $store.cuisineFilter
+                        )
+                    }
+                }
+            }
+            .navigationTitle("Filters")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Reset") {
+                        store.mealFilter = "all"
+                        store.cuisineFilter = "all"
+                        store.favoritesOnly = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
     }
 }
