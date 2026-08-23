@@ -139,6 +139,55 @@ button { font-family: inherit; }
   outline-offset: 2px;
 }
 
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.filters-anchor { position: relative; }
+
+.filters-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.65rem 1.1rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filters-btn.active { color: var(--accent); border-color: var(--accent); }
+
+.filters-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 15;
+  width: 20rem;
+  max-width: 90vw;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 1.1rem 1.2rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* Author CSS's own `display: flex` above would otherwise beat the
+   browser's default `[hidden] { display: none }` regardless of
+   selector specificity, since author styles always win over UA styles
+   — see the same fix on .shell. */
+.filters-panel[hidden] { display: none; }
+
 .shell {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);

@@ -45,6 +45,9 @@ const els = {
   meals: document.getElementById("meal-filters"),
   cuisines: document.getElementById("cuisine-filters"),
   favoritesToggle: document.getElementById("favorites-toggle"),
+  filtersBtn: document.getElementById("filters-btn"),
+  filtersPanel: document.getElementById("filters-panel"),
+  filtersReset: document.getElementById("filters-reset"),
   pantrySearch: document.getElementById("pantry-search"),
   pantrySelected: document.getElementById("pantry-selected"),
   pantryOptions: document.getElementById("pantry-options"),
@@ -282,6 +285,27 @@ function renderFilters() {
     .join("");
 
   els.favoritesToggle.classList.toggle("active", state.favoritesOnly);
+
+  const activeCount = [state.meal !== "all", state.cuisine !== "all", state.favoritesOnly].filter(Boolean).length;
+  els.filtersBtn.classList.toggle("active", activeCount > 0);
+  els.filtersBtn.textContent = "";
+  els.filtersBtn.append(filtersIcon(), document.createTextNode(activeCount > 0 ? `Filters (${activeCount})` : "Filters"));
+}
+
+function filtersIcon() {
+  const span = document.createElement("span");
+  span.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4"/></svg>`;
+  return span.firstElementChild;
+}
+
+function openFilters() {
+  els.filtersPanel.hidden = false;
+  els.filtersBtn.setAttribute("aria-expanded", "true");
+}
+
+function closeFilters() {
+  els.filtersPanel.hidden = true;
+  els.filtersBtn.setAttribute("aria-expanded", "false");
 }
 
 function pantryCatalog() {
@@ -714,6 +738,29 @@ els.favoritesToggle.addEventListener("click", () => {
   state.favoritesOnly = !state.favoritesOnly;
   renderFilters();
   renderGrid();
+});
+
+els.filtersBtn.addEventListener("click", () => {
+  if (els.filtersPanel.hidden) openFilters();
+  else closeFilters();
+});
+
+els.filtersReset.addEventListener("click", () => {
+  state.meal = "all";
+  state.cuisine = "all";
+  state.favoritesOnly = false;
+  renderFilters();
+  renderGrid();
+});
+
+document.addEventListener("click", (event) => {
+  if (els.filtersPanel.hidden) return;
+  if (els.filtersPanel.contains(event.target) || els.filtersBtn.contains(event.target)) return;
+  closeFilters();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !els.filtersPanel.hidden) closeFilters();
 });
 
 els.settingsBtn.addEventListener("click", openSettings);

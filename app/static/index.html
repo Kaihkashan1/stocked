@@ -24,28 +24,39 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a1.8 1.8 0 0 0 .36 1.98l.06.06a2.16 2.16 0 1 1-3.06 3.06l-.06-.06a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.09 1.65v.17a2.16 2.16 0 1 1-4.32 0v-.09a1.8 1.8 0 0 0-1.18-1.65 1.8 1.8 0 0 0-1.98.36l-.06.06a2.16 2.16 0 1 1-3.06-3.06l.06-.06a1.8 1.8 0 0 0 .36-1.98 1.8 1.8 0 0 0-1.65-1.09h-.17a2.16 2.16 0 1 1 0-4.32h.09a1.8 1.8 0 0 0 1.65-1.18 1.8 1.8 0 0 0-.36-1.98l-.06-.06a2.16 2.16 0 1 1 3.06-3.06l.06.06a1.8 1.8 0 0 0 1.98.36h.08a1.8 1.8 0 0 0 1.09-1.65v-.17a2.16 2.16 0 1 1 4.32 0v.09a1.8 1.8 0 0 0 1.09 1.65h.08a1.8 1.8 0 0 0 1.98-.36l.06-.06a2.16 2.16 0 1 1 3.06 3.06l-.06.06a1.8 1.8 0 0 0-.36 1.98v.08a1.8 1.8 0 0 0 1.65 1.09h.17a2.16 2.16 0 1 1 0 4.32h-.09a1.8 1.8 0 0 0-1.65 1.09z"/></svg>
       </button>
     </div>
-    <label class="search">
-      <span class="visually-hidden">Search recipes</span>
-      <input id="search" type="search" placeholder="Search title, ingredient, tag…">
-    </label>
+    <div class="search-row">
+      <label class="search">
+        <span class="visually-hidden">Search recipes</span>
+        <input id="search" type="search" placeholder="Search title, ingredient, tag…">
+      </label>
+      <div class="filters-anchor">
+        <button id="filters-btn" class="filters-btn" type="button" aria-haspopup="true" aria-expanded="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          Filters
+        </button>
+        <div id="filters-panel" class="filters-panel" hidden>
+          <section>
+            <h2 class="eyebrow">Meal</h2>
+            <div id="meal-filters" class="chips"></div>
+          </section>
+          <section>
+            <h2 class="eyebrow">Cuisine</h2>
+            <div id="cuisine-filters" class="chips"></div>
+          </section>
+          <section>
+            <button id="favorites-toggle" class="favorites-toggle" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
+              Favorites only
+            </button>
+          </section>
+          <button id="filters-reset" class="link-btn" type="button">Reset filters</button>
+        </div>
+      </div>
+    </div>
   </header>
 
   <div class="shell" id="recipes-view">
-    <aside class="filters" aria-label="Categories">
-      <section>
-        <h2 class="eyebrow">Meal</h2>
-        <div id="meal-filters" class="chips"></div>
-      </section>
-      <section>
-        <h2 class="eyebrow">Cuisine</h2>
-        <div id="cuisine-filters" class="chips"></div>
-      </section>
-      <section>
-        <button id="favorites-toggle" class="favorites-toggle" type="button">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
-          Favorites only
-        </button>
-      </section>
+    <aside class="filters" aria-label="What I have">
       <section>
         <h2 class="eyebrow">What I have</h2>
         <input id="pantry-search" class="pantry-search" type="search" placeholder="Find an ingredient…">
