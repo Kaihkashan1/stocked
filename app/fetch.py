@@ -131,8 +131,19 @@ def fetch_post(url: str, out_dir: Path) -> FetchedPost:
 
 
 def fetch_article(url: str) -> FetchedPost:
-    """Blog/recipe-page fallback: no video, just page text for Gemini to read."""
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; RecipeBox/1.0)"}
+    """Blog/recipe-page fallback: no video, just page text for Gemini to read.
+    A self-identifying bot UA gets hard-blocked (403) by a lot of ordinary
+    food-blog hosting (Wordfence, Cloudflare's basic bot rules, etc.) even
+    for a single, personal, one-off fetch like this — so this mimics a
+    real browser instead."""
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     try:
         response = httpx.get(url, follow_redirects=True, timeout=20, headers=headers)
         response.raise_for_status()
