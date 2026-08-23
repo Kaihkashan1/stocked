@@ -10,7 +10,7 @@ enum APIError: LocalizedError {
         case .badURL:
             return "The server address is not a valid URL."
         case .unreachable(let host):
-            return "Could not reach \(host). Is the Mac server running, and are both devices on the same Wi-Fi?"
+            return "Could not reach \(host). Check your internet connection, or update the server address in Settings."
         case .badResponse(let code):
             return "The server returned HTTP \(code)."
         }

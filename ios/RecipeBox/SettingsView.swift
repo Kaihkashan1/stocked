@@ -10,14 +10,14 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("http://192.168.0.54:8000", text: $draftURL)
+                    TextField(RecipeStore.hostedURL, text: $draftURL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                 } header: {
-                    Text("Mac server")
+                    Text("Server")
                 } footer: {
-                    Text("On the Mac, run the Recipe Box backend, then use that Mac’s current Wi-Fi IP. iPhone and Mac must be on the same network.")
+                    Text("Recipes load from the hosted Recipe Box server. You do not need your Mac running. Only change this if you are testing a local backend.")
                 }
 
                 Section {

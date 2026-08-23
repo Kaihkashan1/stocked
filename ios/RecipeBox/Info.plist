@@ -30,7 +30,7 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Recipe Box loads your recipes from the server running on your Mac.</string>
+	<string>Recipe Box can load recipes from a server on your local network when you are testing.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

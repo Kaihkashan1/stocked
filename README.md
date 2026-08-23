@@ -1,8 +1,8 @@
 # Recipe Box
 
-Share an Instagram reel from your iPhone. A small backend on this Mac downloads it, asks Gemini to extract the recipe, and appends a row to a Google Sheet. Browse the collection in the Sheets app.
+Share an Instagram reel from your iPhone. The hosted backend downloads it, asks Gemini to extract the recipe, and appends a row to a Google Sheet. Browse the collection in the iPhone app, at the Vercel URL, or in the Sheets app.
 
-This is the free-tier MVP: Instagram only, Google Sheets storage, local Mac or Vercel. Browse on the Mac at `http://127.0.0.1:8000/`, on Vercel after deploy, or in the personal iPhone app in `ios/`. Photos and blog links can come later.
+This is the free-tier MVP: Instagram only, Google Sheets storage, Vercel in production (optional local Mac for development). Browse at `https://recipe-box-ashen-alpha.vercel.app/`, locally at `http://127.0.0.1:8000/`, or in the personal iPhone app in `ios/`. Photos and blog links can come later.
 
 ```
 iPhone Share → POST /ingest → yt-dlp → Gemini → Google Sheets
@@ -93,13 +93,19 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 On this Mac, open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) for the recipe box app. Health check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health).
 
-Find your Mac’s Wi-Fi address (iPhone and Mac on the same network):
+For day-to-day use, point the iPhone Shortcut and app at the hosted URL instead of this Mac:
+
+```
+https://recipe-box-ashen-alpha.vercel.app
+```
+
+A local server is only needed when you are developing the backend. If you do use LAN ingest, find this Mac’s Wi-Fi address (iPhone and Mac on the same network):
 
 ```bash
 ipconfig getifaddr en0
 ```
 
-That value (something like `192.168.1.23`) is what the Shortcut will call. Allow incoming connections if macOS Firewall asks.
+That value (something like `192.168.1.23`) is what a local Shortcut would call. Allow incoming connections if macOS Firewall asks.
 
 ## 6. iPhone Shortcut
 
@@ -108,17 +114,17 @@ On the iPhone:
 1. Open **Shortcuts → All Shortcuts → +**. Name it **Save Recipe**.
 2. Tap the **i** (or shortcut settings) and turn on **Show in Share Sheet**. Accept **URLs** and **Text**.
 3. Add action **Get Contents of URL**:
-   - URL: `http://YOUR_MAC_IP:8000/ingest`
+   - URL: `https://recipe-box-ashen-alpha.vercel.app/ingest`
    - Method: `POST`
    - Headers:
      - `Content-Type` = `application/json`
      - `X-Recipe-Box-Key` = the same value as `RECIPE_BOX_SECRET`
    - Request Body: JSON
    - Add a field `content` whose value is **Shortcut Input**
-4. Add **Show Notification**. Body: **Contents of URL** (the JSON response). You want to see `"status":"queued"`.
+4. Add **Show Notification**. Body: **Contents of URL** (the JSON response). You want to see `"status":"saved"` (or `"duplicate"` if that reel is already in the sheet).
 5. In Instagram: Reel → Share → **More** → enable **Save Recipe**.
 
-The Shortcut returns immediately. The Mac then downloads, extracts, and writes the row. Watch the Terminal for logs, or hit `GET /jobs` with the same header.
+On Vercel the Shortcut waits until the recipe is saved (up to 60 seconds). If a long reel times out, you can still fall back to a local Mac ingest URL.
 
 Test without the phone, from the Mac:
 
@@ -139,7 +145,7 @@ Create a unique topic name at [ntfy.sh](https://ntfy.sh), subscribe in the ntfy 
 
 A SwiftUI app lives in `ios/`. Install it on your own iPhone from Xcode with a free Apple ID. Full steps: [`ios/README.md`](ios/README.md).
 
-Short version: start the backend on this Mac, open `ios/RecipeBox.xcodeproj` in **Xcode.app**, sign with your Personal Team, plug in the iPhone, press Run. In the app, set the server to `http://YOUR_MAC_IP:8000` if it isn’t already. After a Vercel deploy, you can point the app at `https://YOUR_PROJECT.vercel.app` instead.
+Short version: open `ios/RecipeBox.xcodeproj` in **Xcode.app**, sign with your Personal Team, plug in the iPhone, press Run. The app defaults to `https://recipe-box-ashen-alpha.vercel.app` — the Mac does not need to be running.
 
 ## 9. Deploy to Vercel
 
@@ -159,13 +165,13 @@ The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in 
    | `YTDLP_COOKIES` | full contents of `instagram_cookies.txt` (only if you want cloud ingest) |
    | `NTFY_TOPIC` | optional |
 
-4. Redeploy after saving env vars. Open `https://YOUR_PROJECT.vercel.app/` to browse recipes.
+4. Redeploy after saving env vars. Production is [https://recipe-box-ashen-alpha.vercel.app/](https://recipe-box-ashen-alpha.vercel.app/).
 
-Browsing the box works well on Vercel. Instagram ingest has a **60 second** function limit, so long reels may time out in the cloud. Keep the Mac backend for saving from the Shortcut if that happens; the iPhone app can still read from the Vercel URL.
+Browsing the box works well on Vercel. Instagram ingest has a **60 second** function limit, so long reels may time out in the cloud. If that happens, you can temporarily point the Shortcut at a local Mac ingest URL.
 
 ## Notes
 
-- **The app.** On this Mac open `http://127.0.0.1:8000/`. After deploy, use the Vercel URL. On iPhone, install the personal iOS app — see [`ios/README.md`](ios/README.md). Google Sheets remains the database.
+- **The app.** Production is `https://recipe-box-ashen-alpha.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install the personal iOS app — see [`ios/README.md`](ios/README.md). Google Sheets remains the database.
 - **Duplicates.** The same reel URL is not written twice.
 - **Rate limits.** Gemini 429s are retried with backoff.
 - **Instagram.** `yt-dlp` is not an official Instagram API. Keep this as a personal tool; expect occasional breakage when Instagram changes something. If fetches start failing, update with `pip install -U yt-dlp` and re-export `instagram_cookies.txt`.

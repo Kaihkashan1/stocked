@@ -76,7 +76,7 @@ struct RecipeListView: View {
                             .font(.headline)
                         Text(message)
                             .foregroundStyle(.secondary)
-                        Text("Open Settings and set this Mac’s current Wi-Fi address. The backend must be running.")
+                        Text("Pull to retry. If it keeps failing, open Settings and confirm the server address.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

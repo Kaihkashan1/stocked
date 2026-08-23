@@ -16,11 +16,33 @@ final class RecipeStore: ObservableObject {
         didSet { UserDefaults.standard.set(serverURL, forKey: Self.urlKey) }
     }
 
+    static let hostedURL = "https://recipe-box-ashen-alpha.vercel.app"
+
     private static let urlKey = "recipeBox.serverURL"
-    private static let defaultURL = "http://192.168.0.54:8000"
+    private static let legacyLANDefault = "http://192.168.0.54:8000"
 
     init() {
-        serverURL = UserDefaults.standard.string(forKey: Self.urlKey) ?? Self.defaultURL
+        let stored = UserDefaults.standard.string(forKey: Self.urlKey) ?? ""
+        let resolved = Self.resolvedURL(from: stored)
+        serverURL = resolved
+        UserDefaults.standard.set(resolved, forKey: Self.urlKey)
+    }
+
+    /// Prefer the hosted backend. Old LAN defaults still stored on the phone
+    /// would otherwise keep requiring the Mac to be awake.
+    private static func resolvedURL(from stored: String) -> String {
+        let value = stored.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty || value == legacyLANDefault { return hostedURL }
+        guard let host = URL(string: value)?.host?.lowercased() else { return hostedURL }
+        if host == "localhost" || host == "127.0.0.1" { return hostedURL }
+        if host.hasPrefix("192.168.") || host.hasPrefix("10.") { return hostedURL }
+        if host.hasPrefix("172.") {
+            let parts = host.split(separator: ".")
+            if parts.count == 4, let second = Int(parts[1]), (16...31).contains(second) {
+                return hostedURL
+            }
+        }
+        return value
     }
 
     var cuisines: [String] {
