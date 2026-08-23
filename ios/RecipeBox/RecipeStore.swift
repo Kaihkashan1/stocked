@@ -20,6 +20,9 @@ final class RecipeStore: ObservableObject {
     @Published var favoritesOnly = false {
         didSet { if oldValue != favoritesOnly { updateVisible() } }
     }
+    @Published var sortOption: SortOption = .recent {
+        didSet { if oldValue != sortOption { updateVisible() } }
+    }
     @Published var pantryGroups: [PantryGroup] = []
 
     /// Transient error from a favorite toggle or edit save — separate from
@@ -107,12 +110,53 @@ final class RecipeStore: ObservableObject {
         }
     }
 
+    /// Optimistic, like toggleFavorite: flips locally (so the badge/UI is
+    /// instant) then pushes the whole set to the server so the plan matches
+    /// on every device. Reverts on failure.
     func togglePlan(_ recipe: Recipe) {
+        let previous = planIDs
         if planIDs.contains(recipe.id) {
             planIDs.remove(recipe.id)
         } else {
             planIDs.insert(recipe.id)
         }
+        let updated = planIDs
+        Task {
+            do {
+                let confirmed = try await APIClient(baseURLString: serverURL).updatePlan(ids: Array(updated), secret: serverSecret)
+                if planIDs == updated {
+                    planIDs = Set(confirmed)
+                }
+            } catch {
+                if planIDs == updated {
+                    planIDs = previous
+                }
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    /// One request for the whole clear, rather than N concurrent togglePlan
+    /// calls racing each other to write the last (possibly stale) state.
+    func clearPlan() {
+        let previous = planIDs
+        planIDs = []
+        Task {
+            do {
+                let confirmed = try await APIClient(baseURLString: serverURL).updatePlan(ids: [], secret: serverSecret)
+                planIDs = Set(confirmed)
+            } catch {
+                planIDs = previous
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Pulls the latest plan from the server — called after each refresh so
+    /// a change made on another device shows up here too.
+    private func syncPlanFromServer() async {
+        guard let ids = try? await APIClient(baseURLString: serverURL).fetchPlan() else { return }
+        planIDs = Set(ids)
     }
 
     var plannedRecipes: [Recipe] {
@@ -157,7 +201,9 @@ final class RecipeStore: ObservableObject {
             try await APIClient(baseURLString: serverURL).deleteRecipe(id: recipe.id, secret: serverSecret)
             recipesByID.removeValue(forKey: recipe.id)
             recipes.removeAll { $0.id == recipe.id }
-            planIDs.remove(recipe.id)
+            if planIDs.remove(recipe.id) != nil {
+                _ = try? await APIClient(baseURLString: serverURL).updatePlan(ids: Array(planIDs), secret: serverSecret)
+            }
             updateDerived()
             persistCache()
             return nil
@@ -198,6 +244,7 @@ final class RecipeStore: ObservableObject {
             errorMessage = nil
             persistCache()
             prefetchThumbnails()
+            await syncPlanFromServer()
             return true
         } catch {
             guard !Task.isCancelled else { return false }
@@ -242,6 +289,15 @@ final class RecipeStore: ObservableObject {
                 let right = matches[rhs.id]!
                 if left.score != right.score { return left.score > right.score }
                 return left.extraCount < right.extraCount
+            }
+        } else {
+            switch sortOption {
+            case .recent:
+                break // recipes already arrive newest-first from the server
+            case .az:
+                rows.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            case .za:
+                rows.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
             }
         }
         visibleRecipes = rows

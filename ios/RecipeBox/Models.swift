@@ -171,6 +171,14 @@ enum DeepLinkRoute: Equatable {
     case have([String])
 }
 
+/// Only applies when no "have" ingredients are selected — pantry-match
+/// score always wins when it's active, same as before.
+enum SortOption: String, CaseIterable {
+    case recent = "Recent"
+    case az = "A–Z"
+    case za = "Z–A"
+}
+
 struct RecipeMatch {
     let score: Double
     let extraCount: Int
@@ -273,6 +281,86 @@ private func looksLikeQuantityToken(_ token: String) -> Bool {
     // fraction glyph, optionally one more number after a separator.
     let pattern = "^[0-9¼½¾⅓⅔⅛⅜]+([\\/.\\-][0-9]+)?$"
     return cleaned.range(of: pattern, options: .regularExpression) != nil
+}
+
+// MARK: - Serving-size scaling
+
+private let fractionGlyphValues: [Character: Double] = [
+    "¼": 0.25, "½": 0.5, "¾": 0.75, "⅓": 1.0 / 3, "⅔": 2.0 / 3, "⅛": 0.125, "⅜": 0.375,
+]
+
+/// Common cooking fractions to snap a scaled result back to, so "1/3 cup
+/// × 1.5" reads as "½ cup" instead of "0.5 cup" or "0.4999999 cup".
+private let fractionGlyphsByValue: [(Double, String)] = [
+    (0.125, "⅛"), (0.25, "¼"), (1.0 / 3, "⅓"), (0.375, "⅜"),
+    (0.5, "½"), (0.625, "⅝"), (2.0 / 3, "⅔"), (0.75, "¾"), (0.875, "⅞"),
+]
+
+/// Parses a leading quantity token into a number. Explicitly refuses a
+/// range ("2-3") rather than guessing which side to scale — the caller
+/// leaves those untouched instead of silently showing something wrong.
+func parseQuantityNumber(_ token: String) -> Double? {
+    let cleaned = token.trimmingCharacters(in: CharacterSet(charactersIn: ",;"))
+    guard !cleaned.isEmpty, !cleaned.contains("-") else { return nil }
+
+    if cleaned.contains("/") {
+        let parts = cleaned.split(separator: "/")
+        guard parts.count == 2, let numerator = Double(parts[0]), let denominator = Double(parts[1]), denominator != 0 else {
+            return nil
+        }
+        return numerator / denominator
+    }
+
+    var rest = Substring(cleaned)
+    var whole = 0.0
+    var hasWhole = false
+    var numStr = ""
+    while let c = rest.first, c.isNumber || c == "." {
+        numStr.append(c)
+        rest.removeFirst()
+    }
+    if !numStr.isEmpty {
+        whole = Double(numStr) ?? 0
+        hasWhole = true
+    }
+
+    if let glyph = rest.first, let fractionValue = fractionGlyphValues[glyph] {
+        return whole + fractionValue
+    }
+    return hasWhole ? whole : nil
+}
+
+/// The inverse of parseQuantityNumber: a scaled number back into a string
+/// that reads naturally in a recipe ("1½" rather than "1.5", "3" rather
+/// than "3.00").
+func formatQuantityNumber(_ value: Double) -> String {
+    guard value > 0 else { return "0" }
+    let whole = floor(value)
+    let fraction = value - whole
+
+    if fraction < 0.02 {
+        return String(Int(whole))
+    }
+    if fraction > 0.98 {
+        return String(Int(whole) + 1)
+    }
+    for (fractionValue, glyph) in fractionGlyphsByValue where abs(fraction - fractionValue) < 0.03 {
+        return whole > 0 ? "\(Int(whole))\(glyph)" : glyph
+    }
+    return String(format: "%.2g", value)
+}
+
+/// Scales the leading number in an already-split quantity ("2 cups" →
+/// "3 cups" at ×1.5), leaving the unit/rest untouched. Quantities that
+/// don't start with a parseable number (ranges, "a pinch") pass through
+/// unscaled rather than being guessed at.
+func scaledQuantity(_ quantity: String, by scale: Double) -> String {
+    guard scale != 1.0 else { return quantity }
+    let words = quantity.split(separator: " ")
+    guard let first = words.first, let value = parseQuantityNumber(String(first)) else { return quantity }
+    let rest = words.dropFirst().joined(separator: " ")
+    let formatted = formatQuantityNumber(value * scale)
+    return rest.isEmpty ? formatted : "\(formatted) \(rest)"
 }
 
 func stem(_ name: String) -> String {

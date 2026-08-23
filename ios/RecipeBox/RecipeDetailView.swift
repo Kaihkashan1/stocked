@@ -8,6 +8,8 @@ struct RecipeDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var deleting = false
     @State private var deleteError: String?
+    @State private var showCookMode = false
+    @State private var scale: Double = 1.0
 
     private var recipe: Recipe? { store.recipe(id: id) }
 
@@ -52,6 +54,11 @@ struct RecipeDetailView: View {
             if let recipe {
                 EditRecipeView(recipe: recipe)
                     .environmentObject(store)
+            }
+        }
+        .fullScreenCover(isPresented: $showCookMode) {
+            if let recipe {
+                CookModeView(recipe: recipe)
             }
         }
         .confirmationDialog(
@@ -99,6 +106,9 @@ struct RecipeDetailView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     if !recipe.tags.isEmpty {
                         tags(for: recipe)
+                    }
+                    if !recipe.steps.isEmpty {
+                        cookButton
                     }
                     if !recipe.ingredients.isEmpty {
                         ingredientsSection(for: recipe)
@@ -152,26 +162,76 @@ struct RecipeDetailView: View {
     private func tags(for recipe: Recipe) -> some View {
         FlowLayout(spacing: 8) {
             ForEach(recipe.tags, id: \.self) { tag in
-                Text(tag)
-                    .font(Theme.mono(12))
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 6)
-                    .background(Theme.accentSoft)
-                    .foregroundStyle(Theme.accent)
-                    .clipShape(Capsule())
+                Button {
+                    store.query = tag
+                    dismiss()
+                } label: {
+                    Text(tag)
+                        .font(Theme.mono(12))
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 6)
+                        .background(Theme.accentSoft)
+                        .foregroundStyle(Theme.accent)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var cookButton: some View {
+        Button {
+            showCookMode = true
+        } label: {
+            Label("Start Cooking", systemImage: "play.fill")
+                .font(Theme.mono(13, weight: .semibold))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 11)
+                .background(Theme.accent)
+                .foregroundStyle(.white)
+                .clipShape(Capsule())
+        }
+    }
+
+    private func scaleControl() -> some View {
+        HStack(spacing: 8) {
+            Text("Scale")
+                .font(Theme.mono(11.5, weight: .semibold))
+                .foregroundStyle(Theme.inkSoft)
+            ForEach([0.5, 1.0, 1.5, 2.0, 3.0], id: \.self) { factor in
+                Button {
+                    scale = factor
+                } label: {
+                    Text(factor == floor(factor) ? "\(Int(factor))×" : "\(String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), factor))×")
+                        .font(Theme.mono(11.5, weight: .semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(scale == factor ? Theme.accent : Theme.surface2)
+                        .foregroundStyle(scale == factor ? .white : Theme.inkSoft)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
     private func ingredientsSection(for recipe: Recipe) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            sectionHeading("Ingredients")
+        let parsedLines = recipe.ingredients.map(splitIngredientQuantity)
+        let canScale = parsedLines.contains { $0.quantity.flatMap { parseQuantityNumber(String($0.split(separator: " ").first ?? "")) } != nil }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionHeading("Ingredients")
+                Spacer()
+                if canScale {
+                    scaleControl()
+                }
+            }
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(recipe.ingredients.enumerated()), id: \.offset) { index, line in
-                    let parsed = splitIngredientQuantity(line)
+                ForEach(Array(parsedLines.enumerated()), id: \.offset) { index, parsed in
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         if let quantity = parsed.quantity {
-                            Text(quantity)
+                            Text(scaledQuantity(quantity, by: scale))
                                 .font(Theme.mono(12.5, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 9)
@@ -189,7 +249,7 @@ struct RecipeDetailView: View {
                     }
                     .padding(.vertical, 10)
 
-                    if index < recipe.ingredients.count - 1 {
+                    if index < parsedLines.count - 1 {
                         Rectangle().fill(Theme.line).frame(height: 1)
                     }
                 }

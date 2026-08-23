@@ -112,7 +112,65 @@ struct APIClient {
         }
     }
 
+    func fetchPlan() async throws -> [Int] {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/plan", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            throw APIError.badResponse(status)
+        }
+        return try Self.decoder.decode(PlanResponse.self, from: data).ids
+    }
+
+    func updatePlan(ids: [Int], secret: String) async throws -> [Int] {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/plan", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.httpMethod = "PUT"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+        request.httpBody = try JSONEncoder().encode(PlanResponse(ids: ids))
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            throw APIError.badResponse(status)
+        }
+        return try Self.decoder.decode(PlanResponse.self, from: data).ids
+    }
+
     private var trimmedBase: String {
         baseURLString.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
+}
+
+struct PlanResponse: Codable {
+    let ids: [Int]
 }

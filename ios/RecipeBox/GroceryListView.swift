@@ -73,7 +73,7 @@ struct GroceryListView: View {
 
                 Section {
                     Button("Clear plan", role: .destructive) {
-                        for recipe in planned { store.togglePlan(recipe) }
+                        store.clearPlan()
                         checked.removeAll()
                     }
                 }

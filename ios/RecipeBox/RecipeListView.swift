@@ -184,6 +184,21 @@ struct FiltersSheet: View {
                         )
                     }
                 }
+
+                Section {
+                    Picker("Sort", selection: $store.sortOption) {
+                        ForEach(SortOption.allCases, id: \.self) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Sort")
+                } footer: {
+                    if !store.have.isEmpty {
+                        Text("Ignored while \"what I have\" is active — closest fit always comes first then.")
+                    }
+                }
             }
             .navigationTitle("Filters")
             .navigationBarTitleDisplayMode(.inline)
@@ -193,6 +208,7 @@ struct FiltersSheet: View {
                         store.mealFilter = "all"
                         store.cuisineFilter = "all"
                         store.favoritesOnly = false
+                        store.sortOption = .recent
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
