@@ -21,6 +21,7 @@
 		A1000000000000000000001B /* EditRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003C /* EditRecipeView.swift */; };
 		A1000000000000000000001C /* GroceryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003D /* GroceryListView.swift */; };
 		A1000000000000000000001D /* CookModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* CookModeView.swift */; };
+		A1000000000000000000001E /* AddRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003F /* AddRecipeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		A1000000000000000000003C /* EditRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecipeView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003D /* GroceryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003E /* CookModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookModeView.swift; sourceTree = "<group>"; };
+		A1000000000000000000003F /* AddRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRecipeView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +70,7 @@
 				A1000000000000000000003C /* EditRecipeView.swift */,
 				A1000000000000000000003D /* GroceryListView.swift */,
 				A1000000000000000000003E /* CookModeView.swift */,
+				A1000000000000000000003F /* AddRecipeView.swift */,
 				A10000000000000000000038 /* SettingsView.swift */,
 				A10000000000000000000039 /* Assets.xcassets */,
 				A1000000000000000000003A /* Info.plist */,
@@ -173,6 +176,7 @@
 				A1000000000000000000001B /* EditRecipeView.swift in Sources */,
 				A1000000000000000000001C /* GroceryListView.swift in Sources */,
 				A1000000000000000000001D /* CookModeView.swift in Sources */,
+				A1000000000000000000001E /* AddRecipeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

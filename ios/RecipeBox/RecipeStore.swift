@@ -181,11 +181,39 @@ final class RecipeStore: ObservableObject {
         }
     }
 
+    /// Returns an error message on failure, nil on success. Not optimistic —
+    /// there's no local id to assign until the server hands back the row
+    /// number, so the new recipe only appears once it's actually saved.
+    func addRecipe(_ draft: RecipeCreate) async -> String? {
+        do {
+            let created = try await APIClient(baseURLString: serverURL).createRecipe(draft, secret: serverSecret)
+            recipesByID[created.id] = created
+            recipes.insert(created, at: 0)
+            updateDerived()
+            persistCache()
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     /// Returns an error message on failure, nil on success.
-    func saveEdits(id: Int, title: String, servings: String?, ingredients: [String], steps: [String]) async -> String? {
-        let patch = RecipePatch(title: title, servings: servings, ingredients: ingredients, steps: steps)
+    func saveEdits(id: Int, title: String, servings: String?, ingredients: [String], steps: [String], notes: String) async -> String? {
+        let patch = RecipePatch(title: title, servings: servings, ingredients: ingredients, steps: steps, notes: notes)
         do {
             let saved = try await APIClient(baseURLString: serverURL).updateRecipe(id: id, patch: patch, secret: serverSecret)
+            replace(saved)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// Returns an error message on failure, nil on success. A real Gemini
+    /// call server-side, so this can take a few seconds.
+    func recategorizeRecipe(_ recipe: Recipe) async -> String? {
+        do {
+            let saved = try await APIClient(baseURLString: serverURL).recategorize(id: recipe.id, secret: serverSecret)
             replace(saved)
             return nil
         } catch {

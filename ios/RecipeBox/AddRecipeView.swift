@@ -1,30 +1,26 @@
 import SwiftUI
 
-/// Full-screen edit form for a saved recipe. Ingredients/steps are edited as
-/// plain multi-line text (one item per line) — the server re-parses lines the
-/// same way it formats them on save, so the round trip is lossless.
-struct EditRecipeView: View {
+/// Full-screen form for typing a recipe in by hand — no Instagram link, no
+/// Gemini extraction, just title/ingredients/steps like EditRecipeView, plus
+/// the categorization fields Gemini would normally fill in (cuisine, meal,
+/// time, tags) since nothing else will set them for a manual entry.
+struct AddRecipeView: View {
     @EnvironmentObject private var store: RecipeStore
     @Environment(\.dismiss) private var dismiss
 
-    let recipe: Recipe
-
-    @State private var title: String
-    @State private var servings: String
-    @State private var ingredientsText: String
-    @State private var stepsText: String
-    @State private var notes: String
+    @State private var title = ""
+    @State private var servings = ""
+    @State private var ingredientsText = ""
+    @State private var stepsText = ""
+    @State private var cuisine = ""
+    @State private var meal = "other"
+    @State private var time = ""
+    @State private var tagsText = ""
+    @State private var notes = ""
     @State private var saving = false
     @State private var errorMessage: String?
 
-    init(recipe: Recipe) {
-        self.recipe = recipe
-        _title = State(initialValue: recipe.title)
-        _servings = State(initialValue: recipe.servings ?? "")
-        _ingredientsText = State(initialValue: recipe.ingredients.joined(separator: "\n"))
-        _stepsText = State(initialValue: recipe.steps.joined(separator: "\n"))
-        _notes = State(initialValue: recipe.notes)
-    }
+    private static let meals = RecipeListView.meals.filter { $0.0 != "all" }
 
     var body: some View {
         NavigationStack {
@@ -53,6 +49,32 @@ struct EditRecipeView: View {
                 } footer: {
                     Text("One step per line, in order.")
                 }
+                Section("Meal") {
+                    Picker("Meal", selection: $meal) {
+                        ForEach(Self.meals, id: \.0) { key, label in
+                            Text(label).tag(key)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+                Section {
+                    TextField("e.g. Italian", text: $cuisine)
+                    if !store.cuisines.isEmpty {
+                        FilterWrap(items: store.cuisines, selected: Set([cuisine])) { picked in
+                            cuisine = (cuisine == picked) ? "" : picked
+                        }
+                    }
+                } header: {
+                    Text("Cuisine")
+                }
+                Section("Time") {
+                    TextField("e.g. 20 min", text: $time)
+                }
+                Section {
+                    TextField("comma, separated", text: $tagsText)
+                } header: {
+                    Text("Tags")
+                }
                 Section("Notes") {
                     TextEditor(text: $notes)
                         .frame(minHeight: 80)
@@ -66,7 +88,7 @@ struct EditRecipeView: View {
                     }
                 }
             }
-            .navigationTitle("Edit Recipe")
+            .navigationTitle("Add Recipe")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -88,15 +110,24 @@ struct EditRecipeView: View {
         defer { saving = false }
 
         let trimmedServings = servings.trimmingCharacters(in: .whitespacesAndNewlines)
-        let failure = await store.saveEdits(
-            id: recipe.id,
+        let trimmedTime = time.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tags = tagsText
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        let draft = RecipeCreate(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             servings: trimmedServings.isEmpty ? nil : trimmedServings,
             ingredients: lines(from: ingredientsText),
             steps: lines(from: stepsText),
+            cuisine: cuisine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "Uncategorized" : cuisine.trimmingCharacters(in: .whitespacesAndNewlines),
+            meal: meal,
+            time: trimmedTime.isEmpty ? nil : trimmedTime,
+            tags: tags,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
         )
-        if let failure {
+        if let failure = await store.addRecipe(draft) {
             errorMessage = failure
         } else {
             dismiss()

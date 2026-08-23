@@ -9,6 +9,7 @@ from functools import lru_cache
 import gspread
 
 from app.config import settings
+from app.extract import categorize_recipe
 from app.fetch import normalize_url
 from app.match import pantry_items
 from app.models import FetchedPost, Recipe
@@ -30,6 +31,7 @@ HEADERS = [
     "Time",
     "Tags",
     "Favorite",
+    "Notes",
 ]
 SOURCE_COL = 5  # 1-based, matches HEADERS
 CUISINE_COL = 10
@@ -37,7 +39,8 @@ MEAL_COL = 11
 TIME_COL = 12
 TAGS_COL = 13
 FAVORITE_COL = 14
-LAST_COL_LETTER = "N"  # matches len(HEADERS)
+NOTES_COL = 15
+LAST_COL_LETTER = "O"  # matches len(HEADERS)
 TRUE_VALUES = {"true", "yes", "1", "y"}
 
 
@@ -68,6 +71,9 @@ def _ensure_headers(worksheet) -> None:
         return
     if not any(existing):
         worksheet.append_row(HEADERS, value_input_option="RAW")
+        return
+    if existing[:14] == HEADERS[:14]:
+        worksheet.update(f"A1:{LAST_COL_LETTER}1", [HEADERS], value_input_option="RAW")
         return
     if existing[:13] == HEADERS[:13]:
         worksheet.update(f"A1:{LAST_COL_LETTER}1", [HEADERS], value_input_option="RAW")
@@ -137,9 +143,53 @@ def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
         recipe.time or "",
         ", ".join(_clean_tag(tag) for tag in recipe.tags if _clean_tag(tag)),
         "",  # Favorite: not set on save, toggled later from the app
+        "",  # Notes: added later from the app
     ]
     _worksheet().append_row(row, value_input_option="USER_ENTERED")
     logger.info("Saved %r to Google Sheets", recipe.title)
+
+
+def create_recipe(
+    *,
+    title: str,
+    servings: str | None,
+    ingredients: list[str],
+    steps: list[str],
+    cuisine: str,
+    meal: str,
+    time: str | None,
+    tags: list[str],
+    notes: str,
+) -> dict | None:
+    """Adds a recipe typed straight into the app — no capture pipeline, no
+    Gemini call, no source URL. Ingredients/steps are formatted the same
+    way update_recipe re-serializes them, so a later edit round-trips
+    cleanly."""
+    ingredients_text = "\n".join(f"- {line}" for line in ingredients)
+    steps_text = "\n".join(f"{i}. {line}" for i, line in enumerate(steps, start=1))
+    saved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    row = [
+        title,
+        servings or "",
+        ingredients_text,
+        steps_text,
+        "",  # Source: typed in by hand, no URL
+        "",  # Caption
+        "high",  # Confidence: user-authored, not a model guess
+        "",  # Thumbnail
+        saved_at,
+        _clean_cuisine(cuisine),
+        _clean_meal(meal),
+        time or "",
+        ", ".join(_clean_tag(tag) for tag in tags if _clean_tag(tag)),
+        "",  # Favorite
+        notes,
+    ]
+    worksheet = _worksheet()
+    worksheet.append_row(row, value_input_option="USER_ENTERED")
+    row_id = len(worksheet.col_values(1))
+    logger.info("Created row %s (%r) via manual entry", row_id, title)
+    return get_recipe(row_id)
 
 
 def delete_recipe(row_id: int) -> bool:
@@ -159,7 +209,8 @@ def delete_recipe(row_id: int) -> bool:
 
 def update_recipe(row_id: int, **fields) -> dict | None:
     """Partial update of a saved recipe (title, servings, ingredients, steps,
-    favorite). Untouched fields keep their current sheet value."""
+    favorite, notes, cuisine, meal, time, tags). Untouched fields keep their
+    current sheet value."""
     current = get_recipe(row_id)
     if current is None:
         return None
@@ -175,6 +226,12 @@ def update_recipe(row_id: int, **fields) -> dict | None:
         "\n".join(f"{i}. {line}" for i, line in enumerate(steps, start=1)) if steps is not None else current["steps_text"]
     )
     favorite = fields.get("favorite", current["favorite"])
+    notes = fields.get("notes", current["notes"]) or ""
+    cuisine = _clean_cuisine(fields.get("cuisine", current["cuisine"]))
+    meal = _clean_meal(fields.get("meal", current["meal"]))
+    time = fields.get("time", current["time"]) or ""
+    tags_in = fields.get("tags")
+    tags = [_clean_tag(tag) for tag in tags_in if _clean_tag(tag)] if tags_in is not None else current["tags"]
 
     row = [
         title,
@@ -186,11 +243,12 @@ def update_recipe(row_id: int, **fields) -> dict | None:
         current["confidence"],
         current["thumbnail"],
         current["saved_at"],
-        current["cuisine"],
-        current["meal"],
-        current["time"] or "",
-        ", ".join(current["tags"]),
+        cuisine,
+        meal,
+        time,
+        ", ".join(tags),
         "TRUE" if favorite else "",
+        notes,
     ]
     _worksheet().update(f"A{row_id}:{LAST_COL_LETTER}{row_id}", [row], value_input_option="USER_ENTERED")
     logger.info("Updated row %s (%r)", row_id, title)
@@ -207,9 +265,39 @@ def update_recipe(row_id: int, **fields) -> dict | None:
         "pantry": pantry_items(ingredients_list),
         "steps": steps_list,
         "favorite": favorite,
+        "notes": notes,
+        "cuisine": cuisine,
+        "meal": meal,
+        "time": time or None,
+        "tags": tags,
         "ingredients_text": ingredients_text,
         "steps_text": steps_text,
     }
+
+
+def recategorize(row_id: int) -> dict | None:
+    """Re-runs the same Gemini categorization used at save time (see
+    app/extract.py's categorize_recipe) against the recipe's current
+    title/ingredients/steps/caption, and writes back cuisine/meal/time/tags.
+    A deliberate, manually-triggered action (each call is a real Gemini
+    request) for fixing a recipe Gemini filed as Uncategorized/Other."""
+    current = get_recipe(row_id)
+    if current is None:
+        return None
+    category = categorize_recipe(
+        title=current["title"],
+        ingredients=current["ingredients_text"],
+        steps=current["steps_text"],
+        caption=current["caption"],
+        servings=current["servings"] or "",
+    )
+    return update_recipe(
+        row_id,
+        cuisine=category.cuisine,
+        meal=category.meal,
+        time=category.time,
+        tags=category.tags,
+    )
 
 
 def list_recipes() -> list[dict]:
@@ -259,6 +347,7 @@ def _record_to_recipe(row_id: int, record: dict) -> dict:
         "time": str(record.get("Time") or "").strip() or None,
         "tags": [_clean_tag(tag) for tag in tags_raw.split(",") if _clean_tag(tag)],
         "favorite": str(record.get("Favorite") or "").strip().lower() in TRUE_VALUES,
+        "notes": str(record.get("Notes") or "").strip(),
         "ingredients_text": ingredients_text,
         "steps_text": steps_text,
     }

@@ -39,6 +39,7 @@ const state = {
   checkedItems: new Set(),
   openRecipeId: null,
   editingId: null,
+  addingRecipe: false,
 };
 
 const els = {
@@ -61,6 +62,7 @@ const els = {
   planContent: document.getElementById("plan-content"),
   planBadge: document.getElementById("plan-badge"),
   settingsBtn: document.getElementById("settings-btn"),
+  addRecipeBtn: document.getElementById("add-recipe-btn"),
   tabs: document.querySelectorAll(".tab"),
 };
 
@@ -90,6 +92,16 @@ async function load() {
 function authHeaders() {
   const secret = (localStorage.getItem(SECRET_KEY) || "").trim();
   return secret ? { "X-Recipe-Box-Key": secret } : {};
+}
+
+async function createRecipeRequest(draft) {
+  const response = await fetch("/api/recipes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(draft),
+  });
+  if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+  return response.json();
 }
 
 async function patchRecipe(id, patch) {
@@ -381,6 +393,23 @@ function closeFilters() {
   els.filtersBtn.setAttribute("aria-expanded", "false");
 }
 
+// The recipe drawer's "⋯" menu (Original post / Edit / Delete) — same
+// split as the iOS ellipsis menu, with Favorite kept as its own button.
+function toggleRecipeMenu() {
+  const menu = document.querySelector(".recipe-menu");
+  const btn = document.querySelector('[data-action="toggle-recipe-menu"]');
+  if (!menu || !btn) return;
+  menu.hidden = !menu.hidden;
+  btn.setAttribute("aria-expanded", String(!menu.hidden));
+}
+
+function closeRecipeMenu() {
+  const menu = document.querySelector(".recipe-menu");
+  const btn = document.querySelector('[data-action="toggle-recipe-menu"]');
+  if (menu) menu.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
 function pantryCatalog() {
   return unique(state.recipes.flatMap((recipe) => recipe.pantry || [])).filter(
     (item) => !STAPLES.has(item)
@@ -567,6 +596,14 @@ function openRecipe(id) {
   els.drawer.hidden = false;
 }
 
+function openAddRecipe() {
+  state.openRecipeId = null;
+  state.editingId = null;
+  state.addingRecipe = true;
+  els.detail.innerHTML = addRecipeFormHtml();
+  els.drawer.hidden = false;
+}
+
 function refreshOpenRecipe() {
   if (state.openRecipeId == null) return;
   const recipe = state.recipes.find((item) => item.id === state.openRecipeId);
@@ -601,8 +638,8 @@ function recipeHtml(recipe) {
   const steps = (recipe.steps || [])
     .map((item, index) => `<li><span class="step-num">${index + 1}</span><span>${escapeHtml(item)}</span></li>`)
     .join("");
-  const source = recipe.source
-    ? `<p><a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">Original post →</a></p>`
+  const originalPostItem = recipe.source
+    ? `<a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">Original post</a>`
     : "";
   const heroStyle = recipe.thumbnail ? ` style="background-image:url('${escapeAttr(recipe.thumbnail)}')"` : "";
   const heroLetter = recipe.thumbnail ? "" : `<div class="hero-letter">${escapeHtml((recipe.title || "?").slice(0, 1).toUpperCase())}</div>`;
@@ -618,8 +655,16 @@ function recipeHtml(recipe) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
           Favorite
         </button>
-        <button class="pill-btn edit" type="button" data-action="start-edit" data-id="${recipe.id}">Edit</button>
-        <button class="pill-btn delete" type="button" data-action="delete-recipe" data-id="${recipe.id}">Delete</button>
+        <div class="menu-anchor">
+          <button class="pill-btn menu-btn" type="button" data-action="toggle-recipe-menu" aria-haspopup="true" aria-expanded="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+          </button>
+          <div class="recipe-menu" hidden>
+            ${originalPostItem}
+            <button type="button" data-action="start-edit" data-id="${recipe.id}">Edit</button>
+            <button type="button" class="danger" data-action="delete-recipe" data-id="${recipe.id}">Delete</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="hero"${heroStyle}>
@@ -635,7 +680,6 @@ function recipeHtml(recipe) {
       <ul class="ingredients">${ingredients || "<li>None listed</li>"}</ul>
       <h3>Steps</h3>
       <ol class="steps">${steps || "<li>None listed</li>"}</ol>
-      ${source}
     </div>`;
 }
 
@@ -665,6 +709,115 @@ function editFormHtml(recipe) {
       <p id="edit-error" class="edit-error" hidden></p>
       <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">Save</button>
     </div>`;
+}
+
+function addRecipeFormHtml() {
+  const cuisines = unique(state.recipes.map((recipe) => recipe.cuisine));
+  const mealOptions = Object.entries(MEAL_LABELS)
+    .map(([value, label]) => `<option value="${escapeAttr(value)}"${value === "other" ? " selected" : ""}>${escapeHtml(label)}</option>`)
+    .join("");
+  const cuisineChips = cuisines
+    .map((cuisine) => `<button class="pill pill-btn-plain" type="button" data-action="pick-add-cuisine" data-cuisine="${escapeAttr(cuisine)}">${escapeHtml(cuisine)}</button>`)
+    .join("");
+
+  return `
+    <div class="drawer-actions">
+      <button class="icon-btn" type="button" data-action="close-drawer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        Cancel
+      </button>
+    </div>
+    <div class="recipe recipe-body">
+      <h2 style="margin-bottom:1.2rem;">Add recipe</h2>
+      <label class="field">
+        <span>Title</span>
+        <input id="add-title" placeholder="Title">
+      </label>
+      <label class="field">
+        <span>Servings</span>
+        <input id="add-servings" placeholder="e.g. 4">
+      </label>
+      <label class="field">
+        <span>Ingredients — one per line</span>
+        <textarea id="add-ingredients" rows="8"></textarea>
+      </label>
+      <label class="field">
+        <span>Steps — one per line</span>
+        <textarea id="add-steps" rows="10"></textarea>
+      </label>
+      <label class="field">
+        <span>Meal</span>
+        <select id="add-meal">${mealOptions}</select>
+      </label>
+      <label class="field">
+        <span>Cuisine</span>
+        <input id="add-cuisine" placeholder="e.g. Italian">
+      </label>
+      ${cuisineChips ? `<div class="chips" style="margin:-0.6rem 0 1.1rem;">${cuisineChips}</div>` : ""}
+      <label class="field">
+        <span>Time</span>
+        <input id="add-time" placeholder="e.g. 20 min">
+      </label>
+      <label class="field">
+        <span>Tags — comma separated</span>
+        <input id="add-tags" placeholder="quick, vegetarian">
+      </label>
+      <label class="field">
+        <span>Notes</span>
+        <textarea id="add-notes" rows="3"></textarea>
+      </label>
+      <p id="add-error" class="edit-error" hidden></p>
+      <button class="pill-btn primary" type="button" data-action="save-add-recipe">Save</button>
+    </div>`;
+}
+
+async function saveAddRecipe() {
+  const titleInput = document.getElementById("add-title");
+  const servingsInput = document.getElementById("add-servings");
+  const ingredientsInput = document.getElementById("add-ingredients");
+  const stepsInput = document.getElementById("add-steps");
+  const mealInput = document.getElementById("add-meal");
+  const cuisineInput = document.getElementById("add-cuisine");
+  const timeInput = document.getElementById("add-time");
+  const tagsInput = document.getElementById("add-tags");
+  const notesInput = document.getElementById("add-notes");
+  const errorEl = document.getElementById("add-error");
+  const saveBtn = document.querySelector('[data-action="save-add-recipe"]');
+
+  const title = titleInput.value.trim();
+  if (!title) {
+    errorEl.textContent = "Title can't be empty.";
+    errorEl.hidden = false;
+    return;
+  }
+
+  const draft = {
+    title,
+    servings: servingsInput.value.trim() || null,
+    ingredients: linesFrom(ingredientsInput.value),
+    steps: linesFrom(stepsInput.value),
+    meal: mealInput.value,
+    cuisine: cuisineInput.value.trim() || "Uncategorized",
+    time: timeInput.value.trim() || null,
+    tags: tagsInput.value.split(",").map((tag) => tag.trim()).filter(Boolean),
+    notes: notesInput.value.trim(),
+  };
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving…";
+  try {
+    const created = await createRecipeRequest(draft);
+    state.recipes.unshift(created);
+    state.addingRecipe = false;
+    closeDrawer();
+    renderFilters();
+    renderGrid();
+  } catch (err) {
+    errorEl.textContent = `Couldn't save: ${err.message}`;
+    errorEl.hidden = false;
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save";
+  }
 }
 
 async function toggleFavorite(id) {
@@ -769,6 +922,7 @@ function closeDrawer() {
   els.drawer.hidden = true;
   state.openRecipeId = null;
   state.editingId = null;
+  state.addingRecipe = false;
   if (location.hash.startsWith("#recipe/")) {
     history.replaceState(null, "", location.pathname);
   }
@@ -851,11 +1005,19 @@ document.addEventListener("click", (event) => {
   closeFilters();
 });
 
+document.addEventListener("click", (event) => {
+  const menu = document.querySelector(".recipe-menu");
+  if (!menu || menu.hidden) return;
+  if (menu.contains(event.target) || event.target.closest('[data-action="toggle-recipe-menu"]')) return;
+  closeRecipeMenu();
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !els.filtersPanel.hidden) closeFilters();
 });
 
 els.settingsBtn.addEventListener("click", openSettings);
+els.addRecipeBtn.addEventListener("click", openAddRecipe);
 
 els.tabs.forEach((btn) => {
   btn.addEventListener("click", () => setTab(btn.dataset.tab));
@@ -895,6 +1057,10 @@ document.addEventListener("click", (event) => {
       event.stopPropagation();
       togglePlan(id);
       break;
+    case "toggle-recipe-menu":
+      event.stopPropagation();
+      toggleRecipeMenu();
+      break;
     case "close-drawer":
       closeDrawer();
       break;
@@ -916,6 +1082,14 @@ document.addEventListener("click", (event) => {
     case "delete-recipe":
       deleteRecipe(id);
       break;
+    case "save-add-recipe":
+      saveAddRecipe();
+      break;
+    case "pick-add-cuisine": {
+      const input = document.getElementById("add-cuisine");
+      if (input) input.value = actionEl.dataset.cuisine;
+      break;
+    }
     case "clear-plan":
       state.checkedItems.clear();
       clearPlan();
