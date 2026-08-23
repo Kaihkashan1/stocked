@@ -27,12 +27,9 @@ struct GroceryListView: View {
                 Section("Planned") {
                     ForEach(planned) { recipe in
                         NavigationLink(value: recipe.id) {
-                            HStack(spacing: 12) {
-                                RecipeThumb(recipe: recipe, size: 40)
-                                Text(recipe.title)
-                                    .font(Theme.display(15.5, weight: .semibold))
-                                    .foregroundStyle(Theme.ink)
-                            }
+                            Text(recipe.title)
+                                .font(Theme.display(15.5, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {

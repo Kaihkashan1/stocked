@@ -316,35 +316,15 @@ button { font-family: inherit; }
   cursor: pointer;
   padding: 0;
   font: inherit;
+  position: relative;
 }
 
 .card:hover { border-color: var(--accent); }
 
-.thumb {
-  height: 150px;
-  background: var(--surface-2);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  position: relative;
-}
-
-.thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.thumb-letter {
-  font-family: "Fraunces", serif;
-  font-size: 2.4rem;
-  color: var(--accent);
-}
-
 .card-actions {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 10px;
+  right: 10px;
   display: flex;
   gap: 6px;
 }
@@ -353,8 +333,8 @@ button { font-family: inherit; }
   width: 30px;
   height: 30px;
   border-radius: 999px;
-  border: none;
-  background: rgba(248, 249, 243, 0.92);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
   color: var(--ink-soft);
   display: flex;
   align-items: center;
@@ -366,12 +346,13 @@ button { font-family: inherit; }
 .card-icon-btn.favorite.active svg { fill: currentColor; }
 .card-icon-btn.plan.active { color: var(--accent); }
 
-.card-body { padding: 0.95rem 1rem 1.1rem; }
+.card-body { padding: 1rem 1rem 1.1rem; }
 
 .card-body h2 {
   font-size: 1.05rem;
   line-height: 1.25;
   margin-bottom: 0.5rem;
+  padding-right: 4.6rem;
 }
 
 .meta {
@@ -530,42 +511,13 @@ button { font-family: inherit; }
 
 .recipe-menu button.danger { color: var(--danger); }
 
-.hero {
-  height: 230px;
-  background-size: cover;
-  background-position: center;
-  position: relative;
-  background-color: var(--surface-2);
+.hero-plain {
+  padding: 1.8rem 1.4rem 1.2rem;
+  border-bottom: 1px solid var(--line);
 }
 
-.hero::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(20, 15, 8, 0) 40%, rgba(16, 12, 7, 0.72) 100%);
-}
-
-.hero-letter {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: "Fraunces", serif;
-  font-size: 4rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.hero-text {
-  position: absolute;
-  left: 1.4rem;
-  right: 1.4rem;
-  bottom: 1.1rem;
-  z-index: 1;
-}
-
-.hero-text .eyebrow { color: var(--warm-soft); margin-bottom: 0.4rem; }
-.hero-text h2 { color: #fff; font-size: 1.9rem; line-height: 1.15; margin: 0; }
+.hero-plain .eyebrow { color: var(--ink-soft); margin-bottom: 0.4rem; }
+.hero-plain h2 { color: var(--ink); font-size: 1.9rem; line-height: 1.15; margin: 0; }
 
 .recipe-body { padding: 1.6rem 1.4rem 3rem; }
 
@@ -690,20 +642,6 @@ ol.steps li {
   padding: 0.6rem 0.9rem;
   box-shadow: var(--shadow);
 }
-
-.plan-thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: var(--surface-2);
-  flex-shrink: 0;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.plan-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
 .plan-title {
   flex: 1;

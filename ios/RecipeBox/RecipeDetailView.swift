@@ -164,29 +164,18 @@ struct RecipeDetailView: View {
     }
 
     private func hero(for recipe: Recipe) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            RecipeHeroImage(recipe: recipe)
-                .frame(height: 260)
-                .frame(maxWidth: .infinity)
-                .clipped()
-
-            LinearGradient(
-                colors: [.clear, Color.black.opacity(0.7)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(metaLine(for: recipe).uppercased())
-                    .font(Theme.mono(11))
-                    .tracking(0.5)
-                    .foregroundStyle(Theme.warmSoft)
-                Text(recipe.title)
-                    .font(Theme.display(26, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-            .padding(18)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(metaLine(for: recipe).uppercased())
+                .font(Theme.mono(11))
+                .tracking(0.5)
+                .foregroundStyle(Theme.inkSoft)
+            Text(recipe.title)
+                .font(Theme.display(28, weight: .bold))
+                .foregroundStyle(Theme.ink)
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface)
     }
 
     private func metaLine(for recipe: Recipe) -> String {
@@ -200,7 +189,7 @@ struct RecipeDetailView: View {
         FlowLayout(spacing: 8) {
             ForEach(recipe.tags, id: \.self) { tag in
                 Button {
-                    store.query = tag
+                    store.tagFilter = tag
                     dismiss()
                 } label: {
                     Text(tag)
@@ -327,36 +316,6 @@ struct RecipeDetailView: View {
         Text(title)
             .font(Theme.display(19, weight: .semibold))
             .foregroundStyle(Theme.ink)
-    }
-}
-
-/// Full-width hero treatment: the recipe photo if there is one, otherwise a
-/// warm gradient with the recipe's first letter — always "real" imagery,
-/// never a tiny floating square.
-struct RecipeHeroImage: View {
-    let recipe: Recipe
-    @State private var image: UIImage?
-
-    var body: some View {
-        ZStack {
-            LinearGradient(colors: [Theme.accent, Theme.ink], startPoint: .topLeading, endPoint: .bottomTrailing)
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Text(String(recipe.title.prefix(1)).uppercased())
-                    .font(Theme.display(72, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.82))
-            }
-        }
-        .task(id: recipe.thumbnail) {
-            guard let url = recipe.thumbnailURL else {
-                image = nil
-                return
-            }
-            image = await ThumbnailCache.shared.image(for: url, maxPixel: 800)
-        }
     }
 }
 

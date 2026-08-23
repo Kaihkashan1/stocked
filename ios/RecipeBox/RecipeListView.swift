@@ -17,7 +17,7 @@ struct RecipeListView: View {
     ]
 
     private var activeFilterCount: Int {
-        [store.mealFilter != "all", store.cuisineFilter != "all", store.favoritesOnly]
+        [store.mealFilter != "all", store.cuisineFilter != "all", store.tagFilter != "all", store.favoritesOnly]
             .filter { $0 }
             .count
     }
@@ -185,6 +185,15 @@ struct FiltersSheet: View {
                     }
                 }
 
+                if !store.tags.isEmpty {
+                    Section("Tag") {
+                        FilterRow(
+                            options: [("all", "All tags")] + store.tags.map { ($0, $0) },
+                            selection: $store.tagFilter
+                        )
+                    }
+                }
+
                 Section {
                     Picker("Sort", selection: $store.sortOption) {
                         ForEach(SortOption.allCases, id: \.self) { option in
@@ -207,6 +216,7 @@ struct FiltersSheet: View {
                     Button("Reset") {
                         store.mealFilter = "all"
                         store.cuisineFilter = "all"
+                        store.tagFilter = "all"
                         store.favoritesOnly = false
                         store.sortOption = .recent
                     }
@@ -335,26 +345,23 @@ struct RecipeRow: View, Equatable {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            RecipeThumb(recipe: recipe, size: 72)
-            VStack(alignment: .leading, spacing: 7) {
-                Text(recipe.title)
-                    .font(Theme.display(17, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(2)
-                HStack(spacing: 6) {
-                    if let match {
-                        pill(match.label, background: Theme.accent, foreground: .white)
-                    } else {
-                        pill(recipe.cuisine, background: Theme.accentSoft, foreground: Theme.accent)
-                    }
-                    if match == nil, recipe.meal != "other" {
-                        pill(recipe.mealLabel, background: Theme.warmSoft, foreground: Theme.warm)
-                    }
+        VStack(alignment: .leading, spacing: 7) {
+            Text(recipe.title)
+                .font(Theme.display(17, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(2)
+            HStack(spacing: 6) {
+                if let match {
+                    pill(match.label, background: Theme.accent, foreground: .white)
+                } else {
+                    pill(recipe.cuisine, background: Theme.accentSoft, foreground: Theme.accent)
+                }
+                if match == nil, recipe.meal != "other" {
+                    pill(recipe.mealLabel, background: Theme.warmSoft, foreground: Theme.warm)
                 }
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
 
     private func pill(_ text: String, background: Color, foreground: Color) -> some View {
@@ -369,36 +376,3 @@ struct RecipeRow: View, Equatable {
     }
 }
 
-struct RecipeThumb: View {
-    let recipe: Recipe
-    var size: CGFloat = 56
-    @State private var image: UIImage?
-
-    var body: some View {
-        ZStack {
-            LinearGradient(colors: [Theme.accent, Theme.ink], startPoint: .topLeading, endPoint: .bottomTrailing)
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                letter
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .task(id: recipe.thumbnail) {
-            guard let url = recipe.thumbnailURL else {
-                image = nil
-                return
-            }
-            image = await ThumbnailCache.shared.image(for: url, maxPixel: size * 3)
-        }
-    }
-
-    private var letter: some View {
-        Text(String(recipe.title.prefix(1)).uppercased())
-            .font(Theme.display(size * 0.4, weight: .bold))
-            .foregroundStyle(.white.opacity(0.85))
-    }
-}

@@ -11,6 +11,13 @@ final class RecipeStore: ObservableObject {
     @Published var cuisineFilter = "all" {
         didSet { if oldValue != cuisineFilter { updateVisible() } }
     }
+    /// Tags cover cooking method/appliance (air-fryer, one-pot, ...) as well
+    /// as diet/flavor — whatever Gemini tagged the recipe with — so this is
+    /// the one filter dimension that covers something like "Air Fryer"
+    /// without a hardcoded category list.
+    @Published var tagFilter = "all" {
+        didSet { if oldValue != tagFilter { updateVisible() } }
+    }
     @Published var query = "" {
         didSet { if oldValue != query { updateVisible() } }
     }
@@ -38,6 +45,7 @@ final class RecipeStore: ObservableObject {
     @Published private(set) var visibleRecipes: [Recipe] = []
     @Published private(set) var matchesByID: [Int: RecipeMatch] = [:]
     @Published private(set) var cuisines: [String] = []
+    @Published private(set) var tags: [String] = []
     @Published private(set) var selectedPantryGroups: [PantryGroup] = []
     @Published private(set) var visiblePantryGroups: [PantryGroup] = []
     @Published private(set) var haveSet: Set<String> = []
@@ -271,7 +279,6 @@ final class RecipeStore: ObservableObject {
             apply(recipes: payload.recipes, pantry: payload.pantry)
             errorMessage = nil
             persistCache()
-            prefetchThumbnails()
             await syncPlanFromServer()
             return true
         } catch {
@@ -301,6 +308,7 @@ final class RecipeStore: ObservableObject {
             if favoritesOnly, !recipe.favorite { return false }
             if mealFilter != "all", recipe.meal != mealFilter { return false }
             if cuisineFilter != "all", recipe.cuisine != cuisineFilter { return false }
+            if tagFilter != "all", !recipe.tags.contains(tagFilter) { return false }
             if needle.isEmpty { return true }
             return recipe.searchBlob.contains(needle)
         }
@@ -356,6 +364,7 @@ final class RecipeStore: ObservableObject {
 
     private func updateDerived() {
         cuisines = Array(Set(recipes.map(\.cuisine).filter { !$0.isEmpty })).sorted()
+        tags = Array(Set(recipes.flatMap(\.tags))).sorted()
         updateVisible()
     }
 
@@ -367,15 +376,6 @@ final class RecipeStore: ObservableObject {
             )
         ).sorted()
         return items.isEmpty ? [] : [PantryGroup(category: "Ingredients", items: items)]
-    }
-
-    private func prefetchThumbnails() {
-        let urls = recipes.prefix(30).compactMap(\.thumbnailURL)
-        Task.detached(priority: .utility) {
-            for url in urls {
-                _ = await ThumbnailCache.shared.image(for: url, maxPixel: 168)
-            }
-        }
     }
 
     private func cacheURL() -> URL? {
