@@ -13,9 +13,18 @@ from fastapi.staticfiles import StaticFiles
 from app.auth import require_secret
 from app.config import ROOT, settings
 from app.match import STAPLES, grouped_pantry
-from app.models import PlanUpdate, RecipeUpdate
+from app.models import PlanUpdate, RecipeCreate, RecipeUpdate
 from app.pipeline import jobs, process_recipe
-from app.store import delete_recipe, get_plan_ids, get_recipe, list_recipes, save_plan_ids, update_recipe
+from app.store import (
+    create_recipe,
+    delete_recipe,
+    get_plan_ids,
+    get_recipe,
+    list_recipes,
+    recategorize,
+    save_plan_ids,
+    update_recipe,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -84,6 +93,14 @@ async def api_get_recipe(row_id: int):
     return _public(recipe)
 
 
+@app.post("/api/recipes", dependencies=[Depends(require_secret)])
+async def api_create_recipe(body: RecipeCreate):
+    created = create_recipe(**body.model_dump())
+    if not created:
+        raise HTTPException(status_code=500, detail="Could not save recipe")
+    return _public(created)
+
+
 @app.patch("/api/recipes/{row_id}", dependencies=[Depends(require_secret)])
 async def api_update_recipe(row_id: int, body: RecipeUpdate):
     if not get_recipe(row_id):
@@ -99,6 +116,16 @@ async def api_delete_recipe(row_id: int):
     if not delete_recipe(row_id):
         raise HTTPException(status_code=404, detail="Recipe not found")
     return {"status": "deleted", "id": row_id}
+
+
+@app.post("/api/recipes/{row_id}/recategorize", dependencies=[Depends(require_secret)])
+async def api_recategorize_recipe(row_id: int):
+    if not get_recipe(row_id):
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    updated = recategorize(row_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return _public(updated)
 
 
 @app.get("/api/plan")

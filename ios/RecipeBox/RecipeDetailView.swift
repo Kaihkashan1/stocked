@@ -10,6 +10,8 @@ struct RecipeDetailView: View {
     @State private var deleteError: String?
     @State private var showCookMode = false
     @State private var scale: Double = 1.0
+    @State private var recategorizing = false
+    @State private var recategorizeError: String?
 
     private var recipe: Recipe? { store.recipe(id: id) }
 
@@ -51,11 +53,18 @@ struct RecipeDetailView: View {
                             Link("Original post", destination: url)
                         }
                         Button("Edit") { showEdit = true }
+                        Button("Recategorize") {
+                            Task { await recategorize(recipe) }
+                        }
                         Button("Delete", role: .destructive) { showDeleteConfirm = true }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        if recategorizing {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "ellipsis.circle")
+                        }
                     }
-                    .disabled(deleting)
+                    .disabled(deleting || recategorizing)
                 }
             }
         }
@@ -96,6 +105,18 @@ struct RecipeDetailView: View {
         } message: { message in
             Text(message)
         }
+        .alert(
+            "Couldn't recategorize",
+            isPresented: Binding(
+                get: { recategorizeError != nil },
+                set: { shown in if !shown { recategorizeError = nil } }
+            ),
+            presenting: recategorizeError
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { message in
+            Text(message)
+        }
     }
 
     private func delete(_ recipe: Recipe) async {
@@ -105,6 +126,14 @@ struct RecipeDetailView: View {
             deleteError = error
         } else {
             dismiss()
+        }
+    }
+
+    private func recategorize(_ recipe: Recipe) async {
+        recategorizing = true
+        defer { recategorizing = false }
+        if let error = await store.recategorizeRecipe(recipe) {
+            recategorizeError = error
         }
     }
 
@@ -124,6 +153,9 @@ struct RecipeDetailView: View {
                     }
                     if !recipe.steps.isEmpty {
                         stepsSection(for: recipe)
+                    }
+                    if !recipe.notes.isEmpty {
+                        notesSection(for: recipe)
                     }
                 }
                 .padding(20)
@@ -275,6 +307,19 @@ struct RecipeDetailView: View {
                         .foregroundStyle(Theme.ink)
                 }
             }
+        }
+    }
+
+    private func notesSection(for recipe: Recipe) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeading("Notes")
+            Text(recipe.notes)
+                .font(.body)
+                .foregroundStyle(Theme.ink)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.warmSoft.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 

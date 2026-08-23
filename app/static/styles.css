@@ -658,7 +658,7 @@ ol.steps li {
   color: var(--ink-soft);
 }
 
-.field input, .field textarea {
+.field input, .field textarea, .field select {
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--ink);

@@ -23,6 +23,21 @@ class Recipe(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class RecipeCreate(BaseModel):
+    """A recipe typed in by hand from the app — skips capture/Gemini
+    entirely, so every field is supplied by the user up front."""
+
+    title: str
+    servings: str | None = None
+    ingredients: list[str] = Field(default_factory=list)
+    steps: list[str] = Field(default_factory=list)
+    cuisine: str = "Uncategorized"
+    meal: Meal = "other"
+    time: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    notes: str = ""
+
+
 class RecipeUpdate(BaseModel):
     """Partial edit from the app. Unset fields are left alone in the sheet."""
 
@@ -31,6 +46,7 @@ class RecipeUpdate(BaseModel):
     ingredients: list[str] | None = None
     steps: list[str] | None = None
     favorite: bool | None = None
+    notes: str | None = None
 
 
 class PlanUpdate(BaseModel):

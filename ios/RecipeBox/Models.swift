@@ -39,6 +39,7 @@ struct Recipe: Codable, Identifiable, Hashable {
     let tags: [String]
     let pantry: [String]
     let favorite: Bool
+    let notes: String
     /// Lowercased blob used for search so we do not rebuild it on every keystroke.
     let searchBlob: String
 
@@ -51,7 +52,7 @@ struct Recipe: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, servings, ingredients, steps, source, caption, confidence, thumbnail, cuisine, meal, time, tags, pantry, favorite
+        case id, title, servings, ingredients, steps, source, caption, confidence, thumbnail, cuisine, meal, time, tags, pantry, favorite, notes
         case savedAt = "saved_at"
     }
 
@@ -61,7 +62,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         id: Int, title: String, servings: String?, ingredients: [String], steps: [String],
         source: String, caption: String, confidence: String, thumbnail: String, savedAt: String?,
         cuisine: String, meal: String, time: String?, tags: [String], pantry: [String],
-        favorite: Bool, searchBlob: String
+        favorite: Bool, notes: String, searchBlob: String
     ) {
         self.id = id
         self.title = title
@@ -79,6 +80,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         self.tags = tags
         self.pantry = pantry
         self.favorite = favorite
+        self.notes = notes
         self.searchBlob = searchBlob
     }
 
@@ -87,7 +89,7 @@ struct Recipe: Codable, Identifiable, Hashable {
             id: id, title: title, servings: servings, ingredients: ingredients, steps: steps,
             source: source, caption: caption, confidence: confidence, thumbnail: thumbnail,
             savedAt: savedAt, cuisine: cuisine, meal: meal, time: time, tags: tags, pantry: pantry,
-            favorite: value, searchBlob: searchBlob
+            favorite: value, notes: notes, searchBlob: searchBlob
         )
     }
 
@@ -109,6 +111,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         pantry = collapsePantryItems(try container.decodeIfPresent([String].self, forKey: .pantry) ?? [])
         favorite = try container.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
+        notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
         searchBlob = ([title, cuisine, meal] + tags + ingredients).joined(separator: " ").lowercased()
     }
 
@@ -130,6 +133,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         try container.encode(tags, forKey: .tags)
         try container.encode(pantry, forKey: .pantry)
         try container.encode(favorite, forKey: .favorite)
+        try container.encode(notes, forKey: .notes)
     }
 
     var mealLabel: String {
@@ -162,6 +166,22 @@ struct RecipePatch: Encodable {
     var ingredients: [String]?
     var steps: [String]?
     var favorite: Bool?
+    var notes: String?
+}
+
+/// A recipe typed straight into the app, sent to POST /api/recipes.
+/// Unlike RecipePatch every field is required — there's no existing row
+/// to fall back on.
+struct RecipeCreate: Encodable {
+    var title: String
+    var servings: String?
+    var ingredients: [String]
+    var steps: [String]
+    var cuisine: String
+    var meal: String
+    var time: String?
+    var tags: [String]
+    var notes: String
 }
 
 /// A recipebox:// deep link, e.g. from a Shortcuts action.
@@ -386,4 +406,17 @@ func matchRecipe(_ recipe: Recipe, have: [String]) -> RecipeMatch? {
     let extra = core.filter { item in !have.contains(where: { namesMatch(item, $0) }) }
     let total = max(core.count, 1)
     return RecipeMatch(score: Double(have.count) / Double(total), extraCount: extra.count)
+}
+
+/// The reverse question from matchRecipe: "could I make this with only what's
+/// in `available`?" (every non-staple ingredient the recipe needs must be
+/// covered), rather than "does this recipe use everything I've flagged as
+/// having?" Used for the Plan tab's "you could also make" bonus discovery,
+/// where `available` is "what I have" plus every ingredient already on the
+/// shopping list for planned recipes.
+func isFullyCovered(_ recipe: Recipe, by available: Set<String>) -> Bool {
+    guard !available.isEmpty else { return false }
+    let core = recipe.pantry.filter { !staples.contains($0) }
+    guard !core.isEmpty else { return false }
+    return core.allSatisfy { item in available.contains(where: { namesMatch(item, $0) }) }
 }

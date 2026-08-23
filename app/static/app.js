@@ -39,6 +39,7 @@ const state = {
   checkedItems: new Set(),
   openRecipeId: null,
   editingId: null,
+  addingRecipe: false,
 };
 
 const els = {
@@ -61,6 +62,7 @@ const els = {
   planContent: document.getElementById("plan-content"),
   planBadge: document.getElementById("plan-badge"),
   settingsBtn: document.getElementById("settings-btn"),
+  addRecipeBtn: document.getElementById("add-recipe-btn"),
   tabs: document.querySelectorAll(".tab"),
 };
 
@@ -90,6 +92,16 @@ async function load() {
 function authHeaders() {
   const secret = (localStorage.getItem(SECRET_KEY) || "").trim();
   return secret ? { "X-Recipe-Box-Key": secret } : {};
+}
+
+async function createRecipeRequest(draft) {
+  const response = await fetch("/api/recipes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(draft),
+  });
+  if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+  return response.json();
 }
 
 async function patchRecipe(id, patch) {
@@ -584,6 +596,14 @@ function openRecipe(id) {
   els.drawer.hidden = false;
 }
 
+function openAddRecipe() {
+  state.openRecipeId = null;
+  state.editingId = null;
+  state.addingRecipe = true;
+  els.detail.innerHTML = addRecipeFormHtml();
+  els.drawer.hidden = false;
+}
+
 function refreshOpenRecipe() {
   if (state.openRecipeId == null) return;
   const recipe = state.recipes.find((item) => item.id === state.openRecipeId);
@@ -691,6 +711,115 @@ function editFormHtml(recipe) {
     </div>`;
 }
 
+function addRecipeFormHtml() {
+  const cuisines = unique(state.recipes.map((recipe) => recipe.cuisine));
+  const mealOptions = Object.entries(MEAL_LABELS)
+    .map(([value, label]) => `<option value="${escapeAttr(value)}"${value === "other" ? " selected" : ""}>${escapeHtml(label)}</option>`)
+    .join("");
+  const cuisineChips = cuisines
+    .map((cuisine) => `<button class="pill pill-btn-plain" type="button" data-action="pick-add-cuisine" data-cuisine="${escapeAttr(cuisine)}">${escapeHtml(cuisine)}</button>`)
+    .join("");
+
+  return `
+    <div class="drawer-actions">
+      <button class="icon-btn" type="button" data-action="close-drawer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        Cancel
+      </button>
+    </div>
+    <div class="recipe recipe-body">
+      <h2 style="margin-bottom:1.2rem;">Add recipe</h2>
+      <label class="field">
+        <span>Title</span>
+        <input id="add-title" placeholder="Title">
+      </label>
+      <label class="field">
+        <span>Servings</span>
+        <input id="add-servings" placeholder="e.g. 4">
+      </label>
+      <label class="field">
+        <span>Ingredients — one per line</span>
+        <textarea id="add-ingredients" rows="8"></textarea>
+      </label>
+      <label class="field">
+        <span>Steps — one per line</span>
+        <textarea id="add-steps" rows="10"></textarea>
+      </label>
+      <label class="field">
+        <span>Meal</span>
+        <select id="add-meal">${mealOptions}</select>
+      </label>
+      <label class="field">
+        <span>Cuisine</span>
+        <input id="add-cuisine" placeholder="e.g. Italian">
+      </label>
+      ${cuisineChips ? `<div class="chips" style="margin:-0.6rem 0 1.1rem;">${cuisineChips}</div>` : ""}
+      <label class="field">
+        <span>Time</span>
+        <input id="add-time" placeholder="e.g. 20 min">
+      </label>
+      <label class="field">
+        <span>Tags — comma separated</span>
+        <input id="add-tags" placeholder="quick, vegetarian">
+      </label>
+      <label class="field">
+        <span>Notes</span>
+        <textarea id="add-notes" rows="3"></textarea>
+      </label>
+      <p id="add-error" class="edit-error" hidden></p>
+      <button class="pill-btn primary" type="button" data-action="save-add-recipe">Save</button>
+    </div>`;
+}
+
+async function saveAddRecipe() {
+  const titleInput = document.getElementById("add-title");
+  const servingsInput = document.getElementById("add-servings");
+  const ingredientsInput = document.getElementById("add-ingredients");
+  const stepsInput = document.getElementById("add-steps");
+  const mealInput = document.getElementById("add-meal");
+  const cuisineInput = document.getElementById("add-cuisine");
+  const timeInput = document.getElementById("add-time");
+  const tagsInput = document.getElementById("add-tags");
+  const notesInput = document.getElementById("add-notes");
+  const errorEl = document.getElementById("add-error");
+  const saveBtn = document.querySelector('[data-action="save-add-recipe"]');
+
+  const title = titleInput.value.trim();
+  if (!title) {
+    errorEl.textContent = "Title can't be empty.";
+    errorEl.hidden = false;
+    return;
+  }
+
+  const draft = {
+    title,
+    servings: servingsInput.value.trim() || null,
+    ingredients: linesFrom(ingredientsInput.value),
+    steps: linesFrom(stepsInput.value),
+    meal: mealInput.value,
+    cuisine: cuisineInput.value.trim() || "Uncategorized",
+    time: timeInput.value.trim() || null,
+    tags: tagsInput.value.split(",").map((tag) => tag.trim()).filter(Boolean),
+    notes: notesInput.value.trim(),
+  };
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving…";
+  try {
+    const created = await createRecipeRequest(draft);
+    state.recipes.unshift(created);
+    state.addingRecipe = false;
+    closeDrawer();
+    renderFilters();
+    renderGrid();
+  } catch (err) {
+    errorEl.textContent = `Couldn't save: ${err.message}`;
+    errorEl.hidden = false;
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save";
+  }
+}
+
 async function toggleFavorite(id) {
   id = Number(id);
   const recipe = state.recipes.find((item) => item.id === id);
@@ -793,6 +922,7 @@ function closeDrawer() {
   els.drawer.hidden = true;
   state.openRecipeId = null;
   state.editingId = null;
+  state.addingRecipe = false;
   if (location.hash.startsWith("#recipe/")) {
     history.replaceState(null, "", location.pathname);
   }
@@ -887,6 +1017,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 els.settingsBtn.addEventListener("click", openSettings);
+els.addRecipeBtn.addEventListener("click", openAddRecipe);
 
 els.tabs.forEach((btn) => {
   btn.addEventListener("click", () => setTab(btn.dataset.tab));
@@ -951,6 +1082,14 @@ document.addEventListener("click", (event) => {
     case "delete-recipe":
       deleteRecipe(id);
       break;
+    case "save-add-recipe":
+      saveAddRecipe();
+      break;
+    case "pick-add-cuisine": {
+      const input = document.getElementById("add-cuisine");
+      if (input) input.value = actionEl.dataset.cuisine;
+      break;
+    }
     case "clear-plan":
       state.checkedItems.clear();
       clearPlan();

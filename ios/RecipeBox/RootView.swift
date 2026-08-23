@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var store: RecipeStore
     @State private var showSettings = false
+    @State private var showAddRecipe = false
     @State private var selectedTab = 0
     @State private var recipesPath = NavigationPath()
 
@@ -11,6 +12,7 @@ struct RootView: View {
             NavigationStack(path: $recipesPath) {
                 RecipeListView()
                     .navigationTitle("Recipe Box")
+                    .toolbar { addButton }
                     .toolbar { settingsButton }
             }
             .tabItem { Label("Recipes", systemImage: "book.closed") }
@@ -30,9 +32,24 @@ struct RootView: View {
             SettingsView()
                 .environmentObject(store)
         }
+        .sheet(isPresented: $showAddRecipe) {
+            AddRecipeView()
+                .environmentObject(store)
+        }
         .task { await store.refresh() }
         .onChange(of: store.pendingRoute) { _, route in
             handle(route)
+        }
+    }
+
+    private var addButton: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                showAddRecipe = true
+            } label: {
+                Image(systemName: "plus")
+            }
+            .accessibilityLabel("Add recipe")
         }
     }
 

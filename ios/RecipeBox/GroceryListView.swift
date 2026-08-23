@@ -44,6 +44,13 @@ struct GroceryListView: View {
                     }
                 }
 
+                if omittedHaveCount > 0 {
+                    Text("Grocery list · \(omittedHaveCount) item\(omittedHaveCount == 1 ? "" : "s") skipped because you already have \(omittedHaveCount == 1 ? "it" : "them")")
+                        .font(Theme.mono(11, weight: .semibold))
+                        .foregroundStyle(Theme.inkSoft)
+                        .listRowSeparator(.hidden)
+                }
+
                 ForEach(groupedIngredients, id: \.key) { group in
                     Section(group.key.capitalized) {
                         ForEach(group.lines, id: \.self) { line in
@@ -68,6 +75,21 @@ struct GroceryListView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                    }
+                }
+
+                if !alsoMakeable.isEmpty {
+                    Section {
+                        ForEach(alsoMakeable) { recipe in
+                            NavigationLink(value: recipe.id) {
+                                Text(recipe.title)
+                                    .font(Theme.display(15, weight: .semibold))
+                            }
+                        }
+                    } header: {
+                        Text("You could also make")
+                    } footer: {
+                        Text("Fully covered by what you have plus everything on this shopping list.")
                     }
                 }
 
@@ -102,18 +124,49 @@ struct GroceryListView: View {
     /// the recipe's already-canonicalized pantry names (server-computed —
     /// see app/match.py) the line mentions, so "2 cups basmati rice" and
     /// "1 cup rice" both land under "rice" without re-parsing quantities.
+    /// Skips anything already in "what I have" — this is a shopping list,
+    /// not a full ingredient list.
     private var groupedIngredients: [(key: String, lines: [String])] {
         var buckets: [String: [String]] = [:]
         var seenLines: Set<String> = []
         for recipe in planned {
             for line in recipe.ingredients {
                 guard seenLines.insert(line).inserted else { continue }
-                buckets[canonicalKey(for: line, pantry: recipe.pantry), default: []].append(line)
+                let key = canonicalKey(for: line, pantry: recipe.pantry)
+                guard !store.haveSet.contains(where: { namesMatch($0, key) }) else { continue }
+                buckets[key, default: []].append(line)
             }
         }
         return buckets
             .map { (key: $0.key, lines: $0.value.sorted()) }
             .sorted { $0.key < $1.key }
+    }
+
+    /// How many distinct ingredient lines were left off the list above
+    /// because they matched something in "what I have".
+    private var omittedHaveCount: Int {
+        var seenLines: Set<String> = []
+        var count = 0
+        for recipe in planned {
+            for line in recipe.ingredients {
+                guard seenLines.insert(line).inserted else { continue }
+                let key = canonicalKey(for: line, pantry: recipe.pantry)
+                if store.haveSet.contains(where: { namesMatch($0, key) }) { count += 1 }
+            }
+        }
+        return count
+    }
+
+    /// Recipes outside the plan that would become fully makeable once you've
+    /// done this shopping — "what I have" plus every ingredient already
+    /// needed for the planned recipes.
+    private var alsoMakeable: [Recipe] {
+        let plannedIDs = Set(planned.map(\.id))
+        guard !plannedIDs.isEmpty else { return [] }
+        let expanded = store.haveSet.union(planned.flatMap(\.pantry))
+        return store.recipes
+            .filter { !plannedIDs.contains($0.id) && isFullyCovered($0, by: expanded) }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 
     private func canonicalKey(for line: String, pantry: [String]) -> String {
