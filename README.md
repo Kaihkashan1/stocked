@@ -1,11 +1,11 @@
 # Recipe Box
 
-Share an Instagram reel from your iPhone. The hosted backend downloads it, asks Gemini to extract the recipe, and appends a row to a Google Sheet. Browse the collection in the iPhone app, at the Vercel URL, or in the Sheets app.
+Share a recipe reel, video, or blog link from your iPhone. The hosted backend fetches it, asks Gemini to extract the recipe, and appends a row to a Google Sheet. Browse the collection in the iPhone app, at the Vercel URL, or in the Sheets app.
 
-This is the free-tier MVP: Instagram only, Google Sheets storage, Vercel in production (optional local Mac for development). Browse at `https://kaihkashan-recipe-box.vercel.app/`, locally at `http://127.0.0.1:8000/`, or in the personal iPhone app in `ios/`. Photos and blog links can come later.
+This is the free-tier MVP: Google Sheets storage, Vercel in production (optional local Mac for development). Browse at `https://kaihkashan-recipe-box.vercel.app/`, locally at `http://127.0.0.1:8000/`, or in the personal iPhone app in `ios/`.
 
 ```
-iPhone Share → POST /ingest → yt-dlp → Gemini → Google Sheets
+iPhone Share → POST /ingest → yt-dlp (or a plain page fetch) → Gemini → Google Sheets
 ```
 
 ## 1. Install the app
@@ -121,10 +121,18 @@ On the iPhone:
      - `X-Recipe-Box-Key` = the same value as `RECIPE_BOX_SECRET`
    - Request Body: JSON
    - Add a field `content` whose value is **Shortcut Input**
-4. Add **Show Notification**. Body: **Contents of URL** (the JSON response). You want to see `"status":"saved"` (or `"duplicate"` if that reel is already in the sheet).
-5. In Instagram: Reel → Share → **More** → enable **Save Recipe**.
+4. Add **Get Dictionary Value**. Key: `status`. Dictionary: **Contents of URL**.
+5. Add **If**. Input: **Dictionary Value**. Condition: **is** `error`.
+   - Inside the If, add **Show Notification**.
+     - Title: `Recipe Box`
+     - Body: **Get Dictionary Value**, key `error`, dictionary **Contents of URL**
+   - Leave **Otherwise** empty so a successful save (or duplicate) is silent.
+6. Tap **i** on the shortcut and turn **off Show When Run**.
+7. In Instagram: Reel → Share → **More** → enable **Save Recipe**.
 
-On Vercel the Shortcut waits until the recipe is saved (up to 60 seconds). If a long reel times out, you can still fall back to a local Mac ingest URL.
+If this shortcut already exists, delete the old always-on **Show Notification**, then add the If above.
+
+On Vercel the Shortcut waits until the recipe is saved (up to 60 seconds). A timeout still counts as an error. You can fall back to a local Mac ingest URL if that happens.
 
 Test without the phone, from the Mac:
 
@@ -167,15 +175,15 @@ The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in 
 
 4. Redeploy after saving env vars. Production is [https://kaihkashan-recipe-box.vercel.app/](https://kaihkashan-recipe-box.vercel.app/).
 
-Browsing the box works well on Vercel. Instagram ingest has a **60 second** function limit, so long reels may time out in the cloud. If that happens, you can temporarily point the Shortcut at a local Mac ingest URL.
+Browsing the box works well on Vercel. Ingest has a **60 second** function limit, so long videos may time out in the cloud. If that happens, you can temporarily point the Shortcut at a local Mac ingest URL.
 
 ## Notes
 
 - **The app.** Production is `https://kaihkashan-recipe-box.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install the personal iOS app — see [`ios/README.md`](ios/README.md). Google Sheets remains the database.
-- **Duplicates.** The same reel URL is not written twice.
+- **Duplicates.** The same source URL is not written twice.
 - **Rate limits.** Gemini 429s are retried with backoff.
-- **Instagram.** `yt-dlp` is not an official Instagram API. Keep this as a personal tool; expect occasional breakage when Instagram changes something. If fetches start failing, update with `pip install -U yt-dlp` and re-export `instagram_cookies.txt`.
-- **Photos and blog links** are not wired yet. The `/ingest` endpoint will reject anything that isn’t an Instagram URL.
+- **Sources.** Instagram, YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. `yt-dlp` isn't an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If fetches start failing, update with `pip install -U yt-dlp` and re-export `instagram_cookies.txt`.
+- **Photos** (sharing a picture directly, rather than a link) are not wired yet.
 
 ## Layout
 
@@ -184,8 +192,8 @@ app/
   main.py       FastAPI: app UI, GET /api/recipes, POST /ingest
   static/       Recipe box web app
   pipeline.py   Background job: fetch → extract → save
-  fetch.py      Instagram via yt-dlp
-  extract.py    Gemini video/image → structured JSON
+  fetch.py      yt-dlp for video sources, plain HTTP + text extraction otherwise
+  extract.py    Gemini video/image/text → structured JSON
   store.py      Google Sheets append, list, categories
 vercel.json     Vercel function timeout
 ```

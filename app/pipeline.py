@@ -8,7 +8,7 @@ from pathlib import Path
 
 from app import notify
 from app.extract import extract_recipe
-from app.fetch import extract_instagram_url, fetch_post
+from app.fetch import extract_url, fetch_post
 from app.store import save_recipe, source_exists
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ jobs: deque[dict] = deque(maxlen=30)
 def process_recipe(raw_content: str) -> dict:
     url = None
     try:
-        url = extract_instagram_url(raw_content)
+        url = extract_url(raw_content)
         _record(url=url, status="started")
         if source_exists(url):
             logger.info("Already saved, skipping %s", url)
@@ -45,7 +45,12 @@ def process_recipe(raw_content: str) -> dict:
         logger.exception("Failed to process recipe")
         _record(url=url, status="error", error=str(exc))
         notify.send("Recipe Box failed", str(exc)[:400])
-        return {"status": "error", "url": url, "error": str(exc)}
+        return {
+            "status": "error",
+            "url": url,
+            "error": str(exc),
+            "message": str(exc),
+        }
 
 
 def _record(**fields) -> None:

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
+import httpx
 import yt_dlp
 
 from app.config import settings
@@ -12,19 +14,21 @@ from app.models import FetchedPost
 
 logger = logging.getLogger(__name__)
 
-INSTAGRAM_RE = re.compile(
-    r"https?://(?:www\.)?(?:instagram\.com|instagr\.am)/[^\s]+",
-    re.IGNORECASE,
-)
+URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+ARTICLE_MAX_CHARS = 6000
 
 
-def extract_instagram_url(text: str) -> str:
-    """Pull the first Instagram URL out of Shortcut input (which is often messy)."""
-    match = INSTAGRAM_RE.search(text or "")
+def extract_url(text: str) -> str:
+    """Pull the first URL out of Shortcut input (which is often messy).
+
+    Not restricted to any one site: yt-dlp handles video/reel links from
+    hundreds of hosts for free, and anything it doesn't recognize falls back
+    to a plain-text article fetch in fetch_post().
+    """
+    match = URL_RE.search(text or "")
     if not match:
         raise ValueError(
-            "No Instagram URL found. This version only handles reels and posts — "
-            "share a reel, post, or profile link from Instagram."
+            "No link found. Share a recipe reel, video, or blog post link."
         )
     return normalize_url(match.group(0).rstrip(").,]\"'"))
 
@@ -34,6 +38,27 @@ def normalize_url(url: str) -> str:
     # Drop tracking query params / fragments so the same reel dedupes.
     path = parsed.path.rstrip("/")
     return urlunparse((parsed.scheme, parsed.netloc.lower(), path, "", "", ""))
+
+
+def _has_dedicated_extractor(url: str) -> bool:
+    """True if yt-dlp has a site-specific extractor for this URL (Instagram,
+    YouTube, TikTok, hundreds more) rather than only its generic page-scraper.
+    Used to skip straight to the article-text fallback for plain blog links
+    instead of wasting a request having yt-dlp's generic extractor try (and
+    fail) to find an embedded video first."""
+    try:
+        from yt_dlp.extractor import gen_extractor_classes
+    except ImportError:
+        return True  # unknown yt-dlp version's internals; just try it
+    for extractor in gen_extractor_classes():
+        if extractor.ie_key() == "Generic":
+            continue
+        try:
+            if extractor.suitable(url):
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def _ydl_opts(out_dir: Path, download: bool) -> dict:
@@ -63,11 +88,24 @@ def _ydl_opts(out_dir: Path, download: bool) -> dict:
 
 
 def fetch_post(url: str, out_dir: Path) -> FetchedPost:
-    """Download the reel/post. Fall back to caption + thumbnail if video fails."""
+    """Download the reel/post/video. Anything yt-dlp doesn't recognize falls
+    back to a plain-text article fetch — Gemini can extract a recipe from
+    either a video+caption or plain article text."""
     out_dir.mkdir(parents=True, exist_ok=True)
     url = normalize_url(url)
 
-    info = _extract(url, out_dir, download=False)
+    if not _has_dedicated_extractor(url):
+        logger.info("No yt-dlp extractor for %s; treating as an article", url)
+        return fetch_article(url)
+
+    try:
+        info = _extract(url, out_dir, download=False)
+    except RuntimeError as exc:
+        if "Unsupported URL" in str(exc):
+            logger.info("yt-dlp rejected %s; treating as an article", url)
+            return fetch_article(url)
+        raise
+
     if _has_video_formats(info):
         try:
             info = _extract(url, out_dir, download=True)
@@ -90,6 +128,76 @@ def fetch_post(url: str, out_dir: Path) -> FetchedPost:
         thumbnail_url=_thumbnail_url(info),
         media_id=str(info.get("id") or ""),
     )
+
+
+def fetch_article(url: str) -> FetchedPost:
+    """Blog/recipe-page fallback: no video, just page text for Gemini to read."""
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; RecipeBox/1.0)"}
+    try:
+        response = httpx.get(url, follow_redirects=True, timeout=20, headers=headers)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Could not fetch that page. {exc}") from exc
+
+    html = response.text
+    text = extract_article_text(html)
+    if not text:
+        raise RuntimeError("That page didn't have any readable text to extract a recipe from.")
+
+    return FetchedPost(
+        url=url,
+        caption=text[:ARTICLE_MAX_CHARS],
+        video_path=None,
+        thumbnail_path=None,
+        thumbnail_url=extract_og_image(html, url),
+        media_id="",
+    )
+
+
+class _ArticleTextExtractor(HTMLParser):
+    """Strips tags/scripts/styles down to plain text, stdlib only."""
+
+    _SKIP_TAGS = {"script", "style", "noscript", "svg", "template"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._skip_depth = 0
+        self.chunks: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag in self._SKIP_TAGS:
+            self._skip_depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in self._SKIP_TAGS and self._skip_depth > 0:
+            self._skip_depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth == 0 and data.strip():
+            self.chunks.append(data.strip())
+
+
+def extract_article_text(html: str) -> str:
+    parser = _ArticleTextExtractor()
+    try:
+        parser.feed(html)
+    except Exception:
+        logger.warning("Could not parse page HTML for article text")
+        return ""
+    return re.sub(r"\s+", " ", " ".join(parser.chunks)).strip()
+
+
+def extract_og_image(html: str, base_url: str) -> str | None:
+    match = re.search(
+        r'<meta[^>]+(?:property|name)=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    from urllib.parse import urljoin
+
+    return urljoin(base_url, match.group(1))
 
 
 def _extract(url: str, out_dir: Path, download: bool) -> dict:

@@ -13,11 +13,14 @@ from app.models import FetchedPost, Recipe, RecipeCategory
 
 logger = logging.getLogger(__name__)
 
-PROMPT = """Watch this Instagram recipe content (video and/or image) and read the caption.
-Extract exactly one recipe.
+PROMPT = """Extract exactly one recipe from this saved recipe content.
+
+If a video and/or image is attached, watch/look at it alongside the text below —
+prefer spoken instructions and on-screen text over the text if they disagree.
+If nothing is attached, the text below is the full source (a caption, or the
+text of a recipe blog page): read it directly.
 
 Rules:
-- Prefer spoken instructions and on-screen text over the caption if they disagree.
 - Quantities and units should be as specific as the content allows. Use "" if unknown.
 - Steps should be a cook-along list, one action per item, in order.
 - cuisine: a short regional label such as Indian, Italian, Mexican, East Asian, Middle Eastern, or American. Use Other only if it truly has no regional identity.
@@ -27,7 +30,7 @@ Rules:
 - If this is not a recipe, still return JSON with a short title, empty lists, confidence "low", and meal "other".
 - Return JSON only, matching the schema. No markdown.
 
-CAPTION:
+TEXT:
 {caption}
 """
 
