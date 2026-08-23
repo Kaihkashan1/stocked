@@ -4,6 +4,10 @@ enum APIError: LocalizedError {
     case badURL
     case unreachable(String)
     case badResponse(Int)
+    /// A FastAPI HTTPException's `detail` — usually a real, actionable
+    /// message (e.g. "Gemini's free daily quota is used up...") rather than
+    /// just a status code.
+    case serverMessage(String)
 
     var errorDescription: String? {
         switch self {
@@ -13,8 +17,23 @@ enum APIError: LocalizedError {
             return "Could not reach \(host). Check your internet connection, or update the server address in Settings."
         case .badResponse(let code):
             return "The server returned HTTP \(code)."
+        case .serverMessage(let message):
+            return message
         }
     }
+}
+
+private struct ServerErrorDetail: Decodable {
+    let detail: String
+}
+
+/// Throws .serverMessage(detail) when the body carries a FastAPI-style
+/// {"detail": "..."} payload, otherwise .badResponse(status).
+private func throwForStatus(_ status: Int, data: Data) throws -> Never {
+    if let detail = try? JSONDecoder().decode(ServerErrorDetail.self, from: data).detail {
+        throw APIError.serverMessage(detail)
+    }
+    throw APIError.badResponse(status)
 }
 
 struct APIClient {
@@ -50,7 +69,7 @@ struct APIClient {
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200 ..< 300).contains(status) else {
-            throw APIError.badResponse(status)
+            try throwForStatus(status, data: data)
         }
 
         return try Self.decoder.decode(RecipesResponse.self, from: data)
@@ -82,7 +101,7 @@ struct APIClient {
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200 ..< 300).contains(status) else {
-            throw APIError.badResponse(status)
+            try throwForStatus(status, data: data)
         }
         return try Self.decoder.decode(Recipe.self, from: data)
     }
@@ -112,7 +131,7 @@ struct APIClient {
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200 ..< 300).contains(status) else {
-            throw APIError.badResponse(status)
+            try throwForStatus(status, data: data)
         }
         return try Self.decoder.decode(Recipe.self, from: data)
     }
@@ -130,16 +149,17 @@ struct APIClient {
             request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
         }
 
+        let data: Data
         let response: URLResponse
         do {
-            (_, response) = try await Self.session.data(for: request)
+            (data, response) = try await Self.session.data(for: request)
         } catch {
             throw APIError.unreachable(trimmedBase)
         }
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200 ..< 300).contains(status) else {
-            throw APIError.badResponse(status)
+            try throwForStatus(status, data: data)
         }
     }
 
@@ -169,7 +189,7 @@ struct APIClient {
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200 ..< 300).contains(status) else {
-            throw APIError.badResponse(status)
+            try throwForStatus(status, data: data)
         }
         return try Self.decoder.decode(Recipe.self, from: data)
     }
@@ -193,7 +213,7 @@ struct APIClient {
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200 ..< 300).contains(status) else {
-            throw APIError.badResponse(status)
+            try throwForStatus(status, data: data)
         }
         return try Self.decoder.decode(PlanResponse.self, from: data).ids
     }
@@ -223,7 +243,7 @@ struct APIClient {
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200 ..< 300).contains(status) else {
-            throw APIError.badResponse(status)
+            try throwForStatus(status, data: data)
         }
         return try Self.decoder.decode(PlanResponse.self, from: data).ids
     }
