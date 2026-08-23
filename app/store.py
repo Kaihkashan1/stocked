@@ -136,7 +136,10 @@ def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
         post.url,
         post.caption,
         recipe.confidence,
-        post.thumbnail_url or "",
+        "",  # Thumbnail: intentionally not saved — the app shows a letter
+        # avatar instead. post.thumbnail_path (a local file, not this URL)
+        # is still passed to Gemini for visual extraction; only the saved,
+        # user-facing image is skipped.
         saved_at,
         _clean_cuisine(recipe.cuisine),
         recipe.meal,
