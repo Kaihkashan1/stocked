@@ -1,14 +1,53 @@
 import SwiftUI
 
 struct RecipeDetailView: View {
-    let recipe: Recipe
+    let id: Int
+    @EnvironmentObject private var store: RecipeStore
+    @State private var showEdit = false
+
+    private var recipe: Recipe? { store.recipe(id: id) }
 
     var body: some View {
+        Group {
+            if let recipe {
+                content(for: recipe)
+            } else {
+                Text("This recipe is no longer available.")
+                    .foregroundStyle(.secondary)
+                    .padding()
+            }
+        }
+        .background(Theme.surface.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let recipe {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await store.toggleFavorite(recipe) }
+                    } label: {
+                        Image(systemName: recipe.favorite ? "star.fill" : "star")
+                    }
+                    .accessibilityLabel(recipe.favorite ? "Remove from favorites" : "Add to favorites")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Edit") { showEdit = true }
+                }
+            }
+        }
+        .sheet(isPresented: $showEdit) {
+            if let recipe {
+                EditRecipeView(recipe: recipe)
+                    .environmentObject(store)
+            }
+        }
+    }
+
+    private func content(for recipe: Recipe) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                header
+                header(for: recipe)
                 if !recipe.tags.isEmpty {
-                    tags
+                    tags(for: recipe)
                 }
                 if !recipe.ingredients.isEmpty {
                     section(title: "Ingredients") {
@@ -41,30 +80,28 @@ struct RecipeDetailView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Theme.surface.ignoresSafeArea())
-        .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var header: some View {
+    private func header(for recipe: Recipe) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             RecipeThumb(recipe: recipe, size: 88)
             Text(recipe.title)
                 .font(.title.weight(.semibold))
                 .foregroundStyle(Theme.ink)
-            Text(metaLine)
+            Text(metaLine(for: recipe))
                 .font(.subheadline)
                 .foregroundStyle(Theme.inkSoft)
         }
     }
 
-    private var metaLine: String {
+    private func metaLine(for recipe: Recipe) -> String {
         [recipe.cuisine, recipe.mealLabel, recipe.servings.map { "\($0) servings" }, recipe.time]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
     }
 
-    private var tags: some View {
+    private func tags(for recipe: Recipe) -> some View {
         FlowLayout(spacing: 8) {
             ForEach(recipe.tags, id: \.self) { tag in
                 Text(tag)

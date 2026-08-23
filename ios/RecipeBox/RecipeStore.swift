@@ -17,7 +17,20 @@ final class RecipeStore: ObservableObject {
     @Published var have: [String] = [] {
         didSet { if oldValue != have { updateVisible() } }
     }
+    @Published var favoritesOnly = false {
+        didSet { if oldValue != favoritesOnly { updateVisible() } }
+    }
     @Published var pantryGroups: [PantryGroup] = []
+
+    /// Transient error from a favorite toggle or edit save — separate from
+    /// errorMessage, which is reserved for "couldn't load the list at all".
+    @Published var actionError: String?
+    /// Set by RecipeBoxApp's onOpenURL; consumed once by RootView.
+    @Published var pendingRoute: DeepLinkRoute?
+
+    @Published var planIDs: Set<Int> {
+        didSet { UserDefaults.standard.set(Array(planIDs), forKey: Self.planKey) }
+    }
 
     @Published private(set) var visibleRecipes: [Recipe] = []
     @Published private(set) var matchesByID: [Int: RecipeMatch] = [:]
@@ -30,9 +43,17 @@ final class RecipeStore: ObservableObject {
         didSet { UserDefaults.standard.set(serverURL, forKey: Self.urlKey) }
     }
 
+    /// Only needed to favorite/edit from the phone — sent as X-Recipe-Box-Key.
+    /// Blank is fine against a dev server with no RECIPE_BOX_SECRET set.
+    @Published var serverSecret: String {
+        didSet { UserDefaults.standard.set(serverSecret, forKey: Self.secretKey) }
+    }
+
     static let hostedURL = "https://kaihkashan-recipe-box.vercel.app"
 
     private static let urlKey = "recipeBox.serverURL"
+    private static let secretKey = "recipeBox.serverSecret"
+    private static let planKey = "recipeBox.planIDs"
     private static let legacyLANDefault = "http://192.168.0.54:8000"
     private static let legacyHostedHosts: Set<String> = [
         "recipe-box-ashen-alpha.vercel.app",
@@ -48,6 +69,8 @@ final class RecipeStore: ObservableObject {
         let resolved = Self.resolvedURL(from: stored)
         serverURL = resolved
         UserDefaults.standard.set(resolved, forKey: Self.urlKey)
+        serverSecret = UserDefaults.standard.string(forKey: Self.secretKey) ?? ""
+        planIDs = Set(UserDefaults.standard.array(forKey: Self.planKey) as? [Int] ?? [])
         loadCache()
     }
 
@@ -82,6 +105,58 @@ final class RecipeStore: ObservableObject {
                 query = ""
             }
         }
+    }
+
+    func togglePlan(_ recipe: Recipe) {
+        if planIDs.contains(recipe.id) {
+            planIDs.remove(recipe.id)
+        } else {
+            planIDs.insert(recipe.id)
+        }
+    }
+
+    var plannedRecipes: [Recipe] {
+        recipes.filter { planIDs.contains($0.id) }
+    }
+
+    /// Optimistic: flips the star immediately, then confirms with the server.
+    /// Reverts and surfaces actionError if the request fails.
+    func toggleFavorite(_ recipe: Recipe) async {
+        let optimistic = recipe.withFavorite(!recipe.favorite)
+        replace(optimistic)
+        do {
+            let saved = try await APIClient(baseURLString: serverURL).updateRecipe(
+                id: recipe.id,
+                patch: RecipePatch(favorite: optimistic.favorite),
+                secret: serverSecret
+            )
+            replace(saved)
+        } catch {
+            replace(recipe)
+            actionError = error.localizedDescription
+        }
+    }
+
+    /// Returns an error message on failure, nil on success.
+    func saveEdits(id: Int, title: String, servings: String?, ingredients: [String], steps: [String]) async -> String? {
+        let patch = RecipePatch(title: title, servings: servings, ingredients: ingredients, steps: steps)
+        do {
+            let saved = try await APIClient(baseURLString: serverURL).updateRecipe(id: id, patch: patch, secret: serverSecret)
+            replace(saved)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    private func replace(_ updated: Recipe) {
+        guard recipesByID[updated.id] != nil else { return }
+        recipesByID[updated.id] = updated
+        if let index = recipes.firstIndex(where: { $0.id == updated.id }) {
+            recipes[index] = updated
+        }
+        updateDerived()
+        persistCache()
     }
 
     @discardableResult
@@ -131,6 +206,7 @@ final class RecipeStore: ObservableObject {
         haveSet = Set(have)
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var rows = recipes.filter { recipe in
+            if favoritesOnly, !recipe.favorite { return false }
             if mealFilter != "all", recipe.meal != mealFilter { return false }
             if cuisineFilter != "all", recipe.cuisine != cuisineFilter { return false }
             if needle.isEmpty { return true }

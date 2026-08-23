@@ -32,6 +32,16 @@ struct SettingsView: View {
                             .foregroundStyle(.red)
                     }
                 }
+
+                Section {
+                    SecureField("Only needed to favorite/edit", text: $store.serverSecret)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("Edit key")
+                } footer: {
+                    Text("Same value as RECIPE_BOX_SECRET on the server — the Shortcut already sends this. Leave blank against a dev server with no secret set.")
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

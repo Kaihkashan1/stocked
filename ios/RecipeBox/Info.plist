@@ -31,6 +31,17 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Recipe Box can load recipes from a server on your local network when you are testing.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.kaihkashan.RecipeBox</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>recipebox</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

@@ -56,6 +56,36 @@ struct APIClient {
         return try Self.decoder.decode(RecipesResponse.self, from: data)
     }
 
+    func updateRecipe(id: Int, patch: RecipePatch, secret: String) async throws -> Recipe {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/recipes/\(id)", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.httpMethod = "PATCH"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+        request.httpBody = try JSONEncoder().encode(patch)
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            throw APIError.badResponse(status)
+        }
+        return try Self.decoder.decode(Recipe.self, from: data)
+    }
+
     private var trimmedBase: String {
         baseURLString.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }

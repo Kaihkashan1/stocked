@@ -57,6 +57,17 @@ struct RecipeListView: View {
                     options: meals,
                     selection: $store.mealFilter
                 )
+                Button {
+                    store.favoritesOnly.toggle()
+                } label: {
+                    Label(
+                        store.favoritesOnly ? "Showing favorites" : "Favorites only",
+                        systemImage: store.favoritesOnly ? "star.fill" : "star"
+                    )
+                    .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(store.favoritesOnly ? Theme.accent : Theme.inkSoft)
             }
 
             if !store.cuisines.isEmpty {
@@ -92,21 +103,50 @@ struct RecipeListView: View {
                         NavigationLink(value: recipe.id) {
                             EquatableView(content: RecipeRow(recipe: recipe, match: store.matchesByID[recipe.id]))
                         }
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                Task { await store.toggleFavorite(recipe) }
+                            } label: {
+                                Label("Favorite", systemImage: recipe.favorite ? "star.slash" : "star.fill")
+                            }
+                            .tint(Theme.warm)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button {
+                                store.togglePlan(recipe)
+                            } label: {
+                                Label(
+                                    store.planIDs.contains(recipe.id) ? "Remove" : "Add to plan",
+                                    systemImage: store.planIDs.contains(recipe.id) ? "cart.badge.minus" : "cart.badge.plus"
+                                )
+                            }
+                            .tint(Theme.accent)
+                        }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
         .navigationDestination(for: Int.self) { id in
-            if let recipe = store.recipe(id: id) {
-                RecipeDetailView(recipe: recipe)
-            }
+            RecipeDetailView(id: id)
         }
         .refreshable { await store.refresh() }
         .overlay {
             if store.isLoading, store.recipes.isEmpty {
                 ProgressView("Loading recipes…")
             }
+        }
+        .alert(
+            "Couldn't save",
+            isPresented: Binding(
+                get: { store.actionError != nil },
+                set: { shown in if !shown { store.actionError = nil } }
+            ),
+            presenting: store.actionError
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { message in
+            Text(message)
         }
     }
 }

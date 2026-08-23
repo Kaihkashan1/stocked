@@ -38,6 +38,7 @@ struct Recipe: Codable, Identifiable, Hashable {
     let time: String?
     let tags: [String]
     let pantry: [String]
+    let favorite: Bool
     /// Lowercased blob used for search so we do not rebuild it on every keystroke.
     let searchBlob: String
 
@@ -50,8 +51,44 @@ struct Recipe: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, servings, ingredients, steps, source, caption, confidence, thumbnail, cuisine, meal, time, tags, pantry
+        case id, title, servings, ingredients, steps, source, caption, confidence, thumbnail, cuisine, meal, time, tags, pantry, favorite
         case savedAt = "saved_at"
+    }
+
+    /// Memberwise init for building a locally-modified copy (optimistic
+    /// favorite toggles) without a round trip through Codable.
+    init(
+        id: Int, title: String, servings: String?, ingredients: [String], steps: [String],
+        source: String, caption: String, confidence: String, thumbnail: String, savedAt: String?,
+        cuisine: String, meal: String, time: String?, tags: [String], pantry: [String],
+        favorite: Bool, searchBlob: String
+    ) {
+        self.id = id
+        self.title = title
+        self.servings = servings
+        self.ingredients = ingredients
+        self.steps = steps
+        self.source = source
+        self.caption = caption
+        self.confidence = confidence
+        self.thumbnail = thumbnail
+        self.savedAt = savedAt
+        self.cuisine = cuisine
+        self.meal = meal
+        self.time = time
+        self.tags = tags
+        self.pantry = pantry
+        self.favorite = favorite
+        self.searchBlob = searchBlob
+    }
+
+    func withFavorite(_ value: Bool) -> Recipe {
+        Recipe(
+            id: id, title: title, servings: servings, ingredients: ingredients, steps: steps,
+            source: source, caption: caption, confidence: confidence, thumbnail: thumbnail,
+            savedAt: savedAt, cuisine: cuisine, meal: meal, time: time, tags: tags, pantry: pantry,
+            favorite: value, searchBlob: searchBlob
+        )
     }
 
     init(from decoder: Decoder) throws {
@@ -71,6 +108,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         time = try container.decodeIfPresent(String.self, forKey: .time)
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         pantry = collapsePantryItems(try container.decodeIfPresent([String].self, forKey: .pantry) ?? [])
+        favorite = try container.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
         searchBlob = ([title, cuisine, meal] + tags + ingredients).joined(separator: " ").lowercased()
     }
 
@@ -91,6 +129,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         try container.encodeIfPresent(time, forKey: .time)
         try container.encode(tags, forKey: .tags)
         try container.encode(pantry, forKey: .pantry)
+        try container.encode(favorite, forKey: .favorite)
     }
 
     var mealLabel: String {
@@ -112,6 +151,24 @@ struct Recipe: Codable, Identifiable, Hashable {
     var sourceURL: URL? {
         URL(string: source)
     }
+}
+
+/// Partial edit sent to PATCH /api/recipes/{id}. Optional properties are
+/// synthesized with encodeIfPresent, so an unset field is simply omitted
+/// from the request body — the server leaves it untouched.
+struct RecipePatch: Encodable {
+    var title: String?
+    var servings: String?
+    var ingredients: [String]?
+    var steps: [String]?
+    var favorite: Bool?
+}
+
+/// A recipebox:// deep link, e.g. from a Shortcuts action.
+enum DeepLinkRoute: Equatable {
+    case plan
+    case surprise
+    case have([String])
 }
 
 struct RecipeMatch {

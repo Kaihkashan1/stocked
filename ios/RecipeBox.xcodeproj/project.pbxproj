@@ -18,6 +18,8 @@
 		A10000000000000000000018 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* SettingsView.swift */; };
 		A10000000000000000000019 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000039 /* Assets.xcassets */; };
 		A1000000000000000000001A /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003B /* ThumbnailCache.swift */; };
+		A1000000000000000000001B /* EditRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003C /* EditRecipeView.swift */; };
+		A1000000000000000000001C /* GroceryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003D /* GroceryListView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +36,8 @@
 		A10000000000000000000039 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000000000000000000003A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000000000000000000003B /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
+		A1000000000000000000003C /* EditRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecipeView.swift; sourceTree = "<group>"; };
+		A1000000000000000000003D /* GroceryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +63,8 @@
 				A10000000000000000000035 /* RootView.swift */,
 				A10000000000000000000036 /* RecipeListView.swift */,
 				A10000000000000000000037 /* RecipeDetailView.swift */,
+				A1000000000000000000003C /* EditRecipeView.swift */,
+				A1000000000000000000003D /* GroceryListView.swift */,
 				A10000000000000000000038 /* SettingsView.swift */,
 				A10000000000000000000039 /* Assets.xcassets */,
 				A1000000000000000000003A /* Info.plist */,
@@ -161,6 +167,8 @@
 				A10000000000000000000017 /* RecipeDetailView.swift in Sources */,
 				A10000000000000000000018 /* SettingsView.swift in Sources */,
 				A1000000000000000000001A /* ThumbnailCache.swift in Sources */,
+				A1000000000000000000001B /* EditRecipeView.swift in Sources */,
+				A1000000000000000000001C /* GroceryListView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
