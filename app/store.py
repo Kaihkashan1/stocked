@@ -148,7 +148,17 @@ def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
         "",  # Favorite: not set on save, toggled later from the app
         "",  # Notes: added later from the app
     ]
-    _worksheet().append_row(row, value_input_option="USER_ENTERED")
+    # A plain append_row() lets the Sheets API auto-detect "the table" to
+    # append after — which, in practice, sometimes appended a new row
+    # shifted many columns to the right instead of at column A (confirmed
+    # live: this corrupted several real rows and briefly took down
+    # /api/recipes entirely). Writing to an explicit, computed row number
+    # is unambiguous and can't drift like that. col_values(1) returns every
+    # row up to the last non-blank title, including blank/soft-deleted rows
+    # in between, so its length is exactly the last real row number.
+    worksheet = _worksheet()
+    next_row = len(worksheet.col_values(1)) + 1
+    worksheet.update(f"A{next_row}:{LAST_COL_LETTER}{next_row}", [row], value_input_option="USER_ENTERED")
     logger.info("Saved %r to Google Sheets", recipe.title)
 
 
@@ -188,9 +198,11 @@ def create_recipe(
         "",  # Favorite
         notes,
     ]
+    # See save_recipe for why this writes to an explicit row instead of
+    # using append_row's auto-detected table range.
     worksheet = _worksheet()
-    worksheet.append_row(row, value_input_option="USER_ENTERED")
-    row_id = len(worksheet.col_values(1))
+    row_id = len(worksheet.col_values(1)) + 1
+    worksheet.update(f"A{row_id}:{LAST_COL_LETTER}{row_id}", [row], value_input_option="USER_ENTERED")
     logger.info("Created row %s (%r) via manual entry", row_id, title)
     return get_recipe(row_id)
 
