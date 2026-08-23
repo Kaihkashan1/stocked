@@ -23,6 +23,16 @@ class Recipe(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class RecipeUpdate(BaseModel):
+    """Partial edit from the app. Unset fields are left alone in the sheet."""
+
+    title: str | None = None
+    servings: str | None = None
+    ingredients: list[str] | None = None
+    steps: list[str] | None = None
+    favorite: bool | None = None
+
+
 class RecipeCategory(BaseModel):
     cuisine: str = "Uncategorized"
     meal: Meal = "other"

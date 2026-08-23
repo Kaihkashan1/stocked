@@ -13,8 +13,9 @@ from fastapi.staticfiles import StaticFiles
 from app.auth import require_secret
 from app.config import ROOT, settings
 from app.match import STAPLES, grouped_pantry
+from app.models import RecipeUpdate
 from app.pipeline import jobs, process_recipe
-from app.store import get_recipe, list_recipes
+from app.store import get_recipe, list_recipes, update_recipe
 
 logging.basicConfig(
     level=logging.INFO,
@@ -83,6 +84,16 @@ async def api_get_recipe(row_id: int):
     return _public(recipe)
 
 
+@app.patch("/api/recipes/{row_id}", dependencies=[Depends(require_secret)])
+async def api_update_recipe(row_id: int, body: RecipeUpdate):
+    if not get_recipe(row_id):
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    updated = update_recipe(row_id, **body.model_dump(exclude_unset=True))
+    if not updated:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return _public(updated)
+
+
 @app.get("/jobs", dependencies=[Depends(require_secret)])
 async def list_jobs():
     return {"jobs": list(jobs)}
@@ -98,9 +109,9 @@ async def ingest(request: Request, background_tasks: BackgroundTasks):
         )
     # Serverless freezes after the response, so ingest must finish in-request on Vercel.
     if os.environ.get("VERCEL"):
-        result = process_recipe(content)
-        code = 200 if result.get("status") in {"saved", "duplicate"} else 500
-        return JSONResponse(status_code=code, content=result)
+        # Keep HTTP 200 on save/duplicate/error so the iPhone Shortcut can
+        # read `status` and notify only when it is "error".
+        return process_recipe(content)
     background_tasks.add_task(process_recipe, content)
     return {"status": "queued", "message": "Saving… I'll add it to your sheet shortly."}
 

@@ -28,12 +28,16 @@ HEADERS = [
     "Meal",
     "Time",
     "Tags",
+    "Favorite",
 ]
 SOURCE_COL = 5  # 1-based, matches HEADERS
 CUISINE_COL = 10
 MEAL_COL = 11
 TIME_COL = 12
 TAGS_COL = 13
+FAVORITE_COL = 14
+LAST_COL_LETTER = "N"  # matches len(HEADERS)
+TRUE_VALUES = {"true", "yes", "1", "y"}
 
 
 @lru_cache(maxsize=1)
@@ -64,8 +68,11 @@ def _ensure_headers(worksheet) -> None:
     if not any(existing):
         worksheet.append_row(HEADERS, value_input_option="RAW")
         return
+    if existing[:13] == HEADERS[:13]:
+        worksheet.update(f"A1:{LAST_COL_LETTER}1", [HEADERS], value_input_option="RAW")
+        return
     if existing[:9] == HEADERS[:9]:
-        worksheet.update("A1:M1", [HEADERS], value_input_option="RAW")
+        worksheet.update(f"A1:{LAST_COL_LETTER}1", [HEADERS], value_input_option="RAW")
         return
     logger.warning("Sheet already has a header row that does not match %s", HEADERS)
 
@@ -95,9 +102,65 @@ def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
         recipe.meal,
         recipe.time or "",
         ", ".join(_clean_tag(tag) for tag in recipe.tags if _clean_tag(tag)),
+        "",  # Favorite: not set on save, toggled later from the app
     ]
     _worksheet().append_row(row, value_input_option="USER_ENTERED")
     logger.info("Saved %r to Google Sheets", recipe.title)
+
+
+def update_recipe(row_id: int, **fields) -> dict | None:
+    """Partial update of a saved recipe (title, servings, ingredients, steps,
+    favorite). Untouched fields keep their current sheet value."""
+    current = get_recipe(row_id)
+    if current is None:
+        return None
+
+    title = fields.get("title", current["title"])
+    servings = fields.get("servings", current["servings"]) or ""
+    ingredients = fields.get("ingredients")
+    ingredients_text = (
+        "\n".join(f"- {line}" for line in ingredients) if ingredients is not None else current["ingredients_text"]
+    )
+    steps = fields.get("steps")
+    steps_text = (
+        "\n".join(f"{i}. {line}" for i, line in enumerate(steps, start=1)) if steps is not None else current["steps_text"]
+    )
+    favorite = fields.get("favorite", current["favorite"])
+
+    row = [
+        title,
+        servings,
+        ingredients_text,
+        steps_text,
+        current["source"],
+        current["caption"],
+        current["confidence"],
+        current["thumbnail"],
+        current["saved_at"],
+        current["cuisine"],
+        current["meal"],
+        current["time"] or "",
+        ", ".join(current["tags"]),
+        "TRUE" if favorite else "",
+    ]
+    _worksheet().update(f"A{row_id}:{LAST_COL_LETTER}{row_id}", [row], value_input_option="USER_ENTERED")
+    logger.info("Updated row %s (%r)", row_id, title)
+
+    # Build the response from what we just wrote instead of a second read —
+    # one Sheets API round trip per edit instead of two.
+    ingredients_list = ingredients if ingredients is not None else current["ingredients"]
+    steps_list = steps if steps is not None else current["steps"]
+    return {
+        **current,
+        "title": title,
+        "servings": servings or None,
+        "ingredients": ingredients_list,
+        "pantry": pantry_items(ingredients_list),
+        "steps": steps_list,
+        "favorite": favorite,
+        "ingredients_text": ingredients_text,
+        "steps_text": steps_text,
+    }
 
 
 def list_recipes() -> list[dict]:
@@ -146,6 +209,7 @@ def _record_to_recipe(row_id: int, record: dict) -> dict:
         "meal": _clean_meal(str(record.get("Meal") or "")),
         "time": str(record.get("Time") or "").strip() or None,
         "tags": [_clean_tag(tag) for tag in tags_raw.split(",") if _clean_tag(tag)],
+        "favorite": str(record.get("Favorite") or "").strip().lower() in TRUE_VALUES,
         "ingredients_text": ingredients_text,
         "steps_text": steps_text,
     }
