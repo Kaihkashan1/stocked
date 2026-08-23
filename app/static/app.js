@@ -30,6 +30,7 @@ const state = {
   tab: "recipes",
   meal: "all",
   cuisine: "all",
+  tag: "all",
   query: "",
   have: [],
   pantryQuery: "",
@@ -46,6 +47,7 @@ const els = {
   search: document.getElementById("search"),
   meals: document.getElementById("meal-filters"),
   cuisines: document.getElementById("cuisine-filters"),
+  tagFilters: document.getElementById("tag-filters"),
   favoritesToggle: document.getElementById("favorites-toggle"),
   filtersBtn: document.getElementById("filters-btn"),
   filtersPanel: document.getElementById("filters-panel"),
@@ -288,18 +290,13 @@ function renderPlan() {
   }
 
   const rows = planned
-    .map((recipe) => {
-      const letter = (recipe.title || "?").slice(0, 1).toUpperCase();
-      const thumb = recipe.thumbnail
-        ? `<img src="${escapeAttr(recipe.thumbnail)}" alt="">`
-        : `<span class="thumb-letter" style="font-size:1.1rem">${escapeHtml(letter)}</span>`;
-      return `
+    .map(
+      (recipe) => `
         <div class="plan-row">
-          <div class="plan-thumb">${thumb}</div>
           <button class="plan-title" type="button" data-action="open-recipe" data-id="${recipe.id}">${escapeHtml(recipe.title)}</button>
           <button class="icon-btn" type="button" data-action="toggle-plan" data-id="${recipe.id}">Remove</button>
-        </div>`;
-    })
+        </div>`
+    )
     .join("");
 
   const groups = groupedIngredients(planned)
@@ -365,13 +362,22 @@ function renderFilters() {
     .map((cuisine) => chip("cuisine", cuisine, cuisine === "all" ? "All cuisines" : cuisine))
     .join("");
 
+  // Tags cover cooking method/appliance (air-fryer, one-pot, ...) as well as
+  // diet/flavor — anything Gemini tagged the recipe with — so this is the
+  // one place a category like "Air Fryer" becomes a real filter without
+  // hardcoding a fixed list.
+  const tags = ["all", ...unique(state.recipes.flatMap((recipe) => recipe.tags || []))];
+  els.tagFilters.innerHTML = tags.map((tag) => chip("tag", tag, tag === "all" ? "All tags" : tag)).join("");
+
   els.favoritesToggle.classList.toggle("active", state.favoritesOnly);
 
   document
     .querySelectorAll("#sort-options .chip")
     .forEach((chip) => chip.classList.toggle("active", chip.dataset.sort === state.sort));
 
-  const activeCount = [state.meal !== "all", state.cuisine !== "all", state.favoritesOnly].filter(Boolean).length;
+  const activeCount = [state.meal !== "all", state.cuisine !== "all", state.tag !== "all", state.favoritesOnly].filter(
+    Boolean
+  ).length;
   els.filtersBtn.classList.toggle("active", activeCount > 0);
   els.filtersBtn.textContent = "";
   els.filtersBtn.append(filtersIcon(), document.createTextNode(activeCount > 0 ? `Filters (${activeCount})` : "Filters"));
@@ -503,6 +509,7 @@ function filtered() {
     if (state.favoritesOnly && !recipe.favorite) continue;
     if (state.meal !== "all" && recipe.meal !== state.meal) continue;
     if (state.cuisine !== "all" && recipe.cuisine !== state.cuisine) continue;
+    if (state.tag !== "all" && !(recipe.tags || []).includes(state.tag)) continue;
     const match = recipeMatch(recipe);
     if (!match.ok) continue;
     if (query) {
@@ -544,10 +551,6 @@ function renderGrid() {
 }
 
 function cardHtml({ recipe, match }) {
-  const letter = (recipe.title || "?").slice(0, 1).toUpperCase();
-  const thumb = recipe.thumbnail
-    ? `<img src="${escapeAttr(recipe.thumbnail)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'), {className:'thumb-letter', textContent:'${escapeAttr(letter)}'}))">`
-    : `<div class="thumb-letter">${escapeHtml(letter)}</div>`;
   const tags = [`<span class="pill">${escapeHtml(recipe.cuisine)}</span>`];
   if (recipe.meal && recipe.meal !== "other") {
     tags.push(`<span class="pill warm">${escapeHtml(MEAL_LABELS[recipe.meal] || recipe.meal)}</span>`);
@@ -565,18 +568,15 @@ function cardHtml({ recipe, match }) {
   const planActive = state.planIDs.has(recipe.id) ? " active" : "";
   return `
     <div class="card" data-id="${recipe.id}">
-      <div class="thumb">
-        ${thumb}
-        <div class="card-actions">
-          <button class="card-icon-btn favorite${favoriteActive}" type="button" data-action="toggle-favorite" data-id="${recipe.id}" aria-label="Favorite">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="${recipe.favorite ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
-          </button>
-          <button class="card-icon-btn plan${planActive}" type="button" data-action="toggle-plan" data-id="${recipe.id}" aria-label="Add to plan">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 3h2.4l2.1 11.4a2 2 0 0 0 2 1.6h8.3a2 2 0 0 0 2-1.6L21 7H6"/><circle cx="9" cy="20" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="20" r="1.3" fill="currentColor" stroke="none"/></svg>
-          </button>
-        </div>
+      <div class="card-actions">
+        <button class="card-icon-btn favorite${favoriteActive}" type="button" data-action="toggle-favorite" data-id="${recipe.id}" aria-label="Favorite">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="${recipe.favorite ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
+        </button>
+        <button class="card-icon-btn plan${planActive}" type="button" data-action="toggle-plan" data-id="${recipe.id}" aria-label="Add to plan">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 3h2.4l2.1 11.4a2 2 0 0 0 2 1.6h8.3a2 2 0 0 0 2-1.6L21 7H6"/><circle cx="9" cy="20" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="20" r="1.3" fill="currentColor" stroke="none"/></svg>
+        </button>
       </div>
-      <button class="card-body" type="button" data-action="open-recipe" data-id="${recipe.id}" style="text-align:left; background:none; border:none; cursor:pointer; padding:0.95rem 1rem 1.1rem; font:inherit; color:inherit;">
+      <button class="card-body" type="button" data-action="open-recipe" data-id="${recipe.id}" style="text-align:left; background:none; border:none; cursor:pointer; padding:1.1rem; font:inherit; color:inherit;">
         <h2>${escapeHtml(recipe.title)}</h2>
         <div class="meta">${tags.join("")}</div>
       </button>
@@ -641,8 +641,6 @@ function recipeHtml(recipe) {
   const originalPostItem = recipe.source
     ? `<a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">Original post</a>`
     : "";
-  const heroStyle = recipe.thumbnail ? ` style="background-image:url('${escapeAttr(recipe.thumbnail)}')"` : "";
-  const heroLetter = recipe.thumbnail ? "" : `<div class="hero-letter">${escapeHtml((recipe.title || "?").slice(0, 1).toUpperCase())}</div>`;
 
   return `
     <div class="drawer-actions">
@@ -667,12 +665,9 @@ function recipeHtml(recipe) {
         </div>
       </div>
     </div>
-    <div class="hero"${heroStyle}>
-      ${heroLetter}
-      <div class="hero-text">
-        <p class="eyebrow">${escapeHtml(bits.join(" · "))}</p>
-        <h2 id="recipe-title">${escapeHtml(recipe.title)}</h2>
-      </div>
+    <div class="hero-plain">
+      <p class="eyebrow">${escapeHtml(bits.join(" · "))}</p>
+      <h2 id="recipe-title">${escapeHtml(recipe.title)}</h2>
     </div>
     <div class="recipe recipe-body">
       <div class="meta">${tags}</div>
@@ -983,6 +978,7 @@ els.filtersBtn.addEventListener("click", () => {
 els.filtersReset.addEventListener("click", () => {
   state.meal = "all";
   state.cuisine = "all";
+  state.tag = "all";
   state.favoritesOnly = false;
   state.sort = "recent";
   renderFilters();
@@ -1066,8 +1062,8 @@ document.addEventListener("click", (event) => {
       break;
     case "filter-tag":
       closeDrawer();
-      state.query = actionEl.dataset.tag;
-      els.search.value = state.query;
+      state.tag = actionEl.dataset.tag;
+      renderFilters();
       renderGrid();
       break;
     case "start-edit":

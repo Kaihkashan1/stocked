@@ -148,10 +148,6 @@ struct Recipe: Codable, Identifiable, Hashable {
         }
     }
 
-    var thumbnailURL: URL? {
-        URL(string: thumbnail)
-    }
-
     var sourceURL: URL? {
         URL(string: source)
     }
