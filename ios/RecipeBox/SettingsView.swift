@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draftURL = ""
     @State private var saving = false
+    @State private var saveError: String?
 
     var body: some View {
         NavigationStack {
@@ -25,6 +26,11 @@ struct SettingsView: View {
                         Task { await save() }
                     }
                     .disabled(draftURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
+                    if let saveError {
+                        Text(saveError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
                 }
             }
             .navigationTitle("Settings")
@@ -40,11 +46,14 @@ struct SettingsView: View {
 
     private func save() async {
         saving = true
+        saveError = nil
         defer { saving = false }
         store.serverURL = draftURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        await store.refresh()
-        if store.errorMessage == nil {
+        let ok = await store.refresh()
+        if ok {
             dismiss()
+        } else {
+            saveError = "Could not reach that server. Check the address and your internet connection."
         }
     }
 }

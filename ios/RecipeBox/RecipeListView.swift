@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct RecipeListView: View {
     @EnvironmentObject private var store: RecipeStore
@@ -17,9 +18,38 @@ struct RecipeListView: View {
     var body: some View {
         List {
             Section {
-                TextField("Search title, ingredient, tag…", text: $store.query)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                DebouncedTextField(
+                    placeholder: "Search recipes or ingredients you have…",
+                    text: $store.query
+                )
+                ForEach(store.selectedPantryGroups) { group in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(group.category)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        FilterWrap(items: group.items, selected: store.haveSet) { item in
+                            store.toggleIngredient(item)
+                        }
+                    }
+                    .id("have-\(group.category)")
+                }
+                if !store.visiblePantryGroups.isEmpty {
+                    ForEach(store.visiblePantryGroups) { group in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Add \(group.category.lowercased())")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                            FilterWrap(items: group.items, selected: store.haveSet) { item in
+                                store.toggleIngredient(item)
+                            }
+                        }
+                        .id("pantry-\(group.category)")
+                    }
+                }
+            } footer: {
+                Text("Type a dish, tag, or ingredient. Tap an ingredient to keep it as something you have.")
             }
 
             Section("Meal") {
@@ -38,38 +68,7 @@ struct RecipeListView: View {
                 }
             }
 
-            Section("What I have") {
-                TextField("Find an ingredient…", text: $store.pantryQuery)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                ForEach(store.selectedPantryGroups) { group in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(group.category)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-                        FilterWrap(items: group.items, selected: Set(store.have)) { item in
-                            store.toggleIngredient(item)
-                        }
-                    }
-                    .id("have-\(group.category)")
-                }
-                ForEach(store.visiblePantryGroups) { group in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(group.category)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-                        FilterWrap(items: group.items, selected: Set(store.have)) { item in
-                            store.toggleIngredient(item)
-                            store.pantryQuery = ""
-                        }
-                    }
-                    .id("pantry-\(group.category)")
-                }
-            }
-
-            if let message = store.errorMessage {
+            if let message = store.errorMessage, store.recipes.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Can't load recipes")
@@ -90,16 +89,18 @@ struct RecipeListView: View {
             } else {
                 Section("\(store.visibleRecipes.count) recipe\(store.visibleRecipes.count == 1 ? "" : "s")") {
                     ForEach(store.visibleRecipes) { recipe in
-                        NavigationLink(value: recipe) {
-                            RecipeRow(recipe: recipe, match: matchRecipe(recipe, have: store.have))
+                        NavigationLink(value: recipe.id) {
+                            EquatableView(content: RecipeRow(recipe: recipe, match: store.matchesByID[recipe.id]))
                         }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
-        .navigationDestination(for: Recipe.self) { recipe in
-            RecipeDetailView(recipe: recipe)
+        .navigationDestination(for: Int.self) { id in
+            if let recipe = store.recipe(id: id) {
+                RecipeDetailView(recipe: recipe)
+            }
         }
         .refreshable { await store.refresh() }
         .overlay {
@@ -107,6 +108,35 @@ struct RecipeListView: View {
                 ProgressView("Loading recipes…")
             }
         }
+    }
+}
+
+struct DebouncedTextField: View {
+    let placeholder: String
+    @Binding var text: String
+    var delay: Duration = .milliseconds(160)
+
+    @State private var draft = ""
+    @State private var task: Task<Void, Never>?
+
+    var body: some View {
+        TextField(placeholder, text: $draft)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .onAppear { draft = text }
+            .onChange(of: text) { _, new in
+                if new != draft { draft = new }
+            }
+            .onChange(of: draft) { _, new in
+                task?.cancel()
+                task = Task { @MainActor in
+                    try? await Task.sleep(for: delay)
+                    guard !Task.isCancelled else { return }
+                    if text != new {
+                        text = new
+                    }
+                }
+            }
     }
 }
 
@@ -177,9 +207,18 @@ struct FlexibleChipRow: View {
     }
 }
 
-struct RecipeRow: View {
+struct RecipeRow: View, Equatable {
     let recipe: Recipe
     var match: RecipeMatch? = nil
+
+    static func == (lhs: RecipeRow, rhs: RecipeRow) -> Bool {
+        lhs.recipe.id == rhs.recipe.id
+            && lhs.recipe.title == rhs.recipe.title
+            && lhs.recipe.thumbnail == rhs.recipe.thumbnail
+            && lhs.recipe.cuisine == rhs.recipe.cuisine
+            && lhs.recipe.meal == rhs.recipe.meal
+            && lhs.match?.label == rhs.match?.label
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -211,26 +250,29 @@ struct RecipeRow: View {
 struct RecipeThumb: View {
     let recipe: Recipe
     var size: CGFloat = 56
+    @State private var image: UIImage?
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Theme.bg)
-            if let url = recipe.thumbnailURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    default:
-                        letter
-                    }
-                }
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
             } else {
                 letter
             }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .task(id: recipe.thumbnail) {
+            guard let url = recipe.thumbnailURL else {
+                image = nil
+                return
+            }
+            image = await ThumbnailCache.shared.image(for: url, maxPixel: size * 3)
+        }
     }
 
     private var letter: some View {

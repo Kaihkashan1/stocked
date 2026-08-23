@@ -20,6 +20,17 @@ enum APIError: LocalizedError {
 struct APIClient {
     var baseURLString: String
 
+    private static let decoder = JSONDecoder()
+    private static let session: URLSession = {
+        let cache = URLCache(memoryCapacity: 16 * 1024 * 1024, diskCapacity: 64 * 1024 * 1024)
+        let config = URLSessionConfiguration.default
+        config.urlCache = cache
+        config.requestCachePolicy = .useProtocolCachePolicy
+        config.timeoutIntervalForRequest = 15
+        config.waitsForConnectivity = false
+        return URLSession(configuration: config)
+    }()
+
     func fetchRecipes() async throws -> RecipesResponse {
         guard let base = URL(string: trimmedBase),
               let url = URL(string: "/api/recipes", relativeTo: base)
@@ -27,11 +38,12 @@ struct APIClient {
 
         var request = URLRequest(url: url.absoluteURL)
         request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
 
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await Self.session.data(for: request)
         } catch {
             throw APIError.unreachable(trimmedBase)
         }
@@ -41,8 +53,7 @@ struct APIClient {
             throw APIError.badResponse(status)
         }
 
-        let decoded = try JSONDecoder().decode(RecipesResponse.self, from: data)
-        return decoded
+        return try Self.decoder.decode(RecipesResponse.self, from: data)
     }
 
     private var trimmedBase: String {

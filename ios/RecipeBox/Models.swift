@@ -7,7 +7,8 @@ struct RecipesResponse: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         recipes = try container.decode([Recipe].self, forKey: .recipes)
-        pantry = try container.decodeIfPresent([PantryGroup].self, forKey: .pantry) ?? []
+        let groups = try container.decodeIfPresent([PantryGroup].self, forKey: .pantry) ?? []
+        pantry = groups.map { PantryGroup(category: $0.category, items: collapsePantryItems($0.items)) }
     }
 
     enum CodingKeys: String, CodingKey {
@@ -37,6 +38,16 @@ struct Recipe: Codable, Identifiable, Hashable {
     let time: String?
     let tags: [String]
     let pantry: [String]
+    /// Lowercased blob used for search so we do not rebuild it on every keystroke.
+    let searchBlob: String
+
+    static func == (lhs: Recipe, rhs: Recipe) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, title, servings, ingredients, steps, source, caption, confidence, thumbnail, cuisine, meal, time, tags, pantry
@@ -59,7 +70,27 @@ struct Recipe: Codable, Identifiable, Hashable {
         meal = try container.decodeIfPresent(String.self, forKey: .meal) ?? "other"
         time = try container.decodeIfPresent(String.self, forKey: .time)
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
-        pantry = try container.decodeIfPresent([String].self, forKey: .pantry) ?? []
+        pantry = collapsePantryItems(try container.decodeIfPresent([String].self, forKey: .pantry) ?? [])
+        searchBlob = ([title, cuisine, meal] + tags + ingredients).joined(separator: " ").lowercased()
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encodeIfPresent(servings, forKey: .servings)
+        try container.encode(ingredients, forKey: .ingredients)
+        try container.encode(steps, forKey: .steps)
+        try container.encode(source, forKey: .source)
+        try container.encode(caption, forKey: .caption)
+        try container.encode(confidence, forKey: .confidence)
+        try container.encode(thumbnail, forKey: .thumbnail)
+        try container.encodeIfPresent(savedAt, forKey: .savedAt)
+        try container.encode(cuisine, forKey: .cuisine)
+        try container.encode(meal, forKey: .meal)
+        try container.encodeIfPresent(time, forKey: .time)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(pantry, forKey: .pantry)
     }
 
     var mealLabel: String {
@@ -94,6 +125,47 @@ struct RecipeMatch {
 }
 
 private let staples: Set<String> = ["salt", "water", "oil", "pepper", "black pepper", "sugar"]
+
+/// Cuts and shapes of a grocery item, not their own pantry entries.
+private let pantryForms: Set<String> = [
+    "lollipop", "lollipops",
+    "breast", "breasts",
+    "thigh", "thighs",
+    "wing", "wings",
+    "drumstick", "drumsticks",
+    "tender", "tenders", "tenderloin",
+    "fillet", "filet", "fillets",
+    "cutlet", "cutlets",
+    "chop", "chops",
+    "loin", "shoulder", "shank", "belly",
+    "nugget", "nuggets",
+    "cube", "cubes",
+    "strip", "strips",
+    "chunk", "chunks",
+    "bite", "bites",
+    "boneless", "skinless",
+    "ground", "whole",
+    "leg", "legs",
+]
+
+func collapsePantryItems(_ items: [String]) -> [String] {
+    var seen = Set<String>()
+    var found: [String] = []
+    for item in items {
+        let name = collapsePantryName(item)
+        guard !name.isEmpty, !seen.contains(name) else { continue }
+        seen.insert(name)
+        found.append(name)
+    }
+    return found
+}
+
+func collapsePantryName(_ name: String) -> String {
+    let words = name.lowercased().split { !$0.isLetter }.map(String.init).filter { !$0.isEmpty }
+    let core = words.filter { !pantryForms.contains($0) }
+    let kept = core.isEmpty ? words : core
+    return kept.joined(separator: " ")
+}
 
 func stem(_ name: String) -> String {
     if name.hasSuffix("chillies") { return String(name.dropLast(2)) }

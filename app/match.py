@@ -73,6 +73,50 @@ PREP = {
     "into",
     "with",
 }
+# Cuts and shapes of a grocery item, not their own pantry entries.
+# "chicken lollipop" and "chicken breast" should both be "chicken".
+FORMS = {
+    "lollipop",
+    "lollipops",
+    "breast",
+    "breasts",
+    "thigh",
+    "thighs",
+    "wing",
+    "wings",
+    "drumstick",
+    "drumsticks",
+    "tender",
+    "tenders",
+    "tenderloin",
+    "fillet",
+    "filet",
+    "fillets",
+    "cutlet",
+    "cutlets",
+    "chop",
+    "chops",
+    "loin",
+    "shoulder",
+    "shank",
+    "belly",
+    "nugget",
+    "nuggets",
+    "cube",
+    "cubes",
+    "strip",
+    "strips",
+    "chunk",
+    "chunks",
+    "bite",
+    "bites",
+    "boneless",
+    "skinless",
+    "ground",
+    "whole",
+    "leg",
+    "legs",
+}
 STAPLES = {"salt", "water", "oil", "pepper", "black pepper", "sugar"}
 
 
@@ -83,6 +127,9 @@ def canonical_ingredient(line: str) -> str:
     text = text.replace(",", " ")
     text = re.sub(r"[\d¼½¾⅓⅔⅛⅜/.\-]+", " ", text)
     words = [word for word in re.findall(r"[a-z]+", text) if word not in UNITS and word not in PREP]
+    core = [word for word in words if word not in FORMS]
+    if core:
+        words = core
     if not words:
         return ""
     return _singularize(" ".join(words))

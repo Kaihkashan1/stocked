@@ -2,7 +2,7 @@
 
 Share an Instagram reel from your iPhone. The hosted backend downloads it, asks Gemini to extract the recipe, and appends a row to a Google Sheet. Browse the collection in the iPhone app, at the Vercel URL, or in the Sheets app.
 
-This is the free-tier MVP: Instagram only, Google Sheets storage, Vercel in production (optional local Mac for development). Browse at `https://recipe-box-ashen-alpha.vercel.app/`, locally at `http://127.0.0.1:8000/`, or in the personal iPhone app in `ios/`. Photos and blog links can come later.
+This is the free-tier MVP: Instagram only, Google Sheets storage, Vercel in production (optional local Mac for development). Browse at `https://kaihkashan-recipe-box.vercel.app/`, locally at `http://127.0.0.1:8000/`, or in the personal iPhone app in `ios/`. Photos and blog links can come later.
 
 ```
 iPhone Share → POST /ingest → yt-dlp → Gemini → Google Sheets
@@ -96,7 +96,7 @@ On this Mac, open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) for the recip
 For day-to-day use, point the iPhone Shortcut and app at the hosted URL instead of this Mac:
 
 ```
-https://recipe-box-ashen-alpha.vercel.app
+https://kaihkashan-recipe-box.vercel.app
 ```
 
 A local server is only needed when you are developing the backend. If you do use LAN ingest, find this Mac’s Wi-Fi address (iPhone and Mac on the same network):
@@ -114,7 +114,7 @@ On the iPhone:
 1. Open **Shortcuts → All Shortcuts → +**. Name it **Save Recipe**.
 2. Tap the **i** (or shortcut settings) and turn on **Show in Share Sheet**. Accept **URLs** and **Text**.
 3. Add action **Get Contents of URL**:
-   - URL: `https://recipe-box-ashen-alpha.vercel.app/ingest`
+   - URL: `https://kaihkashan-recipe-box.vercel.app/ingest`
    - Method: `POST`
    - Headers:
      - `Content-Type` = `application/json`
@@ -145,7 +145,7 @@ Create a unique topic name at [ntfy.sh](https://ntfy.sh), subscribe in the ntfy 
 
 A SwiftUI app lives in `ios/`. Install it on your own iPhone from Xcode with a free Apple ID. Full steps: [`ios/README.md`](ios/README.md).
 
-Short version: open `ios/RecipeBox.xcodeproj` in **Xcode.app**, sign with your Personal Team, plug in the iPhone, press Run. The app defaults to `https://recipe-box-ashen-alpha.vercel.app` — the Mac does not need to be running.
+Short version: open `ios/RecipeBox.xcodeproj` in **Xcode.app**, sign with your Personal Team, plug in the iPhone, press Run. The app defaults to `https://kaihkashan-recipe-box.vercel.app` — the Mac does not need to be running.
 
 ## 9. Deploy to Vercel
 
@@ -165,13 +165,13 @@ The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in 
    | `YTDLP_COOKIES` | full contents of `instagram_cookies.txt` (only if you want cloud ingest) |
    | `NTFY_TOPIC` | optional |
 
-4. Redeploy after saving env vars. Production is [https://recipe-box-ashen-alpha.vercel.app/](https://recipe-box-ashen-alpha.vercel.app/).
+4. Redeploy after saving env vars. Production is [https://kaihkashan-recipe-box.vercel.app/](https://kaihkashan-recipe-box.vercel.app/).
 
 Browsing the box works well on Vercel. Instagram ingest has a **60 second** function limit, so long reels may time out in the cloud. If that happens, you can temporarily point the Shortcut at a local Mac ingest URL.
 
 ## Notes
 
-- **The app.** Production is `https://recipe-box-ashen-alpha.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install the personal iOS app — see [`ios/README.md`](ios/README.md). Google Sheets remains the database.
+- **The app.** Production is `https://kaihkashan-recipe-box.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install the personal iOS app — see [`ios/README.md`](ios/README.md). Google Sheets remains the database.
 - **Duplicates.** The same reel URL is not written twice.
 - **Rate limits.** Gemini 429s are retried with backoff.
 - **Instagram.** `yt-dlp` is not an official Instagram API. Keep this as a personal tool; expect occasional breakage when Instagram changes something. If fetches start failing, update with `pip install -U yt-dlp` and re-export `instagram_cookies.txt`.
