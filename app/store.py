@@ -10,7 +10,7 @@ import gspread
 from app.config import settings
 from app.fetch import normalize_url
 from app.match import pantry_items
-from app.models import FetchedPost, Recipe, RecipeCategory
+from app.models import FetchedPost, Recipe
 
 logger = logging.getLogger(__name__)
 
@@ -122,25 +122,6 @@ def get_recipe(row_id: int) -> dict | None:
     if not str(record.get("Title") or "").strip():
         return None
     return _record_to_recipe(row_id, record)
-
-
-def recipes_needing_categories() -> list[dict]:
-    return [
-        recipe
-        for recipe in list_recipes()
-        if not recipe["cuisine"] or recipe["cuisine"] == "Uncategorized"
-    ]
-
-
-def update_categories(row_id: int, category: RecipeCategory) -> None:
-    worksheet = _worksheet()
-    cuisine = _clean_cuisine(category.cuisine)
-    tags = ", ".join(_clean_tag(tag) for tag in category.tags if _clean_tag(tag))
-    worksheet.update(
-        f"J{row_id}:M{row_id}",
-        [[cuisine, category.meal, category.time or "", tags]],
-        value_input_option="USER_ENTERED",
-    )
 
 
 def _record_to_recipe(row_id: int, record: dict) -> dict:

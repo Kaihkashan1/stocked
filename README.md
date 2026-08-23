@@ -84,16 +84,10 @@ In `.env`:
 
 When Instagram logs you out, export a fresh file and replace this one.
 
-## 5. Check setup, then run
+## 5. Run
 
 ```bash
 source .venv/bin/activate
-python -m app.check
-```
-
-If that prints `All checks passed`:
-
-```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -187,7 +181,5 @@ app/
   fetch.py      Instagram via yt-dlp
   extract.py    Gemini video/image → structured JSON
   store.py      Google Sheets append, list, categories
-  backfill.py   python -m app.backfill  (categorize old rows)
-  check.py      python -m app.check
 vercel.json     Vercel function timeout
 ```
