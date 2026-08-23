@@ -96,13 +96,26 @@ function authHeaders() {
   return secret ? { "X-Recipe-Box-Key": secret } : {};
 }
 
+// A FastAPI HTTPException's {"detail": "..."} body is usually a real,
+// actionable message (e.g. "Gemini's free daily quota is used up...")
+// rather than just a status code — surface it when present.
+async function errorForResponse(response) {
+  try {
+    const body = await response.json();
+    if (body && typeof body.detail === "string") return new Error(body.detail);
+  } catch {
+    // body wasn't JSON, or had no detail field — fall through
+  }
+  return new Error(`Server returned HTTP ${response.status}`);
+}
+
 async function createRecipeRequest(draft) {
   const response = await fetch("/api/recipes", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(draft),
   });
-  if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+  if (!response.ok) throw await errorForResponse(response);
   return response.json();
 }
 
@@ -112,13 +125,13 @@ async function patchRecipe(id, patch) {
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(patch),
   });
-  if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+  if (!response.ok) throw await errorForResponse(response);
   return response.json();
 }
 
 async function deleteRecipeRequest(id) {
   const response = await fetch(`/api/recipes/${id}`, { method: "DELETE", headers: authHeaders() });
-  if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+  if (!response.ok) throw await errorForResponse(response);
   return response.json();
 }
 
@@ -197,7 +210,7 @@ async function putPlan(ids) {
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ ids: [...ids] }),
   });
-  if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+  if (!response.ok) throw await errorForResponse(response);
   return (await response.json()).ids;
 }
 
