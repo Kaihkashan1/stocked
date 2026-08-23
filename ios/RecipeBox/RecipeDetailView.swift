@@ -41,6 +41,9 @@ struct RecipeDetailView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        if let url = recipe.sourceURL {
+                            Link("Original post", destination: url)
+                        }
                         Button("Edit") { showEdit = true }
                         Button("Delete", role: .destructive) { showDeleteConfirm = true }
                     } label: {
@@ -115,10 +118,6 @@ struct RecipeDetailView: View {
                     }
                     if !recipe.steps.isEmpty {
                         stepsSection(for: recipe)
-                    }
-                    if let url = recipe.sourceURL {
-                        Link("Original post →", destination: url)
-                            .font(.body.weight(.semibold))
                     }
                 }
                 .padding(20)
