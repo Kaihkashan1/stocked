@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 from datetime import datetime, timezone
@@ -75,6 +76,39 @@ def _ensure_headers(worksheet) -> None:
         worksheet.update(f"A1:{LAST_COL_LETTER}1", [HEADERS], value_input_option="RAW")
         return
     logger.warning("Sheet already has a header row that does not match %s", HEADERS)
+
+
+STATE_SHEET_TITLE = "AppState"
+
+
+@lru_cache(maxsize=1)
+def _state_worksheet():
+    spreadsheet = _worksheet().spreadsheet
+    try:
+        return spreadsheet.worksheet(STATE_SHEET_TITLE)
+    except gspread.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(title=STATE_SHEET_TITLE, rows=2, cols=1)
+        worksheet.update("A1", [["{}"]], value_input_option="RAW")
+        return worksheet
+
+
+def get_plan_ids() -> list[int]:
+    """The meal plan is shared across devices (iOS + web) — this is the
+    only piece of client state worth syncing; "what I have" is more of a
+    per-session browsing context than something to carry between devices."""
+    raw = _state_worksheet().acell("A1").value or "{}"
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        data = {}
+    ids = data.get("plan_ids") or []
+    return sorted({int(i) for i in ids if str(i).lstrip("-").isdigit()})
+
+
+def save_plan_ids(ids: list[int]) -> list[int]:
+    clean = sorted({int(i) for i in ids})
+    _state_worksheet().update("A1", [[json.dumps({"plan_ids": clean})]], value_input_option="RAW")
+    return clean
 
 
 def source_exists(url: str) -> bool:

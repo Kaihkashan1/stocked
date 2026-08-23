@@ -13,9 +13,9 @@ from fastapi.staticfiles import StaticFiles
 from app.auth import require_secret
 from app.config import ROOT, settings
 from app.match import STAPLES, grouped_pantry
-from app.models import RecipeUpdate
+from app.models import PlanUpdate, RecipeUpdate
 from app.pipeline import jobs, process_recipe
-from app.store import delete_recipe, get_recipe, list_recipes, update_recipe
+from app.store import delete_recipe, get_plan_ids, get_recipe, list_recipes, save_plan_ids, update_recipe
 
 logging.basicConfig(
     level=logging.INFO,
@@ -99,6 +99,16 @@ async def api_delete_recipe(row_id: int):
     if not delete_recipe(row_id):
         raise HTTPException(status_code=404, detail="Recipe not found")
     return {"status": "deleted", "id": row_id}
+
+
+@app.get("/api/plan")
+async def api_get_plan():
+    return {"ids": get_plan_ids()}
+
+
+@app.put("/api/plan", dependencies=[Depends(require_secret)])
+async def api_put_plan(body: PlanUpdate):
+    return {"ids": save_plan_ids(body.ids)}
 
 
 @app.get("/jobs", dependencies=[Depends(require_secret)])

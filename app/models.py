@@ -33,6 +33,10 @@ class RecipeUpdate(BaseModel):
     favorite: bool | None = None
 
 
+class PlanUpdate(BaseModel):
+    ids: list[int] = Field(default_factory=list)
+
+
 class RecipeCategory(BaseModel):
     cuisine: str = "Uncategorized"
     meal: Meal = "other"
