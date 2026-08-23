@@ -381,6 +381,23 @@ function closeFilters() {
   els.filtersBtn.setAttribute("aria-expanded", "false");
 }
 
+// The recipe drawer's "⋯" menu (Original post / Edit / Delete) — same
+// split as the iOS ellipsis menu, with Favorite kept as its own button.
+function toggleRecipeMenu() {
+  const menu = document.querySelector(".recipe-menu");
+  const btn = document.querySelector('[data-action="toggle-recipe-menu"]');
+  if (!menu || !btn) return;
+  menu.hidden = !menu.hidden;
+  btn.setAttribute("aria-expanded", String(!menu.hidden));
+}
+
+function closeRecipeMenu() {
+  const menu = document.querySelector(".recipe-menu");
+  const btn = document.querySelector('[data-action="toggle-recipe-menu"]');
+  if (menu) menu.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
 function pantryCatalog() {
   return unique(state.recipes.flatMap((recipe) => recipe.pantry || [])).filter(
     (item) => !STAPLES.has(item)
@@ -601,8 +618,8 @@ function recipeHtml(recipe) {
   const steps = (recipe.steps || [])
     .map((item, index) => `<li><span class="step-num">${index + 1}</span><span>${escapeHtml(item)}</span></li>`)
     .join("");
-  const source = recipe.source
-    ? `<p><a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">Original post →</a></p>`
+  const originalPostItem = recipe.source
+    ? `<a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">Original post</a>`
     : "";
   const heroStyle = recipe.thumbnail ? ` style="background-image:url('${escapeAttr(recipe.thumbnail)}')"` : "";
   const heroLetter = recipe.thumbnail ? "" : `<div class="hero-letter">${escapeHtml((recipe.title || "?").slice(0, 1).toUpperCase())}</div>`;
@@ -618,8 +635,16 @@ function recipeHtml(recipe) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
           Favorite
         </button>
-        <button class="pill-btn edit" type="button" data-action="start-edit" data-id="${recipe.id}">Edit</button>
-        <button class="pill-btn delete" type="button" data-action="delete-recipe" data-id="${recipe.id}">Delete</button>
+        <div class="menu-anchor">
+          <button class="pill-btn menu-btn" type="button" data-action="toggle-recipe-menu" aria-haspopup="true" aria-expanded="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+          </button>
+          <div class="recipe-menu" hidden>
+            ${originalPostItem}
+            <button type="button" data-action="start-edit" data-id="${recipe.id}">Edit</button>
+            <button type="button" class="danger" data-action="delete-recipe" data-id="${recipe.id}">Delete</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="hero"${heroStyle}>
@@ -635,7 +660,6 @@ function recipeHtml(recipe) {
       <ul class="ingredients">${ingredients || "<li>None listed</li>"}</ul>
       <h3>Steps</h3>
       <ol class="steps">${steps || "<li>None listed</li>"}</ol>
-      ${source}
     </div>`;
 }
 
@@ -851,6 +875,13 @@ document.addEventListener("click", (event) => {
   closeFilters();
 });
 
+document.addEventListener("click", (event) => {
+  const menu = document.querySelector(".recipe-menu");
+  if (!menu || menu.hidden) return;
+  if (menu.contains(event.target) || event.target.closest('[data-action="toggle-recipe-menu"]')) return;
+  closeRecipeMenu();
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !els.filtersPanel.hidden) closeFilters();
 });
@@ -894,6 +925,10 @@ document.addEventListener("click", (event) => {
     case "toggle-plan":
       event.stopPropagation();
       togglePlan(id);
+      break;
+    case "toggle-recipe-menu":
+      event.stopPropagation();
+      toggleRecipeMenu();
       break;
     case "close-drawer":
       closeDrawer();

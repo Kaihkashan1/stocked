@@ -442,6 +442,11 @@ button { font-family: inherit; }
   background: var(--surface);
   position: sticky;
   top: 0;
+  /* Without this, this sticky element's whole stacking context — including
+     the ellipsis dropdown nested inside it — can paint behind the .hero
+     sibling that follows it in the DOM, since a positioned element with
+     z-index:auto isn't guaranteed to win against a later static sibling. */
+  z-index: 30;
 }
 
 .drawer-actions.editing { justify-content: flex-end; }
@@ -478,10 +483,52 @@ button { font-family: inherit; }
 .pill-btn.favorite { background: var(--warm-soft); color: var(--warm); }
 .pill-btn.favorite svg { opacity: 0.5; }
 .pill-btn.favorite.active svg { opacity: 1; fill: currentColor; }
-.pill-btn.edit { background: var(--surface-2); color: var(--ink); }
-.pill-btn.delete { background: none; color: var(--danger); border: 1px solid var(--danger-soft); }
 .pill-btn.primary { background: var(--accent); color: #fff; }
 .pill-btn:disabled { opacity: 0.6; cursor: default; }
+
+.pill-btn.menu-btn { background: var(--surface-2); color: var(--ink); padding: 0.5rem 0.7rem; }
+
+.menu-anchor { position: relative; }
+
+.recipe-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 25;
+  min-width: 11rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Same author-vs-UA-stylesheet fix as .shell/.filters-panel. */
+.recipe-menu[hidden] { display: none; }
+
+.recipe-menu a,
+.recipe-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-family: "Public Sans", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.recipe-menu a:hover,
+.recipe-menu button:hover { background: var(--bg); }
+
+.recipe-menu button.danger { color: var(--danger); }
 
 .hero {
   height: 230px;

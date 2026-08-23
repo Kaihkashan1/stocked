@@ -28,6 +28,12 @@ struct RecipeDetailView: View {
         // Full immersion while reading a recipe — the fix for the floating
         // tab bar overlapping the last section (ingredients/steps/link).
         .toolbar(.hidden, for: .tabBar)
+        // An opaque nav bar instead of the default transparent-over-content
+        // one — with a full-bleed hero photo right below it, the
+        // transparent/scrollEdge toolbar style is what let the ellipsis
+        // menu's popover render behind the photo instead of above it.
+        .toolbarBackground(Theme.surface, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             if let recipe {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -218,13 +224,10 @@ struct RecipeDetailView: View {
         let parsedLines = recipe.ingredients.map(splitIngredientQuantity)
         let canScale = parsedLines.contains { $0.quantity.flatMap { parseQuantityNumber(String($0.split(separator: " ").first ?? "")) } != nil }
 
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                sectionHeading("Ingredients")
-                Spacer()
-                if canScale {
-                    scaleControl()
-                }
+        return VStack(alignment: .leading, spacing: 12) {
+            sectionHeading("Ingredients")
+            if canScale {
+                scaleControl()
             }
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(parsedLines.enumerated()), id: \.offset) { index, parsed in
