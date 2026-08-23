@@ -10,20 +10,41 @@ const MEAL_LABELS = {
 
 const STAPLES = new Set(["salt", "water", "oil", "pepper", "black pepper", "sugar"]);
 
+// Mirrors app/match.py's UNITS and Models.swift's ingredientUnits, so a
+// quantity gets called out the same way on every surface.
+const INGREDIENT_UNITS = new Set([
+  "cup", "cups", "tbsp", "tsp", "teaspoon", "teaspoons", "tablespoon", "tablespoons",
+  "g", "gram", "grams", "kg", "ml", "l", "litre", "litres", "liter", "liters",
+  "oz", "ounce", "ounces", "lb", "lbs", "pound", "pounds",
+  "clove", "cloves", "slice", "slices", "pinch", "pinches",
+  "can", "cans", "pack", "packs", "packet", "packets",
+  "piece", "pieces", "pc", "pcs", "handful", "handfuls",
+]);
+
+const SECRET_KEY = "recipeBox.secret";
+const PLAN_KEY = "recipeBox.plan";
+
 const state = {
   recipes: [],
   pantryGroups: [],
+  tab: "recipes",
   meal: "all",
   cuisine: "all",
   query: "",
   have: [],
   pantryQuery: "",
+  favoritesOnly: false,
+  planIDs: loadPlanIDs(),
+  checkedItems: new Set(),
+  openRecipeId: null,
+  editingId: null,
 };
 
 const els = {
   search: document.getElementById("search"),
   meals: document.getElementById("meal-filters"),
   cuisines: document.getElementById("cuisine-filters"),
+  favoritesToggle: document.getElementById("favorites-toggle"),
   pantrySearch: document.getElementById("pantry-search"),
   pantrySelected: document.getElementById("pantry-selected"),
   pantryOptions: document.getElementById("pantry-options"),
@@ -31,7 +52,12 @@ const els = {
   status: document.getElementById("status"),
   drawer: document.getElementById("drawer"),
   detail: document.getElementById("recipe-detail"),
-  close: document.getElementById("close-drawer"),
+  recipesView: document.getElementById("recipes-view"),
+  planView: document.getElementById("plan-view"),
+  planContent: document.getElementById("plan-content"),
+  planBadge: document.getElementById("plan-badge"),
+  settingsBtn: document.getElementById("settings-btn"),
+  tabs: document.querySelectorAll(".tab"),
 };
 
 async function load() {
@@ -47,8 +73,202 @@ async function load() {
   renderFilters();
   renderPantry();
   renderGrid();
+  renderPlanBadge();
   maybeOpenFromHash();
 }
+
+// ---------- auth / API ----------
+
+function authHeaders() {
+  const secret = (localStorage.getItem(SECRET_KEY) || "").trim();
+  return secret ? { "X-Recipe-Box-Key": secret } : {};
+}
+
+async function patchRecipe(id, patch) {
+  const response = await fetch(`/api/recipes/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+  return response.json();
+}
+
+async function deleteRecipeRequest(id) {
+  const response = await fetch(`/api/recipes/${id}`, { method: "DELETE", headers: authHeaders() });
+  if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+  return response.json();
+}
+
+function openSettings() {
+  const current = localStorage.getItem(SECRET_KEY) || "";
+  const value = window.prompt(
+    "Edit key — same value as RECIPE_BOX_SECRET on the server. Needed to favorite, edit, or delete from here. Leave blank against a dev server with no secret set.",
+    current
+  );
+  if (value === null) return;
+  localStorage.setItem(SECRET_KEY, value.trim());
+}
+
+// ---------- ingredient quantity emphasis ----------
+
+function looksLikeQuantityToken(token) {
+  const cleaned = token.replace(/^[,;]+|[,;]+$/g, "");
+  if (!cleaned) return false;
+  return /^[0-9¼½¾⅓⅔⅛⅜]+([/.-][0-9]+)?$/.test(cleaned);
+}
+
+function splitIngredientQuantity(line) {
+  const trimmed = line.trim();
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (!words.length || !looksLikeQuantityToken(words[0])) {
+    return { quantity: null, text: trimmed };
+  }
+  const quantityParts = [words[0]];
+  let consumed = 1;
+  if (words.length > 1) {
+    const second = words[1].replace(/[.,;]+$/, "").toLowerCase();
+    if (INGREDIENT_UNITS.has(second)) {
+      quantityParts.push(words[1]);
+      consumed = 2;
+    }
+  }
+  const rest = words.slice(consumed).join(" ").replace(/^[,\s]+/, "");
+  if (!rest) return { quantity: null, text: trimmed };
+  return { quantity: quantityParts.join(" "), text: rest };
+}
+
+// ---------- plan / grocery list ----------
+
+function loadPlanIDs() {
+  try {
+    const raw = localStorage.getItem(PLAN_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function savePlanIDs() {
+  localStorage.setItem(PLAN_KEY, JSON.stringify([...state.planIDs]));
+}
+
+function togglePlan(id) {
+  id = Number(id);
+  if (state.planIDs.has(id)) {
+    state.planIDs.delete(id);
+  } else {
+    state.planIDs.add(id);
+  }
+  savePlanIDs();
+  renderPlanBadge();
+  renderGrid();
+  if (state.tab === "plan") renderPlan();
+}
+
+function renderPlanBadge() {
+  const count = state.planIDs.size;
+  els.planBadge.hidden = count === 0;
+  els.planBadge.textContent = String(count);
+}
+
+function canonicalKey(line, pantry) {
+  const lower = line.toLowerCase();
+  const matches = (pantry || []).filter((item) => lower.includes(item));
+  if (!matches.length) return "other";
+  return matches.reduce((a, b) => (b.length > a.length ? b : a));
+}
+
+function groupedIngredients(planned) {
+  const buckets = new Map();
+  const seenLines = new Set();
+  for (const recipe of planned) {
+    for (const line of recipe.ingredients || []) {
+      if (seenLines.has(line)) continue;
+      seenLines.add(line);
+      const key = canonicalKey(line, recipe.pantry);
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(line);
+    }
+  }
+  return [...buckets.entries()]
+    .map(([key, lines]) => ({ key, lines: lines.sort() }))
+    .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+function renderPlan() {
+  const planned = state.recipes.filter((r) => state.planIDs.has(r.id));
+  if (!planned.length) {
+    els.planContent.innerHTML = `<div class="empty">No recipes planned yet. Tap the cart icon on a recipe to add it here.</div>`;
+    return;
+  }
+
+  const rows = planned
+    .map((recipe) => {
+      const letter = (recipe.title || "?").slice(0, 1).toUpperCase();
+      const thumb = recipe.thumbnail
+        ? `<img src="${escapeAttr(recipe.thumbnail)}" alt="">`
+        : `<span class="thumb-letter" style="font-size:1.1rem">${escapeHtml(letter)}</span>`;
+      return `
+        <div class="plan-row">
+          <div class="plan-thumb">${thumb}</div>
+          <button class="plan-title" type="button" data-action="open-recipe" data-id="${recipe.id}">${escapeHtml(recipe.title)}</button>
+          <button class="icon-btn" type="button" data-action="toggle-plan" data-id="${recipe.id}">Remove</button>
+        </div>`;
+    })
+    .join("");
+
+  const groups = groupedIngredients(planned)
+    .map((group) => {
+      const items = group.lines
+        .map((line) => {
+          const { quantity, text } = splitIngredientQuantity(line);
+          const checked = state.checkedItems.has(line);
+          return `
+            <label class="grocery-item${checked ? " checked" : ""}">
+              <input type="checkbox" data-line="${escapeAttr(line)}" ${checked ? "checked" : ""}>
+              ${quantity ? `<span class="qty">${escapeHtml(quantity)}</span>` : ""}
+              <span>${escapeHtml(text)}</span>
+            </label>`;
+        })
+        .join("");
+      return `
+        <div>
+          <h3 class="pantry-heading">${escapeHtml(capitalize(group.key))}</h3>
+          <div class="grocery-list">${items}</div>
+        </div>`;
+    })
+    .join("");
+
+  els.planContent.innerHTML = `
+    <section>
+      <h2 class="eyebrow">Planned · ${planned.length} recipe${planned.length === 1 ? "" : "s"}</h2>
+      <div class="plan-rows">${rows}</div>
+    </section>
+    <section>
+      <div class="grocery-header">
+        <h2>Grocery list</h2>
+        <button class="link-btn" type="button" data-action="clear-plan">Clear plan</button>
+      </div>
+      <div class="grocery-groups">${groups}</div>
+    </section>`;
+}
+
+function capitalize(value) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+// ---------- tabs ----------
+
+function setTab(tab) {
+  state.tab = tab;
+  els.recipesView.hidden = tab !== "recipes";
+  els.planView.hidden = tab !== "plan";
+  els.tabs.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === tab));
+  if (tab === "plan") renderPlan();
+}
+
+// ---------- filters / recipe grid (existing browse behavior) ----------
 
 function renderFilters() {
   const meals = ["all", ...Object.keys(MEAL_LABELS)];
@@ -60,6 +280,8 @@ function renderFilters() {
   els.cuisines.innerHTML = cuisines
     .map((cuisine) => chip("cuisine", cuisine, cuisine === "all" ? "All cuisines" : cuisine))
     .join("");
+
+  els.favoritesToggle.classList.toggle("active", state.favoritesOnly);
 }
 
 function pantryCatalog() {
@@ -152,6 +374,7 @@ function filtered() {
   const query = state.query.trim().toLowerCase();
   const rows = [];
   for (const recipe of state.recipes) {
+    if (state.favoritesOnly && !recipe.favorite) continue;
     if (state.meal !== "all" && recipe.meal !== state.meal) continue;
     if (state.cuisine !== "all" && recipe.cuisine !== state.cuisine) continue;
     const match = recipeMatch(recipe);
@@ -208,25 +431,54 @@ function cardHtml({ recipe, match }) {
           : `${Math.round(match.score * 100)}% fit`;
     tags.unshift(`<span class="pill match">${escapeHtml(label)}</span>`);
   }
+  const favoriteActive = recipe.favorite ? " active" : "";
+  const planActive = state.planIDs.has(recipe.id) ? " active" : "";
   return `
-    <button class="card" type="button" data-id="${recipe.id}">
-      <div class="thumb">${thumb}</div>
-      <div class="card-body">
+    <div class="card" data-id="${recipe.id}">
+      <div class="thumb">
+        ${thumb}
+        <div class="card-actions">
+          <button class="card-icon-btn favorite${favoriteActive}" type="button" data-action="toggle-favorite" data-id="${recipe.id}" aria-label="Favorite">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="${recipe.favorite ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
+          </button>
+          <button class="card-icon-btn plan${planActive}" type="button" data-action="toggle-plan" data-id="${recipe.id}" aria-label="Add to plan">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 3h2.4l2.1 11.4a2 2 0 0 0 2 1.6h8.3a2 2 0 0 0 2-1.6L21 7H6"/><circle cx="9" cy="20" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="20" r="1.3" fill="currentColor" stroke="none"/></svg>
+          </button>
+        </div>
+      </div>
+      <button class="card-body" type="button" data-action="open-recipe" data-id="${recipe.id}" style="text-align:left; background:none; border:none; cursor:pointer; padding:0.95rem 1rem 1.1rem; font:inherit; color:inherit;">
         <h2>${escapeHtml(recipe.title)}</h2>
         <div class="meta">${tags.join("")}</div>
-      </div>
-    </button>`;
+      </button>
+    </div>`;
 }
 
+// ---------- recipe detail drawer ----------
+
 function openRecipe(id) {
-  const recipe = state.recipes.find((item) => String(item.id) === String(id));
+  id = Number(id);
+  const recipe = state.recipes.find((item) => item.id === id);
   if (!recipe) return;
-  location.hash = `#recipe/${recipe.id}`;
+  state.openRecipeId = id;
+  state.editingId = null;
+  location.hash = `#recipe/${id}`;
   els.detail.innerHTML = recipeHtml(recipe);
   els.drawer.hidden = false;
 }
 
+function refreshOpenRecipe() {
+  if (state.openRecipeId == null) return;
+  const recipe = state.recipes.find((item) => item.id === state.openRecipeId);
+  if (!recipe) {
+    closeDrawer();
+    return;
+  }
+  els.detail.innerHTML = recipeHtml(recipe);
+}
+
 function recipeHtml(recipe) {
+  if (state.editingId === recipe.id) return editFormHtml(recipe);
+
   const bits = [
     recipe.cuisine,
     MEAL_LABELS[recipe.meal] || recipe.meal,
@@ -235,29 +487,183 @@ function recipeHtml(recipe) {
   ].filter(Boolean);
   const tags = (recipe.tags || []).map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join("");
   const ingredients = (recipe.ingredients || [])
-    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .map((item) => {
+      const { quantity, text } = splitIngredientQuantity(item);
+      if (quantity) {
+        return `<li><span class="qty">${escapeHtml(quantity)}</span><span>${escapeHtml(text)}</span></li>`;
+      }
+      return `<li class="ingredient-plain"><span>${escapeHtml(text)}</span></li>`;
+    })
     .join("");
   const steps = (recipe.steps || [])
-    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .map((item, index) => `<li><span class="step-num">${index + 1}</span><span>${escapeHtml(item)}</span></li>`)
     .join("");
   const source = recipe.source
-    ? `<p><a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">Original post</a></p>`
+    ? `<p><a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">Original post →</a></p>`
     : "";
+  const heroStyle = recipe.thumbnail ? ` style="background-image:url('${escapeAttr(recipe.thumbnail)}')"` : "";
+  const heroLetter = recipe.thumbnail ? "" : `<div class="hero-letter">${escapeHtml((recipe.title || "?").slice(0, 1).toUpperCase())}</div>`;
+
   return `
-    <div class="recipe">
-      <p class="eyebrow">${escapeHtml(bits.join(" · "))}</p>
-      <h2 id="recipe-title">${escapeHtml(recipe.title)}</h2>
+    <div class="drawer-actions">
+      <button class="icon-btn" type="button" data-action="close-drawer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        Close
+      </button>
+      <div class="action-group">
+        <button class="pill-btn favorite${recipe.favorite ? " active" : ""}" type="button" data-action="toggle-favorite" data-id="${recipe.id}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
+          Favorite
+        </button>
+        <button class="pill-btn edit" type="button" data-action="start-edit" data-id="${recipe.id}">Edit</button>
+        <button class="pill-btn delete" type="button" data-action="delete-recipe" data-id="${recipe.id}">Delete</button>
+      </div>
+    </div>
+    <div class="hero"${heroStyle}>
+      ${heroLetter}
+      <div class="hero-text">
+        <p class="eyebrow">${escapeHtml(bits.join(" · "))}</p>
+        <h2 id="recipe-title">${escapeHtml(recipe.title)}</h2>
+      </div>
+    </div>
+    <div class="recipe recipe-body">
       <div class="meta">${tags}</div>
       <h3>Ingredients</h3>
-      <ul>${ingredients || "<li>None listed</li>"}</ul>
+      <ul class="ingredients">${ingredients || "<li>None listed</li>"}</ul>
       <h3>Steps</h3>
-      <ol>${steps || "<li>None listed</li>"}</ol>
+      <ol class="steps">${steps || "<li>None listed</li>"}</ol>
       ${source}
     </div>`;
 }
 
+function editFormHtml(recipe) {
+  return `
+    <div class="drawer-actions editing">
+      <button class="icon-btn" type="button" data-action="cancel-edit">Cancel</button>
+    </div>
+    <div class="recipe recipe-body">
+      <h2 style="margin-bottom:1.2rem;">Edit recipe</h2>
+      <label class="field">
+        <span>Title</span>
+        <input id="edit-title" value="${escapeAttr(recipe.title)}">
+      </label>
+      <label class="field">
+        <span>Servings</span>
+        <input id="edit-servings" value="${escapeAttr(recipe.servings || "")}">
+      </label>
+      <label class="field">
+        <span>Ingredients — one per line</span>
+        <textarea id="edit-ingredients" rows="8">${escapeHtml((recipe.ingredients || []).join("\n"))}</textarea>
+      </label>
+      <label class="field">
+        <span>Steps — one per line</span>
+        <textarea id="edit-steps" rows="10">${escapeHtml((recipe.steps || []).join("\n"))}</textarea>
+      </label>
+      <p id="edit-error" class="edit-error" hidden></p>
+      <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">Save</button>
+    </div>`;
+}
+
+async function toggleFavorite(id) {
+  id = Number(id);
+  const recipe = state.recipes.find((item) => item.id === id);
+  if (!recipe) return;
+  const optimistic = !recipe.favorite;
+  recipe.favorite = optimistic;
+  renderGrid();
+  refreshOpenRecipe();
+  try {
+    const updated = await patchRecipe(id, { favorite: optimistic });
+    Object.assign(recipe, updated);
+  } catch (err) {
+    recipe.favorite = !optimistic;
+    window.alert(`Couldn't save: ${err.message}`);
+  }
+  renderGrid();
+  refreshOpenRecipe();
+}
+
+function startEdit(id) {
+  state.editingId = Number(id);
+  refreshOpenRecipe();
+}
+
+function cancelEdit() {
+  state.editingId = null;
+  refreshOpenRecipe();
+}
+
+async function saveEdit(id) {
+  id = Number(id);
+  const titleInput = document.getElementById("edit-title");
+  const servingsInput = document.getElementById("edit-servings");
+  const ingredientsInput = document.getElementById("edit-ingredients");
+  const stepsInput = document.getElementById("edit-steps");
+  const errorEl = document.getElementById("edit-error");
+  const saveBtn = document.querySelector('[data-action="save-edit"]');
+
+  const title = titleInput.value.trim();
+  if (!title) {
+    errorEl.textContent = "Title can't be empty.";
+    errorEl.hidden = false;
+    return;
+  }
+
+  const patch = {
+    title,
+    servings: servingsInput.value.trim() || null,
+    ingredients: linesFrom(ingredientsInput.value),
+    steps: linesFrom(stepsInput.value),
+  };
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving…";
+  try {
+    const updated = await patchRecipe(id, patch);
+    const recipe = state.recipes.find((item) => item.id === id);
+    if (recipe) Object.assign(recipe, updated);
+    state.editingId = null;
+    renderGrid();
+    refreshOpenRecipe();
+  } catch (err) {
+    errorEl.textContent = `Couldn't save: ${err.message}`;
+    errorEl.hidden = false;
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save";
+  }
+}
+
+function linesFrom(text) {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+async function deleteRecipe(id) {
+  id = Number(id);
+  const recipe = state.recipes.find((item) => item.id === id);
+  if (!recipe) return;
+  if (!window.confirm(`Delete "${recipe.title}"? This removes it from your Recipe Box.`)) return;
+  try {
+    await deleteRecipeRequest(id);
+    state.recipes = state.recipes.filter((item) => item.id !== id);
+    state.planIDs.delete(id);
+    savePlanIDs();
+    closeDrawer();
+    renderFilters();
+    renderGrid();
+    renderPlanBadge();
+    if (state.tab === "plan") renderPlan();
+  } catch (err) {
+    window.alert(`Couldn't delete: ${err.message}`);
+  }
+}
+
 function closeDrawer() {
   els.drawer.hidden = true;
+  state.openRecipeId = null;
+  state.editingId = null;
   if (location.hash.startsWith("#recipe/")) {
     history.replaceState(null, "", location.pathname);
   }
@@ -304,6 +710,18 @@ els.pantrySearch.addEventListener("input", () => {
   renderPantry();
 });
 
+els.favoritesToggle.addEventListener("click", () => {
+  state.favoritesOnly = !state.favoritesOnly;
+  renderFilters();
+  renderGrid();
+});
+
+els.settingsBtn.addEventListener("click", openSettings);
+
+els.tabs.forEach((btn) => {
+  btn.addEventListener("click", () => setTab(btn.dataset.tab));
+});
+
 document.addEventListener("click", (event) => {
   const pantry = event.target.closest("[data-pantry]");
   if (pantry) {
@@ -317,11 +735,67 @@ document.addEventListener("click", (event) => {
     renderGrid();
     return;
   }
-  const card = event.target.closest(".card");
-  if (card) openRecipe(card.dataset.id);
+
+  const actionEl = event.target.closest("[data-action]");
+  if (!actionEl) {
+    const card = event.target.closest(".card");
+    if (card) openRecipe(card.dataset.id);
+    return;
+  }
+
+  const { action, id } = actionEl.dataset;
+  switch (action) {
+    case "open-recipe":
+      openRecipe(id);
+      break;
+    case "toggle-favorite":
+      event.stopPropagation();
+      toggleFavorite(id);
+      break;
+    case "toggle-plan":
+      event.stopPropagation();
+      togglePlan(id);
+      break;
+    case "close-drawer":
+      closeDrawer();
+      break;
+    case "start-edit":
+      startEdit(id);
+      break;
+    case "cancel-edit":
+      cancelEdit();
+      break;
+    case "save-edit":
+      saveEdit(id);
+      break;
+    case "delete-recipe":
+      deleteRecipe(id);
+      break;
+    case "clear-plan":
+      state.planIDs.clear();
+      state.checkedItems.clear();
+      savePlanIDs();
+      renderPlanBadge();
+      renderPlan();
+      renderGrid();
+      break;
+    default:
+      break;
+  }
 });
 
-els.close.addEventListener("click", closeDrawer);
+document.addEventListener("change", (event) => {
+  const checkbox = event.target.closest('.grocery-item input[type="checkbox"]');
+  if (!checkbox) return;
+  const line = checkbox.dataset.line;
+  if (state.checkedItems.has(line)) {
+    state.checkedItems.delete(line);
+  } else {
+    state.checkedItems.add(line);
+  }
+  renderPlan();
+});
+
 els.drawer.addEventListener("click", (event) => {
   if (event.target === els.drawer) closeDrawer();
 });

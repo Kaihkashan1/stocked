@@ -6,14 +6,23 @@
   <title>Recipe Box</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <p class="eyebrow">Personal collection</p>
-      <h1>Recipe Box</h1>
+    <div class="topbar-row">
+      <div class="brand">
+        <p class="eyebrow">Personal collection</p>
+        <h1>Recipe Box</h1>
+      </div>
+      <nav class="tabs" aria-label="Sections">
+        <button class="tab active" type="button" data-tab="recipes">Recipes</button>
+        <button class="tab" type="button" data-tab="plan">Plan<span id="plan-badge" class="tab-badge" hidden>0</span></button>
+      </nav>
+      <button id="settings-btn" class="icon-round" type="button" aria-label="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a1.8 1.8 0 0 0 .36 1.98l.06.06a2.16 2.16 0 1 1-3.06 3.06l-.06-.06a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.09 1.65v.17a2.16 2.16 0 1 1-4.32 0v-.09a1.8 1.8 0 0 0-1.18-1.65 1.8 1.8 0 0 0-1.98.36l-.06.06a2.16 2.16 0 1 1-3.06-3.06l.06-.06a1.8 1.8 0 0 0 .36-1.98 1.8 1.8 0 0 0-1.65-1.09h-.17a2.16 2.16 0 1 1 0-4.32h.09a1.8 1.8 0 0 0 1.65-1.18 1.8 1.8 0 0 0-.36-1.98l-.06-.06a2.16 2.16 0 1 1 3.06-3.06l.06.06a1.8 1.8 0 0 0 1.98.36h.08a1.8 1.8 0 0 0 1.09-1.65v-.17a2.16 2.16 0 1 1 4.32 0v.09a1.8 1.8 0 0 0 1.09 1.65h.08a1.8 1.8 0 0 0 1.98-.36l.06-.06a2.16 2.16 0 1 1 3.06 3.06l-.06.06a1.8 1.8 0 0 0-.36 1.98v.08a1.8 1.8 0 0 0 1.65 1.09h.17a2.16 2.16 0 1 1 0 4.32h-.09a1.8 1.8 0 0 0-1.65 1.09z"/></svg>
+      </button>
     </div>
     <label class="search">
       <span class="visually-hidden">Search recipes</span>
@@ -21,7 +30,7 @@
     </label>
   </header>
 
-  <div class="shell">
+  <div class="shell" id="recipes-view">
     <aside class="filters" aria-label="Categories">
       <section>
         <h2 class="eyebrow">Meal</h2>
@@ -30,6 +39,12 @@
       <section>
         <h2 class="eyebrow">Cuisine</h2>
         <div id="cuisine-filters" class="chips"></div>
+      </section>
+      <section>
+        <button id="favorites-toggle" class="favorites-toggle" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
+          Favorites only
+        </button>
       </section>
       <section>
         <h2 class="eyebrow">What I have</h2>
@@ -45,9 +60,12 @@
     </main>
   </div>
 
+  <div class="shell plan-shell" id="plan-view" hidden>
+    <div id="plan-content" class="plan-content"></div>
+  </div>
+
   <div id="drawer" class="drawer" hidden>
     <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="recipe-title">
-      <button id="close-drawer" class="icon-btn" type="button" aria-label="Close">Close</button>
       <article id="recipe-detail"></article>
     </div>
   </div>

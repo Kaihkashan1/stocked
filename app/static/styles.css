@@ -10,6 +10,8 @@
   --accent-soft: #dce7d8;
   --warm: #a56a16;
   --warm-soft: #f1e2c2;
+  --danger: #b6482f;
+  --danger-soft: #f1ddd4;
   --shadow: 0 1px 2px rgba(32, 41, 32, 0.06), 0 10px 28px -12px rgba(32, 41, 32, 0.18);
 }
 
@@ -47,21 +49,80 @@ h1, h2, h3 {
   clip: rect(0 0 0 0);
 }
 
+button { font-family: inherit; }
+
 .topbar {
   position: sticky;
   top: 0;
   z-index: 10;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1.5rem;
-  padding: 1.25rem 1.75rem 1rem;
+  padding: 1.1rem 1.75rem 1rem;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
 
-.brand h1 { font-size: 1.7rem; }
+.topbar-row {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.brand h1 { font-size: 1.6rem; font-weight: 700; }
+
+.tabs {
+  display: flex;
+  gap: 0.3rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.tab {
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tab.active { background: var(--accent); color: #fff; }
+
+.tab-badge {
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
+.tab.active .tab-badge { background: rgba(255, 255, 255, 0.3); }
+
+.icon-round {
+  margin-left: auto;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.icon-round:hover { color: var(--accent); border-color: var(--accent); }
 
 .search input {
   width: min(28rem, 100%);
@@ -87,7 +148,32 @@ h1, h2, h3 {
   padding: 1.5rem 1.75rem 4rem;
 }
 
+/* .shell's own `display: grid` (author CSS) otherwise beats the browser's
+   default `[hidden] { display: none }` (UA CSS) regardless of specificity,
+   since author styles always win over UA styles. */
+.shell[hidden] { display: none; }
+
+.plan-shell { grid-template-columns: minmax(0, 1fr); max-width: 920px; }
+
 .filters section + section { margin-top: 1.5rem; }
+
+.favorites-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.favorites-toggle.active { color: var(--warm); }
+.favorites-toggle svg { opacity: 0.55; }
+.favorites-toggle.active svg { opacity: 1; }
 
 .pantry-search {
   width: 100%;
@@ -128,8 +214,8 @@ h1, h2, h3 {
 .chip.toggle { border-style: dashed; }
 
 .pill.match {
-  background: var(--warm-soft);
-  color: var(--warm);
+  background: var(--accent);
+  color: #fff;
 }
 
 .chips {
@@ -141,11 +227,12 @@ h1, h2, h3 {
 .chip {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.72rem;
+  font-weight: 600;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink-soft);
   border-radius: 999px;
-  padding: 0.35rem 0.7rem;
+  padding: 0.4rem 0.8rem;
   cursor: pointer;
 }
 
@@ -164,7 +251,7 @@ h1, h2, h3 {
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
 .card {
@@ -185,11 +272,12 @@ h1, h2, h3 {
 .card:hover { border-color: var(--accent); }
 
 .thumb {
-  height: 140px;
+  height: 150px;
   background: var(--surface-2);
   display: grid;
   place-items: center;
   overflow: hidden;
+  position: relative;
 }
 
 .thumb img {
@@ -204,12 +292,37 @@ h1, h2, h3 {
   color: var(--accent);
 }
 
+.card-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.card-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(248, 249, 243, 0.92);
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.card-icon-btn.favorite.active { color: var(--warm); }
+.card-icon-btn.favorite.active svg { fill: currentColor; }
+.card-icon-btn.plan.active { color: var(--accent); }
+
 .card-body { padding: 0.95rem 1rem 1.1rem; }
 
 .card-body h2 {
   font-size: 1.05rem;
   line-height: 1.25;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.5rem;
 }
 
 .meta {
@@ -221,12 +334,13 @@ h1, h2, h3 {
 .pill {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.65rem;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   background: var(--accent-soft);
   color: var(--accent);
   border-radius: 4px;
-  padding: 0.15rem 0.4rem;
+  padding: 0.18rem 0.45rem;
 }
 
 .pill.warm {
@@ -252,58 +366,299 @@ h1, h2, h3 {
 
 .drawer[hidden] { display: none; }
 
-.drawer-panel,
 .drawer-panel {
-  width: min(560px, 100%);
+  width: min(600px, 100%);
   height: 100%;
   overflow: auto;
   background: var(--surface);
   border-left: 1px solid var(--line);
-  padding: 1.25rem 1.5rem 3rem;
   box-shadow: var(--shadow);
 }
 
-.icon-btn,
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 1rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+}
+
+.drawer-actions.editing { justify-content: flex-end; }
+
 .icon-btn {
-  float: right;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.3rem;
+}
+
+.action-group { display: flex; gap: 0.5rem; }
+
+.pill-btn {
+  border: none;
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pill-btn.favorite { background: var(--warm-soft); color: var(--warm); }
+.pill-btn.favorite svg { opacity: 0.5; }
+.pill-btn.favorite.active svg { opacity: 1; fill: currentColor; }
+.pill-btn.edit { background: var(--surface-2); color: var(--ink); }
+.pill-btn.delete { background: none; color: var(--danger); border: 1px solid var(--danger-soft); }
+.pill-btn.primary { background: var(--accent); color: #fff; }
+.pill-btn:disabled { opacity: 0.6; cursor: default; }
+
+.hero {
+  height: 230px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  background-color: var(--surface-2);
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(20, 15, 8, 0) 40%, rgba(16, 12, 7, 0.72) 100%);
+}
+
+.hero-letter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Fraunces", serif;
+  font-size: 4rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.hero-text {
+  position: absolute;
+  left: 1.4rem;
+  right: 1.4rem;
+  bottom: 1.1rem;
+  z-index: 1;
+}
+
+.hero-text .eyebrow { color: var(--warm-soft); margin-bottom: 0.4rem; }
+.hero-text h2 { color: #fff; font-size: 1.9rem; line-height: 1.15; margin: 0; }
+
+.recipe-body { padding: 1.6rem 1.4rem 3rem; }
+
+.recipe-body .meta { margin-bottom: 1.8rem; }
+
+.recipe h3 {
+  font-size: 1.25rem;
+  margin: 1.8rem 0 0.9rem;
+}
+
+.recipe h3:first-of-type { margin-top: 0; }
+
+ul.ingredients {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+ul.ingredients li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+}
+
+ul.ingredients li:last-child { border-bottom: none; }
+
+.qty {
+  flex-shrink: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 0.2rem 0.55rem;
+}
+
+.ingredient-plain span {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+ol.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+ol.steps li {
+  display: flex;
+  gap: 0.7rem;
+  counter-increment: step;
+}
+
+.step-num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recipe a { color: var(--accent); font-weight: 600; }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1.1rem;
+}
+
+.field span {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.field input, .field textarea {
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--ink);
-  border-radius: 999px;
-  padding: 0.35rem 0.8rem;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-size: 0.92rem;
+  resize: vertical;
+}
+
+.edit-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin-top: -0.4rem;
+}
+
+/* Plan view */
+.plan-content { display: flex; flex-direction: column; gap: 2.2rem; }
+
+.plan-rows { display: flex; flex-direction: column; gap: 0.6rem; }
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.6rem 0.9rem;
+  box-shadow: var(--shadow);
+}
+
+.plan-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plan-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.plan-title {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--ink);
+  padding: 0;
+}
+
+.grocery-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.recipe h2 { font-size: 1.8rem; margin: 0.4rem 0 0.7rem; }
+.grocery-groups { display: flex; flex-direction: column; gap: 1.3rem; }
 
-.recipe-meta {
+.grocery-list {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.grocery-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  color: var(--ink-soft);
-  font-size: 0.88rem;
-  margin-bottom: 1.4rem;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  font-size: 0.95rem;
 }
 
-.recipe h3 {
-  font-size: 1.05rem;
-  margin: 1.4rem 0 0.6rem;
-}
+.grocery-item:last-child { border-bottom: none; }
 
-.recipe ul, .recipe ol {
-  margin: 0;
-  padding-left: 1.2rem;
-}
+.grocery-item input { accent-color: var(--accent); width: 16px; height: 16px; }
 
-.recipe li { margin: 0.35rem 0; }
-
-.recipe a { color: var(--accent); }
+.grocery-item.checked span { color: var(--ink-soft); text-decoration: line-through; }
+.grocery-item.checked .qty { background: var(--surface-2); color: var(--ink-soft); }
 
 @media (max-width: 820px) {
   .shell { grid-template-columns: 1fr; padding: 1rem 1rem 3rem; }
-  .topbar { flex-direction: column; align-items: stretch; }
+  .topbar-row { flex-wrap: wrap; }
   .search input { width: 100%; }
   .filters { display: flex; gap: 1.25rem; overflow-x: auto; }
   .filters section { min-width: 12rem; }
