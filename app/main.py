@@ -15,7 +15,7 @@ from app.config import ROOT, settings
 from app.match import STAPLES, grouped_pantry
 from app.models import RecipeUpdate
 from app.pipeline import jobs, process_recipe
-from app.store import get_recipe, list_recipes, update_recipe
+from app.store import delete_recipe, get_recipe, list_recipes, update_recipe
 
 logging.basicConfig(
     level=logging.INFO,
@@ -92,6 +92,13 @@ async def api_update_recipe(row_id: int, body: RecipeUpdate):
     if not updated:
         raise HTTPException(status_code=404, detail="Recipe not found")
     return _public(updated)
+
+
+@app.delete("/api/recipes/{row_id}", dependencies=[Depends(require_secret)])
+async def api_delete_recipe(row_id: int):
+    if not delete_recipe(row_id):
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return {"status": "deleted", "id": row_id}
 
 
 @app.get("/jobs", dependencies=[Depends(require_secret)])

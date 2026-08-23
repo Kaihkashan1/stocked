@@ -108,6 +108,21 @@ def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
     logger.info("Saved %r to Google Sheets", recipe.title)
 
 
+def delete_recipe(row_id: int) -> bool:
+    """Blanks the row instead of removing it. Recipe ids are literal sheet
+    row numbers throughout this app (client caches, favorites, the meal
+    plan) — an actual row delete would shift every later row's id and
+    silently break all of that until the next full refresh. list_recipes()
+    and get_recipe() already skip blank-title rows, so a blanked row is
+    simply invisible."""
+    if get_recipe(row_id) is None:
+        return False
+    blank_row = [""] * len(HEADERS)
+    _worksheet().update(f"A{row_id}:{LAST_COL_LETTER}{row_id}", [blank_row], value_input_option="RAW")
+    logger.info("Cleared row %s", row_id)
+    return True
+
+
 def update_recipe(row_id: int, **fields) -> dict | None:
     """Partial update of a saved recipe (title, servings, ingredients, steps,
     favorite). Untouched fields keep their current sheet value."""

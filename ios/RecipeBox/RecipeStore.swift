@@ -149,6 +149,23 @@ final class RecipeStore: ObservableObject {
         }
     }
 
+    /// Returns an error message on failure, nil on success. Not optimistic —
+    /// deletion is destructive enough that it's worth waiting for the server
+    /// to confirm before the row disappears from the list.
+    func deleteRecipe(_ recipe: Recipe) async -> String? {
+        do {
+            try await APIClient(baseURLString: serverURL).deleteRecipe(id: recipe.id, secret: serverSecret)
+            recipesByID.removeValue(forKey: recipe.id)
+            recipes.removeAll { $0.id == recipe.id }
+            planIDs.remove(recipe.id)
+            updateDerived()
+            persistCache()
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     private func replace(_ updated: Recipe) {
         guard recipesByID[updated.id] != nil else { return }
         recipesByID[updated.id] = updated

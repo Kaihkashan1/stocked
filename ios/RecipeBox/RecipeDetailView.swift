@@ -3,7 +3,11 @@ import SwiftUI
 struct RecipeDetailView: View {
     let id: Int
     @EnvironmentObject private var store: RecipeStore
+    @Environment(\.dismiss) private var dismiss
     @State private var showEdit = false
+    @State private var showDeleteConfirm = false
+    @State private var deleting = false
+    @State private var deleteError: String?
 
     private var recipe: Recipe? { store.recipe(id: id) }
 
@@ -30,7 +34,13 @@ struct RecipeDetailView: View {
                     .accessibilityLabel(recipe.favorite ? "Remove from favorites" : "Add to favorites")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Edit") { showEdit = true }
+                    Menu {
+                        Button("Edit") { showEdit = true }
+                        Button("Delete", role: .destructive) { showDeleteConfirm = true }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .disabled(deleting)
                 }
             }
         }
@@ -39,6 +49,42 @@ struct RecipeDetailView: View {
                 EditRecipeView(recipe: recipe)
                     .environmentObject(store)
             }
+        }
+        .confirmationDialog(
+            "Delete this recipe?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let recipe {
+                    Task { await delete(recipe) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes it from your Recipe Box. It stays out of Google Sheets too, but the row itself isn't removed.")
+        }
+        .alert(
+            "Couldn't delete",
+            isPresented: Binding(
+                get: { deleteError != nil },
+                set: { shown in if !shown { deleteError = nil } }
+            ),
+            presenting: deleteError
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { message in
+            Text(message)
+        }
+    }
+
+    private func delete(_ recipe: Recipe) async {
+        deleting = true
+        defer { deleting = false }
+        if let error = await store.deleteRecipe(recipe) {
+            deleteError = error
+        } else {
+            dismiss()
         }
     }
 
