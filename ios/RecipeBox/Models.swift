@@ -224,6 +224,57 @@ func collapsePantryName(_ name: String) -> String {
     return kept.joined(separator: " ")
 }
 
+/// One ingredient line split into a leading quantity (if the text starts
+/// with one) and the rest, so the UI can call out amounts clearly.
+struct IngredientLine {
+    let quantity: String?
+    let text: String
+}
+
+private let ingredientUnits: Set<String> = [
+    "cup", "cups", "tbsp", "tsp", "teaspoon", "teaspoons", "tablespoon", "tablespoons",
+    "g", "gram", "grams", "kg", "ml", "l", "litre", "litres", "liter", "liters",
+    "oz", "ounce", "ounces", "lb", "lbs", "pound", "pounds",
+    "clove", "cloves", "slice", "slices", "pinch", "pinches",
+    "can", "cans", "pack", "packs", "packet", "packets",
+    "piece", "pieces", "pc", "pcs", "handful", "handfuls",
+]
+
+func splitIngredientQuantity(_ line: String) -> IngredientLine {
+    let trimmed = line.trimmingCharacters(in: .whitespaces)
+    let words = trimmed.split(separator: " ").map(String.init)
+    guard let first = words.first, looksLikeQuantityToken(first) else {
+        return IngredientLine(quantity: nil, text: trimmed)
+    }
+
+    var quantityParts = [first]
+    var consumed = 1
+    if words.count > 1 {
+        let second = words[1].trimmingCharacters(in: .punctuationCharacters).lowercased()
+        if ingredientUnits.contains(second) {
+            quantityParts.append(words[1])
+            consumed = 2
+        }
+    }
+
+    let rest = words.dropFirst(consumed)
+        .joined(separator: " ")
+        .trimmingCharacters(in: CharacterSet(charactersIn: ", "))
+    guard !rest.isEmpty else {
+        return IngredientLine(quantity: nil, text: trimmed)
+    }
+    return IngredientLine(quantity: quantityParts.joined(separator: " "), text: rest)
+}
+
+private func looksLikeQuantityToken(_ token: String) -> Bool {
+    let cleaned = token.trimmingCharacters(in: CharacterSet(charactersIn: ",;"))
+    guard !cleaned.isEmpty else { return false }
+    // "2", "1/2", "2.5", "2-3", "1¼" — a leading number, optionally a
+    // fraction glyph, optionally one more number after a separator.
+    let pattern = "^[0-9¼½¾⅓⅔⅛⅜]+([\\/.\\-][0-9]+)?$"
+    return cleaned.range(of: pattern, options: .regularExpression) != nil
+}
+
 func stem(_ name: String) -> String {
     if name.hasSuffix("chillies") { return String(name.dropLast(2)) }
     if name.hasSuffix("ies"), name.count > 4 { return String(name.dropLast(3)) + "y" }

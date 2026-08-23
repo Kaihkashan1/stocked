@@ -23,6 +23,9 @@ struct RecipeDetailView: View {
         }
         .background(Theme.surface.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        // Full immersion while reading a recipe — the fix for the floating
+        // tab bar overlapping the last section (ingredients/steps/link).
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if let recipe {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -31,6 +34,7 @@ struct RecipeDetailView: View {
                     } label: {
                         Image(systemName: recipe.favorite ? "star.fill" : "star")
                     }
+                    .tint(Theme.warm)
                     .accessibilityLabel(recipe.favorite ? "Remove from favorites" : "Add to favorites")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -90,53 +94,51 @@ struct RecipeDetailView: View {
 
     private func content(for recipe: Recipe) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header(for: recipe)
-                if !recipe.tags.isEmpty {
-                    tags(for: recipe)
-                }
-                if !recipe.ingredients.isEmpty {
-                    section(title: "Ingredients") {
-                        ForEach(recipe.ingredients, id: \.self) { item in
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("•")
-                                Text(item)
-                            }
-                        }
+            VStack(alignment: .leading, spacing: 0) {
+                hero(for: recipe)
+                VStack(alignment: .leading, spacing: 22) {
+                    if !recipe.tags.isEmpty {
+                        tags(for: recipe)
+                    }
+                    if !recipe.ingredients.isEmpty {
+                        ingredientsSection(for: recipe)
+                    }
+                    if !recipe.steps.isEmpty {
+                        stepsSection(for: recipe)
+                    }
+                    if let url = recipe.sourceURL {
+                        Link("Original post →", destination: url)
+                            .font(.body.weight(.semibold))
                     }
                 }
-                if !recipe.steps.isEmpty {
-                    section(title: "Steps") {
-                        ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
-                            HStack(alignment: .top, spacing: 10) {
-                                Text("\(index + 1).")
-                                    .font(.body.monospacedDigit().weight(.semibold))
-                                    .foregroundStyle(Theme.accent)
-                                    .frame(width: 24, alignment: .trailing)
-                                Text(step)
-                            }
-                        }
-                    }
-                }
-                if let url = recipe.sourceURL {
-                    Link("Original post", destination: url)
-                        .font(.body.weight(.medium))
-                }
+                .padding(20)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private func header(for recipe: Recipe) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RecipeThumb(recipe: recipe, size: 88)
-            Text(recipe.title)
-                .font(.title.weight(.semibold))
-                .foregroundStyle(Theme.ink)
-            Text(metaLine(for: recipe))
-                .font(.subheadline)
-                .foregroundStyle(Theme.inkSoft)
+    private func hero(for recipe: Recipe) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            RecipeHeroImage(recipe: recipe)
+                .frame(height: 260)
+                .frame(maxWidth: .infinity)
+                .clipped()
+
+            LinearGradient(
+                colors: [.clear, Color.black.opacity(0.7)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(metaLine(for: recipe).uppercased())
+                    .font(Theme.mono(11))
+                    .tracking(0.5)
+                    .foregroundStyle(Theme.warmSoft)
+                Text(recipe.title)
+                    .font(Theme.display(26, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .padding(18)
         }
     }
 
@@ -151,23 +153,102 @@ struct RecipeDetailView: View {
         FlowLayout(spacing: 8) {
             ForEach(recipe.tags, id: \.self) { tag in
                 Text(tag)
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Theme.bg)
+                    .font(Theme.mono(12))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 6)
+                    .background(Theme.accentSoft)
                     .foregroundStyle(Theme.accent)
                     .clipShape(Capsule())
             }
         }
     }
 
-    private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.title3.weight(.semibold))
-            VStack(alignment: .leading, spacing: 8) {
-                content()
+    private func ingredientsSection(for recipe: Recipe) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            sectionHeading("Ingredients")
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(recipe.ingredients.enumerated()), id: \.offset) { index, line in
+                    let parsed = splitIngredientQuantity(line)
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        if let quantity = parsed.quantity {
+                            Text(quantity)
+                                .font(Theme.mono(12.5, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 3)
+                                .background(Theme.accent)
+                                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            Text(parsed.text)
+                                .font(.body)
+                                .foregroundStyle(Theme.ink)
+                        } else {
+                            Text(parsed.text)
+                                .font(.body.italic())
+                                .foregroundStyle(Theme.inkSoft)
+                        }
+                    }
+                    .padding(.vertical, 10)
+
+                    if index < recipe.ingredients.count - 1 {
+                        Rectangle().fill(Theme.line).frame(height: 1)
+                    }
+                }
             }
+        }
+    }
+
+    private func stepsSection(for recipe: Recipe) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionHeading("Steps")
+            ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
+                HStack(alignment: .top, spacing: 12) {
+                    Text("\(index + 1)")
+                        .font(Theme.mono(12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 24, height: 24)
+                        .background(Theme.accent)
+                        .clipShape(Circle())
+                    Text(step)
+                        .font(.body)
+                        .foregroundStyle(Theme.ink)
+                }
+            }
+        }
+    }
+
+    private func sectionHeading(_ title: String) -> some View {
+        Text(title)
+            .font(Theme.display(19, weight: .semibold))
+            .foregroundStyle(Theme.ink)
+    }
+}
+
+/// Full-width hero treatment: the recipe photo if there is one, otherwise a
+/// warm gradient with the recipe's first letter — always "real" imagery,
+/// never a tiny floating square.
+struct RecipeHeroImage: View {
+    let recipe: Recipe
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Theme.accent, Theme.ink], startPoint: .topLeading, endPoint: .bottomTrailing)
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Text(String(recipe.title.prefix(1)).uppercased())
+                    .font(Theme.display(72, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.82))
+            }
+        }
+        .task(id: recipe.thumbnail) {
+            guard let url = recipe.thumbnailURL else {
+                image = nil
+                return
+            }
+            image = await ThumbnailCache.shared.image(for: url, maxPixel: 800)
         }
     }
 }

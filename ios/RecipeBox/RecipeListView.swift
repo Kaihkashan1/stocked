@@ -64,10 +64,10 @@ struct RecipeListView: View {
                         store.favoritesOnly ? "Showing favorites" : "Favorites only",
                         systemImage: store.favoritesOnly ? "star.fill" : "star"
                     )
-                    .font(.caption.weight(.semibold))
+                    .font(Theme.mono(12.5, weight: .semibold))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(store.favoritesOnly ? Theme.accent : Theme.inkSoft)
+                .foregroundStyle(store.favoritesOnly ? Theme.warm : Theme.inkSoft)
             }
 
             if !store.cuisines.isEmpty {
@@ -125,6 +125,13 @@ struct RecipeListView: View {
                     }
                 }
             }
+
+            // Clears the floating tab bar so the last row/link is never
+            // hidden behind it.
+            Color.clear
+                .frame(height: 70)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
         }
         .listStyle(.insetGrouped)
         .navigationDestination(for: Int.self) { id in
@@ -192,11 +199,14 @@ struct FilterRow: View {
                         selection = option.0
                     } label: {
                         Text(option.1)
-                            .font(.caption.weight(.semibold))
+                            .font(Theme.mono(12, weight: .semibold))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
-                            .background(selection == option.0 ? Theme.accent : Theme.bg)
+                            .background(selection == option.0 ? Theme.accent : Theme.surface)
                             .foregroundStyle(selection == option.0 ? Color.white : Theme.inkSoft)
+                            .overlay(
+                                Capsule().strokeBorder(selection == option.0 ? .clear : Theme.line)
+                            )
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
@@ -231,11 +241,14 @@ struct FlexibleChipRow: View {
                         onTap(item)
                     } label: {
                         Text(selected.contains(item) ? "\(item) ×" : item)
-                            .font(.caption.weight(.semibold))
+                            .font(Theme.mono(12, weight: .semibold))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
-                            .background(selected.contains(item) ? Theme.accent : Theme.bg)
-                            .foregroundStyle(selected.contains(item) ? Color.white : Theme.inkSoft)
+                            .background(selected.contains(item) ? Theme.accentSoft : Theme.surface)
+                            .foregroundStyle(selected.contains(item) ? Theme.accent : Theme.inkSoft)
+                            .overlay(
+                                Capsule().strokeBorder(selected.contains(item) ? .clear : Theme.line)
+                            )
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
@@ -261,29 +274,37 @@ struct RecipeRow: View, Equatable {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            RecipeThumb(recipe: recipe, size: 56)
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 14) {
+            RecipeThumb(recipe: recipe, size: 72)
+            VStack(alignment: .leading, spacing: 7) {
                 Text(recipe.title)
-                    .font(.headline)
+                    .font(Theme.display(17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(2)
                 HStack(spacing: 6) {
                     if let match {
-                        Text(match.label)
+                        pill(match.label, background: Theme.accent, foreground: .white)
                     } else {
-                        Text(recipe.cuisine)
+                        pill(recipe.cuisine, background: Theme.accentSoft, foreground: Theme.accent)
                     }
                     if match == nil, recipe.meal != "other" {
-                        Text("·")
-                        Text(recipe.mealLabel)
+                        pill(recipe.mealLabel, background: Theme.warmSoft, foreground: Theme.warm)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(Theme.inkSoft)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+    }
+
+    private func pill(_ text: String, background: Color, foreground: Color) -> some View {
+        Text(text.uppercased())
+            .font(Theme.mono(10.5, weight: .semibold))
+            .tracking(0.3)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(background)
+            .foregroundStyle(foreground)
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 }
 
@@ -294,8 +315,7 @@ struct RecipeThumb: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Theme.bg)
+            LinearGradient(colors: [Theme.accent, Theme.ink], startPoint: .topLeading, endPoint: .bottomTrailing)
             if let image {
                 Image(uiImage: image)
                     .resizable()
@@ -305,7 +325,7 @@ struct RecipeThumb: View {
             }
         }
         .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .task(id: recipe.thumbnail) {
             guard let url = recipe.thumbnailURL else {
                 image = nil
@@ -317,7 +337,7 @@ struct RecipeThumb: View {
 
     private var letter: some View {
         Text(String(recipe.title.prefix(1)).uppercased())
-            .font(.title2.weight(.semibold))
-            .foregroundStyle(Theme.accent)
+            .font(Theme.display(size * 0.4, weight: .bold))
+            .foregroundStyle(.white.opacity(0.85))
     }
 }

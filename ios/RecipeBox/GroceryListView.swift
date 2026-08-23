@@ -27,7 +27,12 @@ struct GroceryListView: View {
                 Section("Planned") {
                     ForEach(planned) { recipe in
                         NavigationLink(value: recipe.id) {
-                            Text(recipe.title)
+                            HStack(spacing: 12) {
+                                RecipeThumb(recipe: recipe, size: 40)
+                                Text(recipe.title)
+                                    .font(Theme.display(15.5, weight: .semibold))
+                                    .foregroundStyle(Theme.ink)
+                            }
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
@@ -42,15 +47,23 @@ struct GroceryListView: View {
                 ForEach(groupedIngredients, id: \.key) { group in
                     Section(group.key.capitalized) {
                         ForEach(group.lines, id: \.self) { line in
+                            let parsed = splitIngredientQuantity(line)
+                            let isChecked = checked.contains(line)
                             Button {
                                 toggle(line)
                             } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: checked.contains(line) ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(checked.contains(line) ? Theme.accent : Theme.inkSoft)
-                                    Text(line)
-                                        .strikethrough(checked.contains(line))
-                                        .foregroundStyle(checked.contains(line) ? Theme.inkSoft : Theme.ink)
+                                HStack(alignment: .firstTextBaseline, spacing: 9) {
+                                    Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                                        .foregroundStyle(isChecked ? Theme.accent : Theme.inkSoft)
+                                    if let quantity = parsed.quantity {
+                                        Text(quantity)
+                                            .font(Theme.mono(11.5, weight: .semibold))
+                                            .foregroundStyle(isChecked ? Theme.inkSoft : Theme.accent)
+                                            .strikethrough(isChecked)
+                                    }
+                                    Text(parsed.text)
+                                        .strikethrough(isChecked)
+                                        .foregroundStyle(isChecked ? Theme.inkSoft : Theme.ink)
                                 }
                             }
                             .buttonStyle(.plain)
@@ -65,6 +78,11 @@ struct GroceryListView: View {
                     }
                 }
             }
+
+            Color.clear
+                .frame(height: 70)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
         }
         .listStyle(.insetGrouped)
         .navigationDestination(for: Int.self) { id in
