@@ -34,6 +34,7 @@ const state = {
   have: [],
   pantryQuery: "",
   favoritesOnly: false,
+  sort: "recent",
   planIDs: loadPlanIDs(),
   checkedItems: new Set(),
   openRecipeId: null,
@@ -78,6 +79,10 @@ async function load() {
   renderGrid();
   renderPlanBadge();
   maybeOpenFromHash();
+  await fetchPlan();
+  renderPlanBadge();
+  renderGrid();
+  if (state.tab === "plan") renderPlan();
 }
 
 // ---------- auth / API ----------
@@ -143,6 +148,10 @@ function splitIngredientQuantity(line) {
 
 // ---------- plan / grocery list ----------
 
+// The plan syncs through GET/PUT /api/plan (same one this app's iOS
+// counterpart uses) so it matches between devices. localStorage is kept
+// only as an instant-render cache for first paint, before the fetch
+// in load() reconciles it against the server.
 function loadPlanIDs() {
   try {
     const raw = localStorage.getItem(PLAN_KEY);
@@ -152,21 +161,81 @@ function loadPlanIDs() {
   }
 }
 
-function savePlanIDs() {
+function cachePlanIDs() {
   localStorage.setItem(PLAN_KEY, JSON.stringify([...state.planIDs]));
 }
 
-function togglePlan(id) {
+async function fetchPlan() {
+  try {
+    const response = await fetch("/api/plan");
+    if (!response.ok) return;
+    const data = await response.json();
+    state.planIDs = new Set(data.ids || []);
+    cachePlanIDs();
+  } catch {
+    // keep whatever the local cache had
+  }
+}
+
+async function putPlan(ids) {
+  const response = await fetch("/api/plan", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ ids: [...ids] }),
+  });
+  if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+  return (await response.json()).ids;
+}
+
+// Optimistic, like toggleFavorite: flips locally first, pushes the whole
+// set, reverts on failure.
+async function togglePlan(id) {
   id = Number(id);
+  const previous = new Set(state.planIDs);
   if (state.planIDs.has(id)) {
     state.planIDs.delete(id);
   } else {
     state.planIDs.add(id);
   }
-  savePlanIDs();
+  cachePlanIDs();
   renderPlanBadge();
   renderGrid();
   if (state.tab === "plan") renderPlan();
+
+  try {
+    const confirmed = await putPlan(state.planIDs);
+    state.planIDs = new Set(confirmed);
+  } catch (err) {
+    state.planIDs = previous;
+    window.alert(`Couldn't save the plan: ${err.message}`);
+  }
+  cachePlanIDs();
+  renderPlanBadge();
+  renderGrid();
+  if (state.tab === "plan") renderPlan();
+}
+
+// One request for the whole clear, rather than N toggles racing to write
+// the last (possibly stale) state.
+async function clearPlan() {
+  const previous = new Set(state.planIDs);
+  state.planIDs = new Set();
+  cachePlanIDs();
+  renderPlanBadge();
+  renderGrid();
+  renderPlan();
+
+  try {
+    const confirmed = await putPlan([]);
+    state.planIDs = new Set(confirmed);
+  } catch (err) {
+    state.planIDs = previous;
+    window.alert(`Couldn't save the plan: ${err.message}`);
+  }
+  cachePlanIDs();
+  renderPlanBadge();
+  renderGrid();
+  renderPlan();
 }
 
 function renderPlanBadge() {
@@ -285,6 +354,10 @@ function renderFilters() {
     .join("");
 
   els.favoritesToggle.classList.toggle("active", state.favoritesOnly);
+
+  document
+    .querySelectorAll("#sort-options .chip")
+    .forEach((chip) => chip.classList.toggle("active", chip.dataset.sort === state.sort));
 
   const activeCount = [state.meal !== "all", state.cuisine !== "all", state.favoritesOnly].filter(Boolean).length;
   els.filtersBtn.classList.toggle("active", activeCount > 0);
@@ -419,6 +492,10 @@ function filtered() {
   }
   if (state.have.length) {
     rows.sort((a, b) => b.match.score - a.match.score || a.match.extra - b.match.extra);
+  } else if (state.sort === "az") {
+    rows.sort((a, b) => a.recipe.title.localeCompare(b.recipe.title));
+  } else if (state.sort === "za") {
+    rows.sort((a, b) => b.recipe.title.localeCompare(a.recipe.title));
   }
   return rows;
 }
@@ -509,7 +586,9 @@ function recipeHtml(recipe) {
     recipe.servings ? `${recipe.servings} servings` : null,
     recipe.time,
   ].filter(Boolean);
-  const tags = (recipe.tags || []).map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join("");
+  const tags = (recipe.tags || [])
+    .map((tag) => `<button class="pill pill-btn-plain" type="button" data-action="filter-tag" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`)
+    .join("");
   const ingredients = (recipe.ingredients || [])
     .map((item) => {
       const { quantity, text } = splitIngredientQuantity(item);
@@ -672,8 +751,10 @@ async function deleteRecipe(id) {
   try {
     await deleteRecipeRequest(id);
     state.recipes = state.recipes.filter((item) => item.id !== id);
-    state.planIDs.delete(id);
-    savePlanIDs();
+    if (state.planIDs.delete(id)) {
+      cachePlanIDs();
+      putPlan(state.planIDs).then((ids) => { state.planIDs = new Set(ids); }).catch(() => {});
+    }
     closeDrawer();
     renderFilters();
     renderGrid();
@@ -749,7 +830,18 @@ els.filtersReset.addEventListener("click", () => {
   state.meal = "all";
   state.cuisine = "all";
   state.favoritesOnly = false;
+  state.sort = "recent";
   renderFilters();
+  renderGrid();
+});
+
+document.getElementById("sort-options").addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-sort]");
+  if (!btn) return;
+  state.sort = btn.dataset.sort;
+  document
+    .querySelectorAll("#sort-options .chip")
+    .forEach((chip) => chip.classList.toggle("active", chip.dataset.sort === state.sort));
   renderGrid();
 });
 
@@ -806,6 +898,12 @@ document.addEventListener("click", (event) => {
     case "close-drawer":
       closeDrawer();
       break;
+    case "filter-tag":
+      closeDrawer();
+      state.query = actionEl.dataset.tag;
+      els.search.value = state.query;
+      renderGrid();
+      break;
     case "start-edit":
       startEdit(id);
       break;
@@ -819,12 +917,8 @@ document.addEventListener("click", (event) => {
       deleteRecipe(id);
       break;
     case "clear-plan":
-      state.planIDs.clear();
       state.checkedItems.clear();
-      savePlanIDs();
-      renderPlanBadge();
-      renderPlan();
-      renderGrid();
+      clearPlan();
       break;
     default:
       break;

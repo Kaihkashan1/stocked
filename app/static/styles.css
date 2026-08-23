@@ -392,6 +392,14 @@ button { font-family: inherit; }
   padding: 0.18rem 0.45rem;
 }
 
+.pill-btn-plain {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.pill-btn-plain:hover { background: var(--accent); color: #fff; }
+
 .pill.warm {
   background: var(--warm-soft);
   color: var(--warm);
