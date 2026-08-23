@@ -1,0 +1,11 @@
+.venv
+.cursor
+ios
+.env
+service_account.json
+instagram_cookies.txt
+downloads
+.git
+__pycache__
+*.pyc
+.DS_Store

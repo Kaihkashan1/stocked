@@ -1,0 +1,8 @@
+# Netscape HTTP Cookie File
+# This is an example only. The app reads instagram_cookies.txt, not this file.
+#
+# 1. Log into Instagram in Chrome or Firefox.
+# 2. Export cookies for instagram.com only (Get cookies.txt LOCALLY or similar).
+# 3. Save that export as instagram_cookies.txt in this folder.
+#
+# Do not commit instagram_cookies.txt — it is a login token.

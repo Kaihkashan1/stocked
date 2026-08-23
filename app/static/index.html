@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recipe Box</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <p class="eyebrow">Personal collection</p>
+      <h1>Recipe Box</h1>
+    </div>
+    <label class="search">
+      <span class="visually-hidden">Search recipes</span>
+      <input id="search" type="search" placeholder="Search title, ingredient, tag…">
+    </label>
+  </header>
+
+  <div class="shell">
+    <aside class="filters" aria-label="Categories">
+      <section>
+        <h2 class="eyebrow">Meal</h2>
+        <div id="meal-filters" class="chips"></div>
+      </section>
+      <section>
+        <h2 class="eyebrow">Cuisine</h2>
+        <div id="cuisine-filters" class="chips"></div>
+      </section>
+      <section>
+        <h2 class="eyebrow">What I have</h2>
+        <input id="pantry-search" class="pantry-search" type="search" placeholder="Find an ingredient…">
+        <div id="pantry-selected"></div>
+        <div id="pantry-options" class="pantry-options"></div>
+      </section>
+    </aside>
+
+    <main>
+      <p id="status" class="status"></p>
+      <div id="grid" class="grid"></div>
+    </main>
+  </div>
+
+  <div id="drawer" class="drawer" hidden>
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="recipe-title">
+      <button id="close-drawer" class="icon-btn" type="button" aria-label="Close">Close</button>
+      <article id="recipe-detail"></article>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
