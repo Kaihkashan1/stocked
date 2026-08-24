@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// The pantry: ingredients you have on hand, plus a shopping list of things
-/// you intend to buy. Drives sorting and "only what I can make" on the
-/// Recipes tab — no more meal-planning/grocery-aggregation concept here,
-/// just what you have and what you're missing.
+/// The pantry: ingredients you have on hand. Drives sorting on the Recipes
+/// tab — no meal-planning/grocery-aggregation, no shopping list, just what
+/// you have.
 struct PantryView: View {
     @EnvironmentObject private var store: RecipeStore
     @State private var newItem = ""
@@ -33,7 +32,7 @@ struct PantryView: View {
             } header: {
                 Text("What I have")
             } footer: {
-                Text("Tap an ingredient below, or add your own — this drives sorting and \"Only what I can make\" on the Recipes tab.")
+                Text("Tap an ingredient below, or add your own — this drives sorting on the Recipes tab.")
             }
 
             Section {
@@ -48,41 +47,6 @@ struct PantryView: View {
                     ForEach(store.visiblePantryGroups) { group in
                         pantryGroup(group, selected: false)
                     }
-                }
-            }
-
-            if !store.pantryGroups.isEmpty {
-                Section {
-                    ForEach(store.pantryGroups) { group in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(group.category)
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-                            FlowLayout(spacing: 8) {
-                                ForEach(group.items, id: \.self) { item in
-                                    let active = store.shoppingList.contains(item)
-                                    Button {
-                                        store.toggleShoppingItem(item)
-                                    } label: {
-                                        Text(active ? "\(item) ×" : item)
-                                            .font(Theme.mono(12, weight: .semibold))
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 7)
-                                            .background(active ? Theme.accentSoft : Theme.surface)
-                                            .foregroundStyle(active ? Theme.accent : Theme.inkSoft)
-                                            .overlay(Capsule().strokeBorder(active ? .clear : Theme.line))
-                                            .clipShape(Capsule())
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Shopping list")
-                } footer: {
-                    Text("Ingredients you plan to buy — check them off once they've made it into \"What I have\" above.")
                 }
             }
 

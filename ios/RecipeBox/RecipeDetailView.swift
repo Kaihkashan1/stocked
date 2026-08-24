@@ -10,7 +10,6 @@ struct RecipeDetailView: View {
     @State private var deleteError: String?
     @State private var showCookMode = false
     @State private var scale: Double = 1.0
-    @State private var addedMissingToShoppingList = false
 
     private var recipe: Recipe? { store.recipe(id: id) }
 
@@ -155,7 +154,7 @@ struct RecipeDetailView: View {
 
     private func pantryMatch(for recipe: Recipe) -> some View {
         let missing = missingIngredients(recipe, have: store.have)
-        return HStack(alignment: .top, spacing: 10) {
+        return Group {
             if missing.isEmpty {
                 Text("You have everything for this.")
                     .font(.footnote.weight(.semibold))
@@ -164,21 +163,12 @@ struct RecipeDetailView: View {
                 Text("Missing \(missing.count) ingredient\(missing.count == 1 ? "" : "s") from your pantry: \(missing.joined(separator: ", "))")
                     .font(.footnote)
                     .foregroundStyle(Theme.inkSoft)
-                Spacer(minLength: 8)
-                Button(addedMissingToShoppingList ? "Added ✓" : "Add to shopping list") {
-                    store.addToShoppingList(missing)
-                    addedMissingToShoppingList = true
-                }
-                .font(Theme.mono(11.5, weight: .semibold))
-                .foregroundStyle(Theme.accent)
-                .disabled(addedMissingToShoppingList)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface2)
-        .onChange(of: recipe.id) { _, _ in addedMissingToShoppingList = false }
     }
 
     private func metaLine(for recipe: Recipe) -> String {

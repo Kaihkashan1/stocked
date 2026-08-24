@@ -205,6 +205,11 @@ enum DeepLinkRoute: Equatable {
     case have([String])
 }
 
+/// The whole tag vocabulary, on purpose — kept short and closed rather than
+/// letting every recipe accumulate its own free-form set. Filtering and the
+/// Add/Edit forms only ever offer these; there's no way to type a new one in.
+let recipeTags = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"]
+
 /// Only applies when no "have" ingredients are selected — pantry-match
 /// score always wins when it's active, same as before.
 enum SortOption: String, CaseIterable {
@@ -428,7 +433,8 @@ func matchRecipe(_ recipe: Recipe, have: [String]) -> RecipeMatch? {
 }
 
 /// The ingredients from `recipe.pantry` not covered by `have` — used both to
-/// sort (closest fit first) and to prefill "add missing to shopping list".
+/// sort (closest fit first) and to call out what's missing on the detail
+/// view.
 func missingIngredients(_ recipe: Recipe, have: [String]) -> [String] {
     let core = recipe.pantry.filter { !staples.contains($0) }
     return core.filter { item in !have.contains(where: { namesMatch(item, $0) }) }

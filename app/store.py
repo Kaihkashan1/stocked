@@ -106,8 +106,6 @@ def _read_app_state() -> dict:
 
 
 def _write_app_state(**updates) -> None:
-    # Read-modify-write against the whole blob — have and shopping_list
-    # share this one cell, so writing one key must not clobber the other.
     data = _read_app_state()
     data.update(updates)
     _state_worksheet().update("A1", [[json.dumps(data)]], value_input_option="RAW")
@@ -115,8 +113,8 @@ def _write_app_state(**updates) -> None:
 
 def get_have_items() -> list[str]:
     """The pantry — ingredients you currently have on hand. Synced across
-    devices (web + iOS), same as the shopping list, so it's a real inventory
-    rather than a per-session browsing filter."""
+    devices (web + iOS), so it's a real inventory rather than a per-session
+    browsing filter."""
     items = _read_app_state().get("have") or []
     return sorted({str(item).strip().lower() for item in items if str(item).strip()})
 
@@ -124,19 +122,6 @@ def get_have_items() -> list[str]:
 def save_have_items(items: list[str]) -> list[str]:
     clean = sorted({str(item).strip().lower() for item in items if str(item).strip()})
     _write_app_state(have=clean)
-    return clean
-
-
-def get_shopping_list() -> list[str]:
-    """Ingredients the user intends to buy but hasn't yet — distinct from
-    "what I have" (already possess)."""
-    items = _read_app_state().get("shopping_list") or []
-    return sorted({str(item).strip().lower() for item in items if str(item).strip()})
-
-
-def save_shopping_list(items: list[str]) -> list[str]:
-    clean = sorted({str(item).strip().lower() for item in items if str(item).strip()})
-    _write_app_state(shopping_list=clean)
     return clean
 
 

@@ -17,8 +17,8 @@ final class RecipeStore: ObservableObject {
         didSet { if oldValue != query { updateVisible() } }
     }
     /// The pantry — ingredients you currently have on hand. Synced across
-    /// devices via /api/pantry, same as the shopping list, so it's a real
-    /// inventory rather than a per-session browsing filter.
+    /// devices via /api/pantry, so it's a real inventory rather than a
+    /// per-session browsing filter.
     @Published var have: [String] = [] {
         didSet {
             if oldValue != have {
@@ -46,16 +46,10 @@ final class RecipeStore: ObservableObject {
     /// Set by RecipeBoxApp's onOpenURL; consumed once by RootView.
     @Published var pendingRoute: DeepLinkRoute?
 
-    /// Ingredients the user intends to buy but hasn't yet — distinct from
-    /// "have" (already possess). Synced across devices, same pattern as the
-    /// pantry.
-    @Published var shoppingList: Set<String> {
-        didSet { UserDefaults.standard.set(Array(shoppingList), forKey: Self.shoppingListKey) }
-    }
-
     @Published private(set) var visibleRecipes: [Recipe] = []
     @Published private(set) var matchesByID: [Int: RecipeMatch] = [:]
-    @Published private(set) var tags: [String] = []
+    /// The fixed tag vocabulary — see recipeTags in Models.swift.
+    let tags = recipeTags
     @Published private(set) var selectedPantryGroups: [PantryGroup] = []
     @Published private(set) var visiblePantryGroups: [PantryGroup] = []
     @Published private(set) var haveSet: Set<String> = []
@@ -75,7 +69,6 @@ final class RecipeStore: ObservableObject {
     private static let urlKey = "recipeBox.serverURL"
     private static let secretKey = "recipeBox.serverSecret"
     private static let haveKey = "recipeBox.have"
-    private static let shoppingListKey = "recipeBox.shoppingList"
     private static let legacyLANDefault = "http://192.168.0.54:8000"
     private static let legacyHostedHosts: Set<String> = [
         "recipe-box-ashen-alpha.vercel.app",
@@ -93,7 +86,6 @@ final class RecipeStore: ObservableObject {
         UserDefaults.standard.set(resolved, forKey: Self.urlKey)
         serverSecret = UserDefaults.standard.string(forKey: Self.secretKey) ?? ""
         have = UserDefaults.standard.array(forKey: Self.haveKey) as? [String] ?? []
-        shoppingList = Set(UserDefaults.standard.array(forKey: Self.shoppingListKey) as? [String] ?? [])
         loadCache()
     }
 
@@ -119,9 +111,9 @@ final class RecipeStore: ObservableObject {
         recipesByID[id]
     }
 
-    /// Optimistic, same shape as toggleShoppingItem: flips locally (so the
-    /// UI is instant) then pushes the whole pantry to the server so it
-    /// matches on every device. Reverts on failure.
+    /// Optimistic, like toggleFavorite: flips locally (so the UI is
+    /// instant) then pushes the whole pantry to the server so it matches on
+    /// every device. Reverts on failure.
     func toggleIngredient(_ item: String) {
         let previous = have
         if let index = have.firstIndex(of: item) {
@@ -162,9 +154,9 @@ final class RecipeStore: ObservableObject {
     /// The server re-categorizes a brand-new custom item on the next full
     /// reload (and apply()'s merge carries it forward if a reload lands
     /// before that happens) — this just keeps it from being unfindable in
-    /// the catalog (and invisible in the shopping list) in the meantime.
-    /// Called from toggleIngredient itself, not just addHaveItem, so any
-    /// path that adds something to `have` keeps this invariant.
+    /// the catalog in the meantime. Called from toggleIngredient itself, not
+    /// just addHaveItem, so any path that adds something to `have` keeps
+    /// this invariant.
     private func ensurePantryGroupContains(_ item: String) {
         guard !pantryGroups.contains(where: { $0.items.contains(item) }) else { return }
         if let index = pantryGroups.firstIndex(where: { $0.category == "Other" }) {
@@ -202,58 +194,6 @@ final class RecipeStore: ObservableObject {
     private func syncPantryFromServer() async {
         guard let items = try? await APIClient(baseURLString: serverURL).fetchPantry() else { return }
         have = items
-    }
-
-    private func syncShoppingListFromServer() async {
-        guard let items = try? await APIClient(baseURLString: serverURL).fetchShoppingList() else { return }
-        shoppingList = Set(items)
-    }
-
-    /// Optimistic, same shape as toggleIngredient.
-    func toggleShoppingItem(_ item: String) {
-        let previous = shoppingList
-        if shoppingList.contains(item) {
-            shoppingList.remove(item)
-        } else {
-            shoppingList.insert(item)
-        }
-        let updated = shoppingList
-        Task {
-            do {
-                let confirmed = try await APIClient(baseURLString: serverURL).updateShoppingList(items: Array(updated), secret: serverSecret)
-                if shoppingList == updated {
-                    shoppingList = Set(confirmed)
-                }
-            } catch {
-                if shoppingList == updated {
-                    shoppingList = previous
-                }
-                actionError = error.localizedDescription
-            }
-        }
-    }
-
-    /// Bulk version of toggleShoppingItem, for the recipe detail view's "add
-    /// missing to shopping list" button — one request for the whole gap
-    /// rather than N toggles racing to write the last (possibly stale) state.
-    func addToShoppingList(_ items: [String]) {
-        guard !items.isEmpty else { return }
-        let previous = shoppingList
-        shoppingList.formUnion(items)
-        let updated = shoppingList
-        Task {
-            do {
-                let confirmed = try await APIClient(baseURLString: serverURL).updateShoppingList(items: Array(updated), secret: serverSecret)
-                if shoppingList == updated {
-                    shoppingList = Set(confirmed)
-                }
-            } catch {
-                if shoppingList == updated {
-                    shoppingList = previous
-                }
-                actionError = error.localizedDescription
-            }
-        }
     }
 
     /// Optimistic: flips the star immediately, then confirms with the server.
@@ -362,7 +302,6 @@ final class RecipeStore: ObservableObject {
             errorMessage = nil
             persistCache()
             await syncPantryFromServer()
-            await syncShoppingListFromServer()
             return true
         } catch {
             guard !Task.isCancelled else { return false }
@@ -387,8 +326,8 @@ final class RecipeStore: ObservableObject {
 
     /// A custom pantry item (typed in free-hand) might not have round-tripped
     /// to the server yet when this refresh's catalog was fetched — carry it
-    /// forward instead of silently dropping it from "What I have" and the
-    /// shopping list the moment a refresh happens to land in between.
+    /// forward instead of silently dropping it from "What I have" the moment
+    /// a refresh happens to land in between.
     private func mergeCustomPantryItems(into fresh: [PantryGroup]) -> [PantryGroup] {
         let freshItems = Set(fresh.flatMap(\.items))
         let missing = have.filter { !freshItems.contains($0) }
@@ -467,7 +406,6 @@ final class RecipeStore: ObservableObject {
     }
 
     private func updateDerived() {
-        tags = Array(Set(recipes.flatMap(\.tags))).sorted()
         updateVisible()
     }
 
