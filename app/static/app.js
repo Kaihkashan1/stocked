@@ -300,7 +300,7 @@ function renderPantryTab() {
   const trimmed = state.pantryQuery.trim();
   const needle = trimmed.toLowerCase();
   if (!trimmed) {
-    els.pantryOptions.innerHTML = `<span class="status">Type to add or find an ingredient</span>`;
+    els.pantryOptions.innerHTML = "";
     return;
   }
 
