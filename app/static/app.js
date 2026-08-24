@@ -78,7 +78,10 @@ async function load() {
     return;
   }
   const data = await response.json();
-  state.recipes = data.recipes || [];
+  state.recipes = (data.recipes || []).map((recipe) => {
+    recipe.searchBlob = computeSearchBlob(recipe);
+    return recipe;
+  });
   state.pantryGroups = Array.isArray(data.pantry) ? data.pantry : [];
   renderFilters();
   renderPantry();
@@ -280,6 +283,8 @@ function canonicalKey(line, pantry) {
   return matches.reduce((a, b) => (b.length > a.length ? b : a));
 }
 
+// Skips anything already in "what I have" — this is a shopping list, not a
+// full ingredient list. Mirrors GroceryListView.swift's groupedIngredients.
 function groupedIngredients(planned) {
   const buckets = new Map();
   const seenLines = new Set();
@@ -288,6 +293,7 @@ function groupedIngredients(planned) {
       if (seenLines.has(line)) continue;
       seenLines.add(line);
       const key = canonicalKey(line, recipe.pantry);
+      if (state.have.some((have) => namesMatch(have, key))) continue;
       if (!buckets.has(key)) buckets.set(key, []);
       buckets.get(key).push(line);
     }
@@ -295,6 +301,46 @@ function groupedIngredients(planned) {
   return [...buckets.entries()]
     .map(([key, lines]) => ({ key, lines: lines.sort() }))
     .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+// How many distinct ingredient lines were left off the list above because
+// they matched something in "what I have".
+function omittedHaveCount(planned) {
+  const seenLines = new Set();
+  let count = 0;
+  for (const recipe of planned) {
+    for (const line of recipe.ingredients || []) {
+      if (seenLines.has(line)) continue;
+      seenLines.add(line);
+      const key = canonicalKey(line, recipe.pantry);
+      if (state.have.some((have) => namesMatch(have, key))) count += 1;
+    }
+  }
+  return count;
+}
+
+// The reverse question from recipeMatch: "could I make this with only
+// what's in `available`?" (every non-staple ingredient must be covered),
+// rather than "does this recipe use everything I've flagged as having?".
+// Mirrors Models.swift's isFullyCovered.
+function isFullyCovered(recipe, available) {
+  if (!available.size) return false;
+  const core = (recipe.pantry || []).filter((item) => !STAPLES.has(item));
+  if (!core.length) return false;
+  return core.every((item) => [...available].some((have) => namesMatch(item, have)));
+}
+
+// Recipes outside the plan that would become fully makeable once this
+// shopping list is done — "what I have" plus every ingredient already
+// needed for the planned recipes. Mirrors GroceryListView.swift's
+// alsoMakeable.
+function alsoMakeable(planned) {
+  const plannedIDs = new Set(planned.map((recipe) => recipe.id));
+  if (!plannedIDs.size) return [];
+  const expanded = new Set([...state.have, ...planned.flatMap((recipe) => recipe.pantry || [])]);
+  return state.recipes
+    .filter((recipe) => !plannedIDs.has(recipe.id) && isFullyCovered(recipe, expanded))
+    .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
 }
 
 function renderPlan() {
@@ -336,6 +382,30 @@ function renderPlan() {
     })
     .join("");
 
+  const omitted = omittedHaveCount(planned);
+  const omittedNote = omitted
+    ? `<p class="omitted-note">${omitted} item${omitted === 1 ? "" : "s"} skipped because you already have ${omitted === 1 ? "it" : "them"}</p>`
+    : "";
+
+  const bonus = alsoMakeable(planned);
+  const bonusSection = bonus.length
+    ? `
+    <section>
+      <h2>You could also make</h2>
+      <p class="eyebrow" style="margin-bottom:0.8rem;">Fully covered by what you have plus everything on this shopping list.</p>
+      <div class="plan-rows">
+        ${bonus
+          .map(
+            (recipe) => `
+          <div class="plan-row">
+            <button class="plan-title" type="button" data-action="open-recipe" data-id="${recipe.id}">${escapeHtml(recipe.title)}</button>
+          </div>`
+          )
+          .join("")}
+      </div>
+    </section>`
+    : "";
+
   els.planContent.innerHTML = `
     <section>
       <h2 class="eyebrow">Planned · ${planned.length} recipe${planned.length === 1 ? "" : "s"}</h2>
@@ -346,8 +416,10 @@ function renderPlan() {
         <h2>Grocery list</h2>
         <button class="link-btn" type="button" data-action="clear-plan">Clear plan</button>
       </div>
+      ${omittedNote}
       <div class="grocery-groups">${groups}</div>
-    </section>`;
+    </section>
+    ${bonusSection}`;
 }
 
 function capitalize(value) {
@@ -517,6 +589,15 @@ function recipeMatch(recipe) {
   return { ok: true, score: state.have.length / total, extra: extra.length };
 }
 
+// Computed once per recipe (on load, and again after any edit that could
+// change these fields) rather than rebuilt on every filtered() call — the
+// same tradeoff Models.swift makes on iOS (see Recipe.searchBlob there).
+function computeSearchBlob(recipe) {
+  return [recipe.title, recipe.cuisine, recipe.meal, ...(recipe.tags || []), ...(recipe.ingredients || [])]
+    .join(" ")
+    .toLowerCase();
+}
+
 function filtered() {
   const query = state.query.trim().toLowerCase();
   const rows = [];
@@ -527,18 +608,7 @@ function filtered() {
     if (state.tag !== "all" && !(recipe.tags || []).includes(state.tag)) continue;
     const match = recipeMatch(recipe);
     if (!match.ok) continue;
-    if (query) {
-      const haystack = [
-        recipe.title,
-        recipe.cuisine,
-        recipe.meal,
-        ...(recipe.tags || []),
-        ...(recipe.ingredients || []),
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(query)) continue;
-    }
+    if (query && !(recipe.searchBlob || computeSearchBlob(recipe)).includes(query)) continue;
     rows.push({ recipe, match });
   }
   if (state.have.length) {
@@ -722,6 +792,9 @@ function recipeHtml(recipe) {
   const originalPostItem = recipe.source
     ? `<a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">Original post</a>`
     : "";
+  const notesSection = recipe.notes
+    ? `<h3>Notes</h3><p class="notes-box">${escapeHtml(recipe.notes)}</p>`
+    : "";
 
   return `
     <div class="drawer-actions">
@@ -756,6 +829,7 @@ function recipeHtml(recipe) {
       <ul class="ingredients">${ingredients || "<li>None listed</li>"}</ul>
       <h3>Steps</h3>
       <ol class="steps">${steps || "<li>None listed</li>"}</ol>
+      ${notesSection}
     </div>`;
 }
 
@@ -781,6 +855,10 @@ function editFormHtml(recipe) {
       <label class="field">
         <span>Steps — one per line</span>
         <textarea id="edit-steps" rows="10">${escapeHtml((recipe.steps || []).join("\n"))}</textarea>
+      </label>
+      <label class="field">
+        <span>Notes</span>
+        <textarea id="edit-notes" rows="3">${escapeHtml(recipe.notes || "")}</textarea>
       </label>
       <p id="edit-error" class="edit-error" hidden></p>
       <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">Save</button>
@@ -888,6 +966,7 @@ async function saveAddRecipe() {
   saveBtn.textContent = "Saving…";
   try {
     const created = await createRecipeRequest(draft);
+    created.searchBlob = computeSearchBlob(created);
     state.recipes.unshift(created);
     state.addingRecipe = false;
     closeDrawer();
@@ -936,6 +1015,7 @@ async function saveEdit(id) {
   const servingsInput = document.getElementById("edit-servings");
   const ingredientsInput = document.getElementById("edit-ingredients");
   const stepsInput = document.getElementById("edit-steps");
+  const notesInput = document.getElementById("edit-notes");
   const errorEl = document.getElementById("edit-error");
   const saveBtn = document.querySelector('[data-action="save-edit"]');
 
@@ -949,6 +1029,7 @@ async function saveEdit(id) {
   const patch = {
     title,
     servings: servingsInput.value.trim() || null,
+    notes: notesInput.value.trim(),
     ingredients: linesFrom(ingredientsInput.value),
     steps: linesFrom(stepsInput.value),
   };
@@ -958,7 +1039,10 @@ async function saveEdit(id) {
   try {
     const updated = await patchRecipe(id, patch);
     const recipe = state.recipes.find((item) => item.id === id);
-    if (recipe) Object.assign(recipe, updated);
+    if (recipe) {
+      Object.assign(recipe, updated);
+      recipe.searchBlob = computeSearchBlob(recipe);
+    }
     state.editingId = null;
     renderGrid();
     refreshOpenRecipe();
@@ -1040,9 +1124,17 @@ function togglePantry(item) {
   renderGrid();
 }
 
+// Debounced like iOS's DebouncedTextField — filtering the full list (plus
+// pantry matching against "what I have") on every single keystroke is
+// wasted work while the user is still typing.
+let searchDebounceTimer = null;
 els.search.addEventListener("input", () => {
-  state.query = els.search.value;
-  renderGrid();
+  const value = els.search.value;
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    state.query = value;
+    renderGrid();
+  }, 160);
 });
 
 els.pantrySearch.addEventListener("input", () => {

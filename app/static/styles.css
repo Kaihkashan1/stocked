@@ -536,6 +536,15 @@ button { font-family: inherit; }
 
 .recipe h3:first-of-type { margin-top: 0; }
 
+.notes-box {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: rgba(241, 226, 194, 0.5); /* --warm-soft at 50% */
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
 ul.ingredients {
   list-style: none;
   margin: 0;
@@ -667,6 +676,14 @@ ol.steps li {
   align-items: baseline;
   justify-content: space-between;
   margin-bottom: 0.9rem;
+}
+
+.omitted-note {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin: -0.4rem 0 0.9rem;
 }
 
 .link-btn {
