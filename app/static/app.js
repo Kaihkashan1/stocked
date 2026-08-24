@@ -34,7 +34,6 @@ const state = {
   have: loadHave(),
   pantryQuery: "",
   favoritesOnly: false,
-  onlyMakeable: false,
   sort: "recent",
   shoppingList: loadShoppingList(),
   openRecipeId: null,
@@ -46,7 +45,6 @@ const els = {
   search: document.getElementById("search"),
   tagFilters: document.getElementById("tag-filters"),
   favoritesToggle: document.getElementById("favorites-toggle"),
-  makeableToggle: document.getElementById("makeable-toggle"),
   filtersBtn: document.getElementById("filters-btn"),
   filtersPanel: document.getElementById("filters-panel"),
   filtersReset: document.getElementById("filters-reset"),
@@ -414,7 +412,7 @@ function renderPantryTab() {
       : `<span class="status">No matching ingredients</span>`;
   }
 
-  const shoppingGroups = groupPantry(pantryCatalog());
+  const shoppingGroups = groupPantry(fullPantryCatalog());
   els.shoppingGroups.innerHTML = shoppingGroups.length
     ? shoppingGroupsHtml(shoppingGroups)
     : `<span class="status">No ingredients known yet</span>`;
@@ -447,13 +445,12 @@ function renderFilters() {
     .join("");
 
   els.favoritesToggle.classList.toggle("active", state.favoritesOnly);
-  els.makeableToggle.classList.toggle("active", state.onlyMakeable);
 
   document
     .querySelectorAll("#sort-options .chip")
     .forEach((chip) => chip.classList.toggle("active", chip.dataset.sort === state.sort));
 
-  const activeCount = [state.tags.size > 0, state.favoritesOnly, state.onlyMakeable].filter(Boolean).length;
+  const activeCount = [state.tags.size > 0, state.favoritesOnly].filter(Boolean).length;
   els.filtersBtn.classList.toggle("active", activeCount > 0);
   els.filtersBtn.textContent = "";
   els.filtersBtn.append(filtersIcon(), document.createTextNode(activeCount > 0 ? `Filters (${activeCount})` : "Filters"));
@@ -496,6 +493,14 @@ function pantryCatalog() {
   return unique(state.recipes.flatMap((recipe) => recipe.pantry || [])).filter(
     (item) => !STAPLES.has(item)
   );
+}
+
+// Recipe-derived ingredients plus anything already known from "What I have"
+// (including custom, non-recipe items like "leftover turkey") — the full
+// universe of things you might want on a shopping list, not just what
+// recipes happen to use.
+function fullPantryCatalog() {
+  return unique([...pantryCatalog(), ...state.pantryGroups.flatMap((group) => group.items)]);
 }
 
 function groupPantry(items) {
@@ -579,7 +584,6 @@ function filtered() {
     if (state.favoritesOnly && !recipe.favorite) continue;
     if (state.tags.size && ![...state.tags].every((tag) => (recipe.tags || []).includes(tag))) continue;
     const match = recipeMatch(recipe);
-    if (state.onlyMakeable && state.have.length && !match.fullyCovered) continue;
     if (query && !(recipe.searchBlob || computeSearchBlob(recipe)).includes(query)) continue;
     rows.push({ recipe, match });
   }
@@ -864,13 +868,9 @@ function toggleTagInInput(inputEl, tag) {
 }
 
 function addRecipeFormHtml(prefill) {
-  const cuisines = unique(state.recipes.map((recipe) => recipe.cuisine));
   const mealValue = prefill?.meal || "other";
   const mealOptions = Object.entries(MEAL_LABELS)
     .map(([value, label]) => `<option value="${escapeAttr(value)}"${value === mealValue ? " selected" : ""}>${escapeHtml(label)}</option>`)
-    .join("");
-  const cuisineChips = cuisines
-    .map((cuisine) => `<button class="pill pill-btn-plain" type="button" data-action="pick-add-cuisine" data-cuisine="${escapeAttr(cuisine)}">${escapeHtml(cuisine)}</button>`)
     .join("");
   const ingredientsValue = prefill ? prefill.ingredients.join("\n") : "";
   const stepsValue = prefill ? prefill.steps.join("\n") : "";
@@ -906,11 +906,7 @@ function addRecipeFormHtml(prefill) {
         <span>Meal</span>
         <select id="add-meal">${mealOptions}</select>
       </label>
-      <label class="field">
-        <span>Cuisine</span>
-        <input id="add-cuisine" placeholder="e.g. Italian" value="${escapeAttr(prefill?.cuisine || "")}">
-      </label>
-      ${cuisineChips ? `<div class="chips" style="margin:-0.6rem 0 1.1rem;">${cuisineChips}</div>` : ""}
+      <input type="hidden" id="add-cuisine" value="${escapeAttr(prefill?.cuisine || "")}">
       <label class="field">
         <span>Time</span>
         <input id="add-time" placeholder="e.g. 20 min" value="${escapeAttr(prefill?.time || "")}">
@@ -1145,12 +1141,6 @@ els.favoritesToggle.addEventListener("click", () => {
   renderGrid();
 });
 
-els.makeableToggle.addEventListener("click", () => {
-  state.onlyMakeable = !state.onlyMakeable;
-  renderFilters();
-  renderGrid();
-});
-
 els.filtersBtn.addEventListener("click", () => {
   if (els.filtersPanel.hidden) openFilters();
   else closeFilters();
@@ -1159,7 +1149,6 @@ els.filtersBtn.addEventListener("click", () => {
 els.filtersReset.addEventListener("click", () => {
   state.tags = new Set();
   state.favoritesOnly = false;
-  state.onlyMakeable = false;
   state.sort = "recent";
   renderFilters();
   renderGrid();
@@ -1270,11 +1259,6 @@ document.addEventListener("click", (event) => {
     case "save-add-recipe":
       saveAddRecipe();
       break;
-    case "pick-add-cuisine": {
-      const input = document.getElementById("add-cuisine");
-      if (input) input.value = actionEl.dataset.cuisine;
-      break;
-    }
     case "pick-add-tag":
     case "pick-edit-tag": {
       const isEdit = action === "pick-edit-tag";

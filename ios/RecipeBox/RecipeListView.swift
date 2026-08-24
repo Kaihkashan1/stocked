@@ -6,7 +6,7 @@ struct RecipeListView: View {
     @State private var showFilters = false
 
     private var activeFilterCount: Int {
-        [!store.tagFilters.isEmpty, store.favoritesOnly, store.onlyMakeable].filter { $0 }.count
+        [!store.tagFilters.isEmpty, store.favoritesOnly].filter { $0 }.count
     }
 
     var body: some View {
@@ -121,23 +121,6 @@ struct FiltersSheet: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(store.favoritesOnly ? Theme.warm : Theme.inkSoft)
-
-                    Button {
-                        store.onlyMakeable.toggle()
-                    } label: {
-                        Label(
-                            store.onlyMakeable ? "Showing only what I can make" : "Only what I can make",
-                            systemImage: store.onlyMakeable ? "checkmark.circle.fill" : "checkmark.circle"
-                        )
-                        .font(Theme.mono(12.5, weight: .semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(store.onlyMakeable ? Theme.accent : Theme.inkSoft)
-                    .disabled(store.have.isEmpty)
-                } footer: {
-                    if store.have.isEmpty {
-                        Text("Mark ingredients as \"What I have\" on the Pantry tab to use this.")
-                    }
                 }
 
                 if !store.tags.isEmpty {
@@ -178,7 +161,6 @@ struct FiltersSheet: View {
                     Button("Reset") {
                         store.tagFilters = []
                         store.favoritesOnly = false
-                        store.onlyMakeable = false
                         store.sortOption = .recent
                     }
                 }
