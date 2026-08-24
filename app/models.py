@@ -49,8 +49,8 @@ class RecipeUpdate(BaseModel):
     notes: str | None = None
 
 
-class PlanUpdate(BaseModel):
-    ids: list[int] = Field(default_factory=list)
+class PantryUpdate(BaseModel):
+    items: list[str] = Field(default_factory=list)
 
 
 class ShoppingListUpdate(BaseModel):

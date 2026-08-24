@@ -106,34 +106,30 @@ def _read_app_state() -> dict:
 
 
 def _write_app_state(**updates) -> None:
-    # Read-modify-write against the whole blob — plan_ids and shopping_list
+    # Read-modify-write against the whole blob — have and shopping_list
     # share this one cell, so writing one key must not clobber the other.
     data = _read_app_state()
     data.update(updates)
     _state_worksheet().update("A1", [[json.dumps(data)]], value_input_option="RAW")
 
 
-def get_plan_ids() -> list[int]:
-    """The meal plan is shared across devices (iOS + web) — this and the
-    shopping list are the only pieces of client state worth syncing;
-    "what I have" is more of a per-session browsing context than something
-    to carry between devices."""
-    ids = _read_app_state().get("plan_ids") or []
-    return sorted({int(i) for i in ids if str(i).lstrip("-").isdigit()})
+def get_have_items() -> list[str]:
+    """The pantry — ingredients you currently have on hand. Synced across
+    devices (web + iOS), same as the shopping list, so it's a real inventory
+    rather than a per-session browsing filter."""
+    items = _read_app_state().get("have") or []
+    return sorted({str(item).strip().lower() for item in items if str(item).strip()})
 
 
-def save_plan_ids(ids: list[int]) -> list[int]:
-    clean = sorted({int(i) for i in ids})
-    _write_app_state(plan_ids=clean)
+def save_have_items(items: list[str]) -> list[str]:
+    clean = sorted({str(item).strip().lower() for item in items if str(item).strip()})
+    _write_app_state(have=clean)
     return clean
 
 
 def get_shopping_list() -> list[str]:
     """Ingredients the user intends to buy but hasn't yet — distinct from
-    "what I have" (already possess) and from the plan's own derived grocery
-    list (tied to specific planned recipes). Feeding these into the "you
-    could also make" pool lets the app answer "if I buy X and Y, what else
-    becomes makeable?" even for recipes that aren't currently planned."""
+    "what I have" (already possess)."""
     items = _read_app_state().get("shopping_list") or []
     return sorted({str(item).strip().lower() for item in items if str(item).strip()})
 

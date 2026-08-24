@@ -15,12 +15,12 @@ struct RecipeBoxApp: App {
     }
 
     /// Parses a recipebox:// deep link, e.g. from a Shortcuts action:
-    /// recipebox://plan, recipebox://surprise, recipebox://have?items=chicken,rice
+    /// recipebox://pantry, recipebox://surprise, recipebox://have?items=chicken,rice
     static func route(for url: URL) -> DeepLinkRoute? {
         guard url.scheme?.lowercased() == "recipebox" else { return nil }
         switch url.host?.lowercased() {
-        case "plan":
-            return .plan
+        case "pantry", "plan": // "plan" kept for shortcuts saved before the rename
+            return .pantry
         case "surprise":
             return .surprise
         case "have":

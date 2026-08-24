@@ -18,9 +18,10 @@ With a free Personal Team, the install lasts about 7 days. Run it again from Xco
 ## Using it
 
 - Pull down to refresh after you save a new recipe.
-- Filter by meal or cuisine, or tap **Favorites only**. Search by title, tag, or ingredient; tap a matching ingredient to pin it as something you have, and recipes that use those ingredients rank first.
+- Filter by tag, or tap **Favorites only**. Search by title, tag, or ingredient.
 - Open a recipe for ingredients and steps. Tap the star to favorite it, or **Edit** to fix a bad extraction — both write straight back to the Sheet.
-- Swipe a recipe left to favorite it, or right to add it to your **Plan** (second tab) — a shopping checklist grouped across everything you've planned.
+- The **Pantry** tab (second tab) is where "what I have" lives: tap ingredients from the browsable catalog, or type in your own (a leftover, a specific brand — anything, whether or not it's in any recipe). Once you've marked pantry items, the Recipes tab sorts by closest fit and shows a "% fit" badge; turn on **Only what I can make** in Filters to hide anything you can't fully cook right now. Opening a recipe you're missing ingredients for shows what's missing with a one-tap **Add to shopping list**.
+- The Pantry tab also holds a **Shopping list** — ingredients you plan to buy, independent of what you currently have.
 
 The phone only needs internet. Leave Settings on the Vercel URL unless you are testing a local backend.
 
@@ -39,8 +40,8 @@ Two things use the Shortcuts app:
 | Link | What it does |
 | --- | --- |
 | `recipebox://surprise` | Opens a random saved recipe |
-| `recipebox://plan` | Jumps straight to the Plan tab |
-| `recipebox://have?items=chicken,rice` | Preloads "what I have" with that ingredient list |
+| `recipebox://pantry` | Jumps straight to the Pantry tab |
+| `recipebox://have?items=chicken,rice` | Replaces "what I have" with that ingredient list |
 
 For "what can I make with ___", make the ingredients dynamic instead of hardcoding them:
 
@@ -50,4 +51,4 @@ For "what can I make with ___", make the ingredients dynamic instead of hardcodi
 4. Add **Open URLs**, input set to that Text.
 5. Optional: turn on **Show in Share Sheet** and **Add to Siri** (in the shortcut's settings, the **i** button) so you can trigger it by voice or from the share sheet.
 
-The "surprise" and "plan" links don't need any input — just one **Open URLs** action each.
+The "surprise" and "pantry" links don't need any input — just one **Open URLs** action each.

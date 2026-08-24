@@ -190,7 +190,7 @@ button { font-family: inherit; }
 
 .shell {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
   max-width: 1180px;
   margin: 0 auto;
@@ -202,9 +202,7 @@ button { font-family: inherit; }
    since author styles always win over UA styles. */
 .shell[hidden] { display: none; }
 
-.plan-shell { grid-template-columns: minmax(0, 1fr); max-width: 920px; }
-
-.filters section + section { margin-top: 1.5rem; }
+.pantry-shell { max-width: 920px; }
 
 .favorites-toggle {
   display: flex;
@@ -525,6 +523,20 @@ button { font-family: inherit; }
 .hero-plain .eyebrow { color: var(--ink-soft); margin-bottom: 0.4rem; }
 .hero-plain h2 { color: var(--ink); font-size: 1.9rem; line-height: 1.15; margin: 0; }
 
+.pantry-match {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.8rem 1.4rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.pantry-match.missing { color: var(--ink-soft); }
+.pantry-match.covered { color: var(--accent); font-weight: 600; }
+.pantry-match .link-btn { color: var(--accent); white-space: nowrap; }
+
 .recipe-body { padding: 1.6rem 1.4rem 3rem; }
 
 .recipe-body .meta { margin-top: 1.8rem; }
@@ -642,49 +654,8 @@ ol.steps li {
   margin-top: -0.4rem;
 }
 
-/* Plan view */
-.plan-content { display: flex; flex-direction: column; gap: 2.2rem; }
-
-.plan-rows { display: flex; flex-direction: column; gap: 0.6rem; }
-
-.plan-row {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 0.6rem 0.9rem;
-  box-shadow: var(--shadow);
-}
-
-.plan-title {
-  flex: 1;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: "Fraunces", serif;
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--ink);
-  padding: 0;
-}
-
-.grocery-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 0.9rem;
-}
-
-.omitted-note {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-  margin: -0.4rem 0 0.9rem;
-}
+/* Pantry view */
+.pantry-content { display: flex; flex-direction: column; gap: 2.2rem; }
 
 .link-btn {
   background: none;
@@ -696,30 +667,37 @@ ol.steps li {
   cursor: pointer;
 }
 
-.grocery-groups { display: flex; flex-direction: column; gap: 1.3rem; }
-
-.grocery-list {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-
-.grocery-item {
+.pantry-add {
   display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.7rem 1rem;
-  border-bottom: 1px solid var(--line);
-  cursor: pointer;
-  font-size: 0.95rem;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
 }
 
-.grocery-item:last-child { border-bottom: none; }
+.pantry-add input {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  font-size: 0.9rem;
+}
 
-.grocery-item input { accent-color: var(--accent); width: 16px; height: 16px; }
+.pantry-add button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 8px;
+  padding: 0.55rem 1.1rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
 
-.grocery-item.checked span { color: var(--ink-soft); text-decoration: line-through; }
-.grocery-item.checked .qty { background: var(--surface-2); color: var(--ink-soft); }
+.grocery-groups { display: flex; flex-direction: column; gap: 1.3rem; }
 
 .photo-loading-overlay {
   position: fixed;
@@ -760,9 +738,7 @@ ol.steps li {
 }
 
 @media (max-width: 820px) {
-  .shell { grid-template-columns: 1fr; padding: 1rem 1rem 3rem; }
+  .shell { padding: 1rem 1rem 3rem; }
   .topbar-row { flex-wrap: wrap; }
   .search input { width: 100%; }
-  .filters { display: flex; gap: 1.25rem; overflow-x: auto; }
-  .filters section { min-width: 12rem; }
 }

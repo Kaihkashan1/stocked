@@ -17,16 +17,16 @@ from app.auth import require_secret
 from app.config import ROOT, settings
 from app.extract import extract_recipe
 from app.match import STAPLES, grouped_pantry
-from app.models import FetchedPost, PlanUpdate, RecipeCreate, RecipeUpdate, ShoppingListUpdate
+from app.models import FetchedPost, PantryUpdate, RecipeCreate, RecipeUpdate, ShoppingListUpdate
 from app.pipeline import jobs, process_recipe
 from app.store import (
     create_recipe,
     delete_recipe,
-    get_plan_ids,
+    get_have_items,
     get_recipe,
     get_shopping_list,
     list_recipes,
-    save_plan_ids,
+    save_have_items,
     save_shopping_list,
     update_recipe,
 )
@@ -78,16 +78,17 @@ async def health():
 @app.get("/api/recipes")
 async def api_list_recipes():
     recipes = [_public(recipe) for recipe in list_recipes()]
-    items = sorted(
-        {
-            item
-            for recipe in recipes
-            for item in recipe.get("pantry") or []
-            if item not in STAPLES
-        },
-        key=str.lower,
-    )
-    return {"recipes": recipes, "pantry": grouped_pantry(items)}
+    items = {
+        item
+        for recipe in recipes
+        for item in recipe.get("pantry") or []
+        if item not in STAPLES
+    }
+    # Custom pantry items (typed in free-hand, not derived from any recipe)
+    # need to show up in the catalog too, so they get a real category
+    # instead of vanishing until they happen to match a recipe.
+    items |= set(get_have_items())
+    return {"recipes": recipes, "pantry": grouped_pantry(sorted(items, key=str.lower))}
 
 
 @app.get("/api/recipes/{row_id}")
@@ -173,14 +174,14 @@ async def api_delete_recipe(row_id: int):
     return {"status": "deleted", "id": row_id}
 
 
-@app.get("/api/plan")
-async def api_get_plan():
-    return {"ids": get_plan_ids()}
+@app.get("/api/pantry")
+async def api_get_pantry():
+    return {"items": get_have_items()}
 
 
-@app.put("/api/plan", dependencies=[Depends(require_secret)])
-async def api_put_plan(body: PlanUpdate):
-    return {"ids": save_plan_ids(body.ids)}
+@app.put("/api/pantry", dependencies=[Depends(require_secret)])
+async def api_put_pantry(body: PantryUpdate):
+    return {"items": save_have_items(body.items)}
 
 
 @app.get("/api/shopping-list")

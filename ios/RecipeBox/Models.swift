@@ -199,7 +199,7 @@ struct RecipeCreate: Encodable {
 
 /// A recipebox:// deep link, e.g. from a Shortcuts action.
 enum DeepLinkRoute: Equatable {
-    case plan
+    case pantry
     case surprise
     case have([String])
 }
@@ -214,11 +214,13 @@ enum SortOption: String, CaseIterable {
 
 struct RecipeMatch {
     let score: Double
-    let extraCount: Int
+    let missingCount: Int
+    let fullyCovered: Bool
 
     var label: String {
-        if extraCount == 0 { return "Best fit" }
-        return "\(Int((score * 100).rounded()))% fit · \(extraCount) extra"
+        if fullyCovered { return "Best fit" }
+        if missingCount == 0 { return "\(Int((score * 100).rounded()))% fit" }
+        return "\(Int((score * 100).rounded()))% fit · \(missingCount) missing"
     }
 }
 
@@ -407,29 +409,26 @@ func namesMatch(_ left: String, _ right: String) -> Bool {
     left == right || left.contains(right) || right.contains(left) || stem(left) == stem(right)
 }
 
+/// How much of this recipe's core (non-staple) ingredients are covered by
+/// "what I have". Unlike the old ingredient-search behavior, marking more
+/// pantry items never hides a recipe — it only ever raises recipes' scores
+/// and shrinks their missing list, the way SuperCook-style matching works.
 func matchRecipe(_ recipe: Recipe, have: [String]) -> RecipeMatch? {
     guard !have.isEmpty else { return nil }
-    let pantry = recipe.pantry
-    for wanted in have {
-        if !pantry.contains(where: { namesMatch(wanted, $0) }) {
-            return nil
-        }
-    }
-    let core = pantry.filter { !staples.contains($0) }
-    let extra = core.filter { item in !have.contains(where: { namesMatch(item, $0) }) }
+    let core = recipe.pantry.filter { !staples.contains($0) }
+    let missing = core.filter { item in !have.contains(where: { namesMatch(item, $0) }) }
     let total = max(core.count, 1)
-    return RecipeMatch(score: Double(have.count) / Double(total), extraCount: extra.count)
+    let matched = core.count - missing.count
+    return RecipeMatch(
+        score: Double(matched) / Double(total),
+        missingCount: missing.count,
+        fullyCovered: !core.isEmpty && missing.isEmpty
+    )
 }
 
-/// The reverse question from matchRecipe: "could I make this with only what's
-/// in `available`?" (every non-staple ingredient the recipe needs must be
-/// covered), rather than "does this recipe use everything I've flagged as
-/// having?" Used for the Plan tab's "you could also make" bonus discovery,
-/// where `available` is "what I have" plus every ingredient already on the
-/// shopping list for planned recipes.
-func isFullyCovered(_ recipe: Recipe, by available: Set<String>) -> Bool {
-    guard !available.isEmpty else { return false }
+/// The ingredients from `recipe.pantry` not covered by `have` — used both to
+/// sort (closest fit first) and to prefill "add missing to shopping list".
+func missingIngredients(_ recipe: Recipe, have: [String]) -> [String] {
     let core = recipe.pantry.filter { !staples.contains($0) }
-    guard !core.isEmpty else { return false }
-    return core.allSatisfy { item in available.contains(where: { namesMatch(item, $0) }) }
+    return core.filter { item in !have.contains(where: { namesMatch(item, $0) }) }
 }

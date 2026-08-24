@@ -22,24 +22,21 @@ const INGREDIENT_UNITS = new Set([
 ]);
 
 const SECRET_KEY = "recipeBox.secret";
-const PLAN_KEY = "recipeBox.plan";
+const HAVE_KEY = "recipeBox.have";
 const SHOPPING_LIST_KEY = "recipeBox.shoppingList";
 
 const state = {
   recipes: [],
   pantryGroups: [],
   tab: "recipes",
-  meal: "all",
-  cuisine: "all",
   tag: "all",
   query: "",
-  have: [],
+  have: loadHave(),
   pantryQuery: "",
   favoritesOnly: false,
+  onlyMakeable: false,
   sort: "recent",
-  planIDs: loadPlanIDs(),
   shoppingList: loadShoppingList(),
-  checkedItems: new Set(),
   openRecipeId: null,
   editingId: null,
   addingRecipe: false,
@@ -47,24 +44,25 @@ const state = {
 
 const els = {
   search: document.getElementById("search"),
-  meals: document.getElementById("meal-filters"),
-  cuisines: document.getElementById("cuisine-filters"),
   tagFilters: document.getElementById("tag-filters"),
   favoritesToggle: document.getElementById("favorites-toggle"),
+  makeableToggle: document.getElementById("makeable-toggle"),
   filtersBtn: document.getElementById("filters-btn"),
   filtersPanel: document.getElementById("filters-panel"),
   filtersReset: document.getElementById("filters-reset"),
-  pantrySearch: document.getElementById("pantry-search"),
-  pantrySelected: document.getElementById("pantry-selected"),
-  pantryOptions: document.getElementById("pantry-options"),
   grid: document.getElementById("grid"),
   status: document.getElementById("status"),
   drawer: document.getElementById("drawer"),
   detail: document.getElementById("recipe-detail"),
   recipesView: document.getElementById("recipes-view"),
-  planView: document.getElementById("plan-view"),
-  planContent: document.getElementById("plan-content"),
-  planBadge: document.getElementById("plan-badge"),
+  pantryView: document.getElementById("pantry-view"),
+  pantryBadge: document.getElementById("pantry-badge"),
+  pantryAddInput: document.getElementById("pantry-add-input"),
+  pantryAddBtn: document.getElementById("pantry-add-btn"),
+  pantrySelected: document.getElementById("pantry-selected"),
+  pantrySearch: document.getElementById("pantry-search"),
+  pantryOptions: document.getElementById("pantry-options"),
+  shoppingGroups: document.getElementById("shopping-groups"),
   settingsBtn: document.getElementById("settings-btn"),
   addRecipeBtn: document.getElementById("add-recipe-btn"),
   addRecipeMenu: document.getElementById("add-recipe-menu"),
@@ -86,15 +84,14 @@ async function load() {
   });
   state.pantryGroups = Array.isArray(data.pantry) ? data.pantry : [];
   renderFilters();
-  renderPantry();
   renderGrid();
-  renderPlanBadge();
+  renderPantryBadge();
   maybeOpenFromHash();
-  await fetchPlan();
+  await fetchHave();
   await fetchShoppingList();
-  renderPlanBadge();
+  renderPantryBadge();
   renderGrid();
-  if (state.tab === "plan") renderPlan();
+  if (state.tab === "pantry") renderPantryTab();
 }
 
 // ---------- auth / API ----------
@@ -181,29 +178,108 @@ function splitIngredientQuantity(line) {
   return { quantity: quantityParts.join(" "), text: rest };
 }
 
-// ---------- plan / grocery list ----------
+// ---------- pantry ("what I have") / shopping list ----------
 
-// The plan syncs through GET/PUT /api/plan (same one this app's iOS
-// counterpart uses) so it matches between devices. localStorage is kept
-// only as an instant-render cache for first paint, before the fetch
-// in load() reconciles it against the server.
-function loadPlanIDs() {
+// The pantry syncs through GET/PUT /api/pantry (same one this app's iOS
+// counterpart uses) so it matches between devices — it's a real inventory
+// now, not a per-session browsing filter. localStorage is kept only as an
+// instant-render cache for first paint, before the fetch in load()
+// reconciles it against the server.
+function loadHave() {
   try {
-    const raw = localStorage.getItem(PLAN_KEY);
-    return new Set(raw ? JSON.parse(raw) : []);
+    const raw = localStorage.getItem(HAVE_KEY);
+    return raw ? JSON.parse(raw) : [];
   } catch {
-    return new Set();
+    return [];
   }
 }
 
-function cachePlanIDs() {
-  localStorage.setItem(PLAN_KEY, JSON.stringify([...state.planIDs]));
+function cacheHave() {
+  localStorage.setItem(HAVE_KEY, JSON.stringify(state.have));
+}
+
+async function fetchHave() {
+  try {
+    const response = await fetch("/api/pantry");
+    if (!response.ok) return;
+    const data = await response.json();
+    state.have = Array.isArray(data.items) ? data.items : [];
+    cacheHave();
+  } catch {
+    // keep whatever the local cache had
+  }
+}
+
+async function putHave(items) {
+  const response = await fetch("/api/pantry", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ items }),
+  });
+  if (!response.ok) throw await errorForResponse(response);
+  return (await response.json()).items;
+}
+
+// Optimistic, like toggleFavorite: flips locally first, pushes the whole
+// set, reverts on failure. Used for both catalog chips and selected chips
+// on the Pantry tab.
+async function togglePantry(item) {
+  const previous = [...state.have];
+  state.have = state.have.includes(item) ? state.have.filter((value) => value !== item) : [...state.have, item];
+  cacheHave();
+  renderPantryBadge();
+  renderGrid();
+  if (state.tab === "pantry") renderPantryTab();
+  refreshOpenRecipe();
+
+  try {
+    const confirmed = await putHave(state.have);
+    state.have = confirmed;
+  } catch (err) {
+    state.have = previous;
+    window.alert(`Couldn't save your pantry: ${err.message}`);
+  }
+  cacheHave();
+  renderPantryBadge();
+  renderGrid();
+  if (state.tab === "pantry") renderPantryTab();
+  refreshOpenRecipe();
+}
+
+// A free-text addition — for something you have that isn't derived from any
+// recipe (a specific brand, a leftover, whatever). Normalized the same way
+// the server does (trimmed, lowercased) so it still matches recipe
+// ingredients via namesMatch just like a catalog pick would.
+function addHaveItem(raw) {
+  const item = raw.trim().toLowerCase();
+  if (!item) return;
+  if (state.have.some((existing) => existing === item || namesMatch(existing, item))) return;
+  ensurePantryGroupContains(item);
+  togglePantry(item);
+}
+
+// The server re-categorizes on the next full reload; this just keeps a
+// freshly-typed custom item from vanishing from "What I have" until then.
+function ensurePantryGroupContains(item) {
+  if (state.pantryGroups.some((group) => group.items.includes(item))) return;
+  let other = state.pantryGroups.find((group) => group.category === "Other");
+  if (!other) {
+    other = { category: "Other", items: [] };
+    state.pantryGroups.push(other);
+  }
+  other.items.push(item);
+  other.items.sort((a, b) => a.localeCompare(b));
+}
+
+function renderPantryBadge() {
+  const count = state.have.length;
+  els.pantryBadge.hidden = count === 0;
+  els.pantryBadge.textContent = String(count);
 }
 
 // Ingredients the user intends to buy but hasn't yet — distinct from "have"
-// (already possess) and from the plan's own derived grocery list (tied to
-// specific planned recipes). Synced through GET/PUT /api/shopping-list, same
-// pattern as the plan, so it feeds "you could also make" on every device.
+// (already possess). Synced through GET/PUT /api/shopping-list, same
+// pattern as the pantry.
 function loadShoppingList() {
   try {
     const raw = localStorage.getItem(SHOPPING_LIST_KEY);
@@ -239,7 +315,7 @@ async function putShoppingList(items) {
   return (await response.json()).items;
 }
 
-// Optimistic, like togglePlan.
+// Optimistic, like togglePantry.
 async function toggleShoppingItem(item) {
   const previous = new Set(state.shoppingList);
   if (state.shoppingList.has(item)) {
@@ -248,7 +324,7 @@ async function toggleShoppingItem(item) {
     state.shoppingList.add(item);
   }
   cacheShoppingList();
-  if (state.tab === "plan") renderPlan();
+  if (state.tab === "pantry") renderPantryTab();
 
   try {
     const confirmed = await putShoppingList(state.shoppingList);
@@ -258,152 +334,45 @@ async function toggleShoppingItem(item) {
     window.alert(`Couldn't save the shopping list: ${err.message}`);
   }
   cacheShoppingList();
-  if (state.tab === "plan") renderPlan();
+  if (state.tab === "pantry") renderPantryTab();
 }
 
-async function fetchPlan() {
-  try {
-    const response = await fetch("/api/plan");
-    if (!response.ok) return;
-    const data = await response.json();
-    state.planIDs = new Set(data.ids || []);
-    cachePlanIDs();
-  } catch {
-    // keep whatever the local cache had
-  }
-}
-
-async function putPlan(ids) {
-  const response = await fetch("/api/plan", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ ids: [...ids] }),
-  });
-  if (!response.ok) throw await errorForResponse(response);
-  return (await response.json()).ids;
-}
-
-// Optimistic, like toggleFavorite: flips locally first, pushes the whole
-// set, reverts on failure.
-async function togglePlan(id) {
+// Bulk version of toggleShoppingItem, for the recipe detail view's "add
+// missing to shopping list" button — one request for the whole gap rather
+// than N toggles racing to write the last (possibly stale) state.
+async function addMissingToShoppingList(id) {
   id = Number(id);
-  const previous = new Set(state.planIDs);
-  if (state.planIDs.has(id)) {
-    state.planIDs.delete(id);
-  } else {
-    state.planIDs.add(id);
+  const recipe = state.recipes.find((item) => item.id === id);
+  if (!recipe) return;
+  const missing = missingIngredients(recipe);
+  if (!missing.length) return;
+
+  const btn = document.querySelector(`[data-action="add-missing-to-shopping"][data-id="${id}"]`);
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Adding…";
   }
-  cachePlanIDs();
-  renderPlanBadge();
-  renderGrid();
-  if (state.tab === "plan") renderPlan();
+
+  const previous = new Set(state.shoppingList);
+  missing.forEach((item) => state.shoppingList.add(item));
+  cacheShoppingList();
 
   try {
-    const confirmed = await putPlan(state.planIDs);
-    state.planIDs = new Set(confirmed);
+    const confirmed = await putShoppingList(state.shoppingList);
+    state.shoppingList = new Set(confirmed);
+    if (btn) btn.textContent = "Added ✓";
   } catch (err) {
-    state.planIDs = previous;
-    window.alert(`Couldn't save the plan: ${err.message}`);
-  }
-  cachePlanIDs();
-  renderPlanBadge();
-  renderGrid();
-  if (state.tab === "plan") renderPlan();
-}
-
-// One request for the whole clear, rather than N toggles racing to write
-// the last (possibly stale) state.
-async function clearPlan() {
-  const previous = new Set(state.planIDs);
-  state.planIDs = new Set();
-  cachePlanIDs();
-  renderPlanBadge();
-  renderGrid();
-  renderPlan();
-
-  try {
-    const confirmed = await putPlan([]);
-    state.planIDs = new Set(confirmed);
-  } catch (err) {
-    state.planIDs = previous;
-    window.alert(`Couldn't save the plan: ${err.message}`);
-  }
-  cachePlanIDs();
-  renderPlanBadge();
-  renderGrid();
-  renderPlan();
-}
-
-function renderPlanBadge() {
-  const count = state.planIDs.size;
-  els.planBadge.hidden = count === 0;
-  els.planBadge.textContent = String(count);
-}
-
-function canonicalKey(line, pantry) {
-  const lower = line.toLowerCase();
-  const matches = (pantry || []).filter((item) => lower.includes(item));
-  if (!matches.length) return "other";
-  return matches.reduce((a, b) => (b.length > a.length ? b : a));
-}
-
-// Skips anything already in "what I have" — this is a shopping list, not a
-// full ingredient list. Mirrors GroceryListView.swift's groupedIngredients.
-function groupedIngredients(planned) {
-  const buckets = new Map();
-  const seenLines = new Set();
-  for (const recipe of planned) {
-    for (const line of recipe.ingredients || []) {
-      if (seenLines.has(line)) continue;
-      seenLines.add(line);
-      const key = canonicalKey(line, recipe.pantry);
-      if (state.have.some((have) => namesMatch(have, key))) continue;
-      if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push(line);
+    state.shoppingList = previous;
+    cacheShoppingList();
+    window.alert(`Couldn't save the shopping list: ${err.message}`);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Add to shopping list";
     }
+    return;
   }
-  return [...buckets.entries()]
-    .map(([key, lines]) => ({ key, lines: lines.sort() }))
-    .sort((a, b) => a.key.localeCompare(b.key));
-}
-
-// How many distinct ingredient lines were left off the list above because
-// they matched something in "what I have".
-function omittedHaveCount(planned) {
-  const seenLines = new Set();
-  let count = 0;
-  for (const recipe of planned) {
-    for (const line of recipe.ingredients || []) {
-      if (seenLines.has(line)) continue;
-      seenLines.add(line);
-      const key = canonicalKey(line, recipe.pantry);
-      if (state.have.some((have) => namesMatch(have, key))) count += 1;
-    }
-  }
-  return count;
-}
-
-// The reverse question from recipeMatch: "could I make this with only
-// what's in `available`?" (every non-staple ingredient must be covered),
-// rather than "does this recipe use everything I've flagged as having?".
-// Mirrors Models.swift's isFullyCovered.
-function isFullyCovered(recipe, available) {
-  if (!available.size) return false;
-  const core = (recipe.pantry || []).filter((item) => !STAPLES.has(item));
-  if (!core.length) return false;
-  return core.every((item) => [...available].some((have) => namesMatch(item, have)));
-}
-
-// Recipes outside the plan that would become fully makeable once this
-// shopping list is done — "what I have" plus every ingredient already
-// needed for the planned recipes. Mirrors GroceryListView.swift's
-// alsoMakeable.
-function alsoMakeable(planned) {
-  const plannedIDs = new Set(planned.map((recipe) => recipe.id));
-  const expanded = new Set([...state.have, ...state.shoppingList, ...planned.flatMap((recipe) => recipe.pantry || [])]);
-  return state.recipes
-    .filter((recipe) => !plannedIDs.has(recipe.id) && isFullyCovered(recipe, expanded))
-    .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+  cacheShoppingList();
+  if (state.tab === "pantry") renderPantryTab();
 }
 
 function shoppingGroupsHtml(groups) {
@@ -420,111 +389,28 @@ function shoppingGroupsHtml(groups) {
     .join("");
 }
 
-function renderPlan() {
-  const planned = state.recipes.filter((r) => state.planIDs.has(r.id));
+// Renders the three dynamic pieces of the Pantry tab (selected chips, the
+// browsable/searchable catalog, and the shopping list) without touching the
+// two static text inputs — replacing those on every keystroke would wipe
+// whatever the user is mid-typing.
+function renderPantryTab() {
+  const selected = groupPantry(state.have);
+  els.pantrySelected.innerHTML = selected.length
+    ? pantryGroupsHtml(selected, true)
+    : `<span class="status">Nothing marked yet</span>`;
 
-  const plannedSection = `
-    <section>
-      <h2 class="eyebrow">Planned · ${planned.length} recipe${planned.length === 1 ? "" : "s"}</h2>
-      ${
-        planned.length
-          ? `<div class="plan-rows">${planned
-              .map(
-                (recipe) => `
-        <div class="plan-row">
-          <button class="plan-title" type="button" data-action="open-recipe" data-id="${recipe.id}">${escapeHtml(recipe.title)}</button>
-          <button class="icon-btn" type="button" data-action="toggle-plan" data-id="${recipe.id}">Remove</button>
-        </div>`
-              )
-              .join("")}</div>`
-          : `<div class="empty">No recipes planned yet. Tap the cart icon on a recipe to add it here.</div>`
-      }
-    </section>`;
+  const needle = state.pantryQuery.trim().toLowerCase();
+  const options = groupPantry(
+    pantryCatalog().filter((item) => !state.have.includes(item) && pantryQueryMatch(item, needle))
+  );
+  els.pantryOptions.innerHTML = options.length
+    ? pantryGroupsHtml(options, false)
+    : `<span class="status">No matching ingredients</span>`;
 
-  // Ingredients you intend to buy but haven't yet — independent of any
-  // planned recipe. Feeds "You could also make" below the same way "what I
-  // have" and the planned recipes' own ingredients do.
   const shoppingGroups = groupPantry(pantryCatalog());
-  const shoppingSection = `
-    <section>
-      <h2>Shopping list</h2>
-      <p class="eyebrow" style="margin-bottom:0.8rem;">Ingredients you plan to buy — counted toward "You could also make" below, even without planning a recipe around them.</p>
-      <div class="grocery-groups">${shoppingGroups.length ? shoppingGroupsHtml(shoppingGroups) : `<span class="status">No ingredients known yet</span>`}</div>
-    </section>`;
-
-  let groceryListSection = "";
-  if (planned.length) {
-    const groups = groupedIngredients(planned)
-      .map((group) => {
-        const items = group.lines
-          .map((line) => {
-            const { quantity, text } = splitIngredientQuantity(line);
-            const checked = state.checkedItems.has(line);
-            return `
-            <label class="grocery-item${checked ? " checked" : ""}">
-              <input type="checkbox" data-line="${escapeAttr(line)}" ${checked ? "checked" : ""}>
-              ${quantity ? `<span class="qty">${escapeHtml(quantity)}</span>` : ""}
-              <span>${escapeHtml(text)}</span>
-            </label>`;
-          })
-          .join("");
-        return `
-        <div>
-          <h3 class="pantry-heading">${escapeHtml(capitalize(group.key))}</h3>
-          <div class="grocery-list">${items}</div>
-        </div>`;
-      })
-      .join("");
-
-    const omitted = omittedHaveCount(planned);
-    const omittedNote = omitted
-      ? `<p class="omitted-note">${omitted} item${omitted === 1 ? "" : "s"} skipped because you already have ${omitted === 1 ? "it" : "them"}</p>`
-      : "";
-
-    groceryListSection = `
-    <section>
-      <div class="grocery-header">
-        <h2>Grocery list</h2>
-        <button class="link-btn" type="button" data-action="clear-plan">Clear plan</button>
-      </div>
-      <p class="eyebrow" style="margin-bottom:0.8rem;">Everything needed for your planned recipes — skips anything marked as "What I have" on the Recipes tab.</p>
-      ${omittedNote}
-      <div class="grocery-groups">${groups}</div>
-    </section>`;
-  }
-
-  // Always shown, even empty — otherwise an empty match list reads as "this
-  // feature doesn't exist" rather than "nothing qualifies yet".
-  const bonus = alsoMakeable(planned);
-  const bonusSection = `
-    <section>
-      <h2>You could also make</h2>
-      <p class="eyebrow" style="margin-bottom:0.8rem;">Fully covered by what you have, your shopping list, and everything already needed for planned recipes.</p>
-      ${
-        bonus.length
-          ? `<div class="plan-rows">
-        ${bonus
-          .map(
-            (recipe) => `
-          <div class="plan-row">
-            <button class="plan-title" type="button" data-action="open-recipe" data-id="${recipe.id}">${escapeHtml(recipe.title)}</button>
-          </div>`
-          )
-          .join("")}
-      </div>`
-          : `<div class="empty">Nothing yet — mark ingredients as "What I have" on the Recipes tab, or tap items in the shopping list below, and matches will show up here.</div>`
-      }
-    </section>`;
-
-  // Grocery list right after Planned — it's the actionable thing you came
-  // for. The shopping-list catalog (everything across every recipe) is a
-  // much bigger, browsier list, so it comes after rather than pushing the
-  // actual grocery list below the fold.
-  els.planContent.innerHTML = `${plannedSection}${groceryListSection}${shoppingSection}${bonusSection}`;
-}
-
-function capitalize(value) {
-  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+  els.shoppingGroups.innerHTML = shoppingGroups.length
+    ? shoppingGroupsHtml(shoppingGroups)
+    : `<span class="status">No ingredients known yet</span>`;
 }
 
 // ---------- tabs ----------
@@ -532,24 +418,14 @@ function capitalize(value) {
 function setTab(tab) {
   state.tab = tab;
   els.recipesView.hidden = tab !== "recipes";
-  els.planView.hidden = tab !== "plan";
+  els.pantryView.hidden = tab !== "pantry";
   els.tabs.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === tab));
-  if (tab === "plan") renderPlan();
+  if (tab === "pantry") renderPantryTab();
 }
 
 // ---------- filters / recipe grid (existing browse behavior) ----------
 
 function renderFilters() {
-  const meals = ["all", ...Object.keys(MEAL_LABELS)];
-  els.meals.innerHTML = meals
-    .map((meal) => chip("meal", meal, meal === "all" ? "All meals" : MEAL_LABELS[meal]))
-    .join("");
-
-  const cuisines = ["all", ...unique(state.recipes.map((recipe) => recipe.cuisine))];
-  els.cuisines.innerHTML = cuisines
-    .map((cuisine) => chip("cuisine", cuisine, cuisine === "all" ? "All cuisines" : cuisine))
-    .join("");
-
   // Tags cover cooking method/appliance (air-fryer, one-pot, ...) as well as
   // diet/flavor — anything Gemini tagged the recipe with — so this is the
   // one place a category like "Air Fryer" becomes a real filter without
@@ -558,14 +434,13 @@ function renderFilters() {
   els.tagFilters.innerHTML = tags.map((tag) => chip("tag", tag, tag === "all" ? "All tags" : tag)).join("");
 
   els.favoritesToggle.classList.toggle("active", state.favoritesOnly);
+  els.makeableToggle.classList.toggle("active", state.onlyMakeable);
 
   document
     .querySelectorAll("#sort-options .chip")
     .forEach((chip) => chip.classList.toggle("active", chip.dataset.sort === state.sort));
 
-  const activeCount = [state.meal !== "all", state.cuisine !== "all", state.tag !== "all", state.favoritesOnly].filter(
-    Boolean
-  ).length;
+  const activeCount = [state.tag !== "all", state.favoritesOnly, state.onlyMakeable].filter(Boolean).length;
   els.filtersBtn.classList.toggle("active", activeCount > 0);
   els.filtersBtn.textContent = "";
   els.filtersBtn.append(filtersIcon(), document.createTextNode(activeCount > 0 ? `Filters (${activeCount})` : "Filters"));
@@ -624,21 +499,6 @@ function groupPantry(items) {
   return [{ category: "Ingredients", items: items }];
 }
 
-function renderPantry() {
-  const selected = groupPantry(state.have);
-  els.pantrySelected.innerHTML = selected.length
-    ? pantryGroupsHtml(selected, true)
-    : `<span class="status">Pick ingredients you have</span>`;
-
-  const needle = state.pantryQuery.trim().toLowerCase();
-  const options = groupPantry(
-    pantryCatalog().filter((item) => !state.have.includes(item) && pantryQueryMatch(item, needle))
-  );
-  els.pantryOptions.innerHTML = options.length
-    ? pantryGroupsHtml(options, false)
-    : `<span class="status">No matching ingredients</span>`;
-}
-
 function pantryGroupsHtml(groups, selected) {
   return groups
     .map((group) => {
@@ -675,28 +535,33 @@ function pantryQueryMatch(item, needle) {
   return item.includes(needle) || needle.includes(item) || namesMatch(item, needle);
 }
 
+// How much of this recipe's core (non-staple) ingredients are covered by
+// "what I have". Unlike the old ingredient-search behavior, marking more
+// pantry items never hides a recipe — it only ever raises recipes' scores
+// and shrinks their missing list, the way SuperCook-style matching works.
 function recipeMatch(recipe) {
-  if (!state.have.length) return { ok: true, score: 0, extra: 0 };
   const pantry = recipe.pantry || [];
-  const haystack = pantry;
-  for (const wanted of state.have) {
-    if (!haystack.some((have) => namesMatch(wanted, have))) {
-      return { ok: false, score: 0, extra: 0 };
-    }
-  }
+  if (!state.have.length) return { score: 0, missing: 0, fullyCovered: false };
   const core = pantry.filter((item) => !STAPLES.has(item));
-  const extra = core.filter((item) => !state.have.some((wanted) => namesMatch(item, wanted)));
+  const missingItems = core.filter((item) => !state.have.some((have) => namesMatch(item, have)));
   const total = Math.max(core.length, 1);
-  return { ok: true, score: state.have.length / total, extra: extra.length };
+  const matched = core.length - missingItems.length;
+  return { score: matched / total, missing: missingItems.length, fullyCovered: core.length > 0 && missingItems.length === 0 };
+}
+
+// The ingredients from `recipe.pantry` you don't have — used both to sort
+// the grid (closest fit first) and to prefill "add missing to shopping
+// list" on the detail view.
+function missingIngredients(recipe) {
+  const core = (recipe.pantry || []).filter((item) => !STAPLES.has(item));
+  return core.filter((item) => !state.have.some((have) => namesMatch(item, have)));
 }
 
 // Computed once per recipe (on load, and again after any edit that could
 // change these fields) rather than rebuilt on every filtered() call — the
 // same tradeoff Models.swift makes on iOS (see Recipe.searchBlob there).
 function computeSearchBlob(recipe) {
-  return [recipe.title, recipe.cuisine, recipe.meal, ...(recipe.tags || []), ...(recipe.ingredients || [])]
-    .join(" ")
-    .toLowerCase();
+  return [recipe.title, ...(recipe.tags || []), ...(recipe.ingredients || [])].join(" ").toLowerCase();
 }
 
 function filtered() {
@@ -704,16 +569,14 @@ function filtered() {
   const rows = [];
   for (const recipe of state.recipes) {
     if (state.favoritesOnly && !recipe.favorite) continue;
-    if (state.meal !== "all" && recipe.meal !== state.meal) continue;
-    if (state.cuisine !== "all" && recipe.cuisine !== state.cuisine) continue;
     if (state.tag !== "all" && !(recipe.tags || []).includes(state.tag)) continue;
     const match = recipeMatch(recipe);
-    if (!match.ok) continue;
+    if (state.onlyMakeable && state.have.length && !match.fullyCovered) continue;
     if (query && !(recipe.searchBlob || computeSearchBlob(recipe)).includes(query)) continue;
     rows.push({ recipe, match });
   }
   if (state.have.length) {
-    rows.sort((a, b) => b.match.score - a.match.score || a.match.extra - b.match.extra);
+    rows.sort((a, b) => b.match.score - a.match.score || a.match.missing - b.match.missing);
   } else if (state.sort === "az") {
     rows.sort((a, b) => a.recipe.title.localeCompare(b.recipe.title));
   } else if (state.sort === "za") {
@@ -725,7 +588,7 @@ function filtered() {
 function renderGrid() {
   const rows = filtered();
   if (state.have.length) {
-    els.status.textContent = `${rows.length} recipe${rows.length === 1 ? "" : "s"} using ${state.have.join(" + ")} · closest fit first`;
+    els.status.textContent = `${rows.length} recipe${rows.length === 1 ? "" : "s"} · closest fit to your pantry first`;
   } else {
     els.status.textContent = `${rows.length} recipe${rows.length === 1 ? "" : "s"}`;
   }
@@ -737,34 +600,26 @@ function renderGrid() {
 }
 
 function cardHtml({ recipe, match }) {
-  const tags = [`<span class="pill">${escapeHtml(recipe.cuisine)}</span>`];
-  if (recipe.meal && recipe.meal !== "other") {
-    tags.push(`<span class="pill warm">${escapeHtml(MEAL_LABELS[recipe.meal] || recipe.meal)}</span>`);
-  }
+  const tags = [];
   if (state.have.length) {
-    const label =
-      match.percent === 100 || match.score === 1
-        ? "Best fit"
-        : match.extra
-          ? `${Math.round(match.score * 100)}% fit · ${match.extra} extra`
-          : `${Math.round(match.score * 100)}% fit`;
+    const label = match.fullyCovered
+      ? "Best fit"
+      : match.missing
+        ? `${Math.round(match.score * 100)}% fit · ${match.missing} missing`
+        : `${Math.round(match.score * 100)}% fit`;
     tags.unshift(`<span class="pill match">${escapeHtml(label)}</span>`);
   }
   const favoriteActive = recipe.favorite ? " active" : "";
-  const planActive = state.planIDs.has(recipe.id) ? " active" : "";
   return `
     <div class="card" data-id="${recipe.id}">
       <div class="card-actions">
         <button class="card-icon-btn favorite${favoriteActive}" type="button" data-action="toggle-favorite" data-id="${recipe.id}" aria-label="Favorite">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="${recipe.favorite ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
         </button>
-        <button class="card-icon-btn plan${planActive}" type="button" data-action="toggle-plan" data-id="${recipe.id}" aria-label="Add to plan">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 3h2.4l2.1 11.4a2 2 0 0 0 2 1.6h8.3a2 2 0 0 0 2-1.6L21 7H6"/><circle cx="9" cy="20" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="20" r="1.3" fill="currentColor" stroke="none"/></svg>
-        </button>
       </div>
       <button class="card-body" type="button" data-action="open-recipe" data-id="${recipe.id}" style="text-align:left; background:none; border:none; cursor:pointer; padding:1.1rem; font:inherit; color:inherit;">
         <h2>${escapeHtml(recipe.title)}</h2>
-        <div class="meta">${tags.join("")}</div>
+        ${tags.length ? `<div class="meta">${tags.join("")}</div>` : ""}
       </button>
     </div>`;
 }
@@ -869,12 +724,7 @@ function refreshOpenRecipe() {
 function recipeHtml(recipe) {
   if (state.editingId === recipe.id) return editFormHtml(recipe);
 
-  const bits = [
-    recipe.cuisine,
-    MEAL_LABELS[recipe.meal] || recipe.meal,
-    recipe.servings ? `${recipe.servings} servings` : null,
-    recipe.time,
-  ].filter(Boolean);
+  const bits = [recipe.servings ? `${recipe.servings} servings` : null, recipe.time].filter(Boolean);
   const tags = (recipe.tags || [])
     .map((tag) => `<button class="pill pill-btn-plain" type="button" data-action="filter-tag" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`)
     .join("");
@@ -896,6 +746,16 @@ function recipeHtml(recipe) {
   const notesSection = recipe.notes
     ? `<h3>Notes</h3><p class="notes-box">${escapeHtml(recipe.notes)}</p>`
     : "";
+
+  const missing = state.have.length ? missingIngredients(recipe) : [];
+  const pantryNote = !state.have.length
+    ? ""
+    : missing.length
+      ? `<div class="pantry-match missing">
+          <span>Missing ${missing.length} ingredient${missing.length === 1 ? "" : "s"} from your pantry: ${escapeHtml(missing.join(", "))}</span>
+          <button class="link-btn" type="button" data-action="add-missing-to-shopping" data-id="${recipe.id}">Add to shopping list</button>
+        </div>`
+      : `<div class="pantry-match covered">You have everything for this.</div>`;
 
   return `
     <div class="drawer-actions">
@@ -924,6 +784,7 @@ function recipeHtml(recipe) {
       <p class="eyebrow">${escapeHtml(bits.join(" · "))}</p>
       <h2 id="recipe-title">${escapeHtml(recipe.title)}</h2>
     </div>
+    ${pantryNote}
     <div class="recipe recipe-body">
       <h3>Ingredients</h3>
       <ul class="ingredients">${ingredients || "<li>None listed</li>"}</ul>
@@ -1170,15 +1031,9 @@ async function deleteRecipe(id) {
   try {
     await deleteRecipeRequest(id);
     state.recipes = state.recipes.filter((item) => item.id !== id);
-    if (state.planIDs.delete(id)) {
-      cachePlanIDs();
-      putPlan(state.planIDs).then((ids) => { state.planIDs = new Set(ids); }).catch(() => {});
-    }
     closeDrawer();
     renderFilters();
     renderGrid();
-    renderPlanBadge();
-    if (state.tab === "plan") renderPlan();
   } catch (err) {
     window.alert(`Couldn't delete: ${err.message}`);
   }
@@ -1215,16 +1070,6 @@ function escapeAttr(value) {
   return escapeHtml(value).replaceAll("'", "&#39;");
 }
 
-function togglePantry(item) {
-  if (state.have.includes(item)) {
-    state.have = state.have.filter((value) => value !== item);
-  } else {
-    state.have = [...state.have, item];
-  }
-  renderPantry();
-  renderGrid();
-}
-
 // Debounced like iOS's DebouncedTextField — filtering the full list (plus
 // pantry matching against "what I have") on every single keystroke is
 // wasted work while the user is still typing.
@@ -1240,11 +1085,29 @@ els.search.addEventListener("input", () => {
 
 els.pantrySearch.addEventListener("input", () => {
   state.pantryQuery = els.pantrySearch.value;
-  renderPantry();
+  renderPantryTab();
+});
+
+els.pantryAddBtn.addEventListener("click", () => {
+  addHaveItem(els.pantryAddInput.value);
+  els.pantryAddInput.value = "";
+  els.pantryAddInput.focus();
+});
+
+els.pantryAddInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  addHaveItem(els.pantryAddInput.value);
+  els.pantryAddInput.value = "";
 });
 
 els.favoritesToggle.addEventListener("click", () => {
   state.favoritesOnly = !state.favoritesOnly;
+  renderFilters();
+  renderGrid();
+});
+
+els.makeableToggle.addEventListener("click", () => {
+  state.onlyMakeable = !state.onlyMakeable;
   renderFilters();
   renderGrid();
 });
@@ -1255,10 +1118,9 @@ els.filtersBtn.addEventListener("click", () => {
 });
 
 els.filtersReset.addEventListener("click", () => {
-  state.meal = "all";
-  state.cuisine = "all";
   state.tag = "all";
   state.favoritesOnly = false;
+  state.onlyMakeable = false;
   state.sort = "recent";
   renderFilters();
   renderGrid();
@@ -1340,10 +1202,6 @@ document.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleFavorite(id);
       break;
-    case "toggle-plan":
-      event.stopPropagation();
-      togglePlan(id);
-      break;
     case "toggle-recipe-menu":
       event.stopPropagation();
       toggleRecipeMenu();
@@ -1377,9 +1235,8 @@ document.addEventListener("click", (event) => {
       if (input) input.value = actionEl.dataset.cuisine;
       break;
     }
-    case "clear-plan":
-      state.checkedItems.clear();
-      clearPlan();
+    case "add-missing-to-shopping":
+      addMissingToShoppingList(id);
       break;
     case "open-add-recipe":
       els.addRecipeMenu.hidden = true;
@@ -1396,18 +1253,6 @@ document.addEventListener("click", (event) => {
     default:
       break;
   }
-});
-
-document.addEventListener("change", (event) => {
-  const checkbox = event.target.closest('.grocery-item input[type="checkbox"]');
-  if (!checkbox) return;
-  const line = checkbox.dataset.line;
-  if (state.checkedItems.has(line)) {
-    state.checkedItems.delete(line);
-  } else {
-    state.checkedItems.add(line);
-  }
-  renderPlan();
 });
 
 els.drawer.addEventListener("click", (event) => {
