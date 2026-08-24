@@ -18,7 +18,7 @@ With a free Personal Team, the install lasts about 7 days. Run it again from Xco
 ## Using it
 
 - Pull down to refresh after you save a new recipe.
-- Filter by tag, or tap **Favorites only**. Search by title, tag, or ingredient.
+- Filter by tag (select as many as you like — diet, course, source, appliance, anything), or tap **Favorites only**. Search by title, tag, or ingredient. Tag chips also show up when adding or editing a recipe, so picking "vegetarian" or "mom's recipes" is a tap instead of retyping it.
 - Open a recipe for ingredients and steps. Tap the star to favorite it, or **Edit** to fix a bad extraction — both write straight back to the Sheet.
 - The **Pantry** tab (second tab) is where "what I have" lives: tap ingredients from the browsable catalog, or type in your own (a leftover, a specific brand — anything, whether or not it's in any recipe). Once you've marked pantry items, the Recipes tab sorts by closest fit and shows a "% fit" badge; turn on **Only what I can make** in Filters to hide anything you can't fully cook right now. Opening a recipe you're missing ingredients for shows what's missing with a one-tap **Add to shopping list**.
 - The Pantry tab also holds a **Shopping list** — ingredients you plan to buy, independent of what you currently have.

@@ -378,6 +378,7 @@ button { font-family: inherit; }
 }
 
 .pill-btn-plain:hover { background: var(--accent); color: #fff; }
+.pill-btn-plain.active { background: var(--accent); color: #fff; }
 
 .pill.warm {
   background: var(--warm-soft);

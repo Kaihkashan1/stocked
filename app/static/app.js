@@ -29,7 +29,7 @@ const state = {
   recipes: [],
   pantryGroups: [],
   tab: "recipes",
-  tag: "all",
+  tags: new Set(),
   query: "",
   have: loadHave(),
   pantryQuery: "",
@@ -433,12 +433,18 @@ function setTab(tab) {
 // ---------- filters / recipe grid (existing browse behavior) ----------
 
 function renderFilters() {
-  // Tags cover cooking method/appliance (air-fryer, one-pot, ...) as well as
-  // diet/flavor — anything Gemini tagged the recipe with — so this is the
-  // one place a category like "Air Fryer" becomes a real filter without
-  // hardcoding a fixed list.
-  const tags = ["all", ...unique(state.recipes.flatMap((recipe) => recipe.tags || []))];
-  els.tagFilters.innerHTML = tags.map((tag) => chip("tag", tag, tag === "all" ? "All tags" : tag)).join("");
+  // Tags cover cooking method/appliance (air-fryer, one-pot, ...), diet
+  // (vegetarian, non-vegetarian), course (dessert), and source (mom's
+  // recipes) — anything you've tagged a recipe with — so this is the one
+  // place any category becomes a real filter without hardcoding a fixed
+  // list. Multi-select (AND): a recipe must carry every selected tag.
+  const tags = unique(state.recipes.flatMap((recipe) => recipe.tags || []));
+  els.tagFilters.innerHTML = tags
+    .map((tag) => {
+      const active = state.tags.has(tag);
+      return `<button class="chip${active ? " active" : ""}" type="button" data-action="toggle-tag-filter" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}${active ? " ×" : ""}</button>`;
+    })
+    .join("");
 
   els.favoritesToggle.classList.toggle("active", state.favoritesOnly);
   els.makeableToggle.classList.toggle("active", state.onlyMakeable);
@@ -447,7 +453,7 @@ function renderFilters() {
     .querySelectorAll("#sort-options .chip")
     .forEach((chip) => chip.classList.toggle("active", chip.dataset.sort === state.sort));
 
-  const activeCount = [state.tag !== "all", state.favoritesOnly, state.onlyMakeable].filter(Boolean).length;
+  const activeCount = [state.tags.size > 0, state.favoritesOnly, state.onlyMakeable].filter(Boolean).length;
   els.filtersBtn.classList.toggle("active", activeCount > 0);
   els.filtersBtn.textContent = "";
   els.filtersBtn.append(filtersIcon(), document.createTextNode(activeCount > 0 ? `Filters (${activeCount})` : "Filters"));
@@ -520,11 +526,6 @@ function pantryGroupsHtml(groups, selected) {
     .join("");
 }
 
-function chip(kind, value, label) {
-  const active = state[kind] === value ? " active" : "";
-  return `<button class="chip${active}" type="button" data-kind="${kind}" data-value="${escapeAttr(value)}">${escapeHtml(label)}</button>`;
-}
-
 function stem(name) {
   if (name.endsWith("chillies")) return name.slice(0, -2);
   if (name.endsWith("ies") && name.length > 4) return `${name.slice(0, -3)}y`;
@@ -576,7 +577,7 @@ function filtered() {
   const rows = [];
   for (const recipe of state.recipes) {
     if (state.favoritesOnly && !recipe.favorite) continue;
-    if (state.tag !== "all" && !(recipe.tags || []).includes(state.tag)) continue;
+    if (state.tags.size && ![...state.tags].every((tag) => (recipe.tags || []).includes(tag))) continue;
     const match = recipeMatch(recipe);
     if (state.onlyMakeable && state.have.length && !match.fullyCovered) continue;
     if (query && !(recipe.searchBlob || computeSearchBlob(recipe)).includes(query)) continue;
@@ -829,9 +830,37 @@ function editFormHtml(recipe) {
         <span>Notes</span>
         <textarea id="edit-notes" rows="3">${escapeHtml(recipe.notes || "")}</textarea>
       </label>
+      <label class="field">
+        <span>Tags — comma separated</span>
+        <input id="edit-tags" placeholder="quick, vegetarian, mom's recipes" value="${escapeAttr((recipe.tags || []).join(", "))}">
+      </label>
+      <div id="edit-tag-chips" class="chips" style="margin:-0.6rem 0 1.1rem;">${existingTagChips("pick-edit-tag", recipe.tags || [])}</div>
       <p id="edit-error" class="edit-error" hidden></p>
       <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">Save</button>
     </div>`;
+}
+
+// Recipe categories (diet, course, source, appliance, ...) are all just
+// tags — this is the one place every known tag becomes a quick-pick chip
+// when adding or editing a recipe, rather than requiring someone to
+// remember and retype "vegetarian" or "mom's recipes" exactly each time.
+function existingTagChips(action, selectedTags) {
+  const known = unique(state.recipes.flatMap((recipe) => recipe.tags || []));
+  if (!known.length) return "";
+  return known
+    .map((tag) => {
+      const active = selectedTags.some((selected) => selected.toLowerCase() === tag.toLowerCase());
+      return `<button class="pill pill-btn-plain${active ? " active" : ""}" type="button" data-action="${action}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`;
+    })
+    .join("");
+}
+
+function toggleTagInInput(inputEl, tag) {
+  const current = inputEl.value.split(",").map((item) => item.trim()).filter(Boolean);
+  const index = current.findIndex((item) => item.toLowerCase() === tag.toLowerCase());
+  if (index >= 0) current.splice(index, 1);
+  else current.push(tag);
+  inputEl.value = current.join(", ");
 }
 
 function addRecipeFormHtml(prefill) {
@@ -888,8 +917,9 @@ function addRecipeFormHtml(prefill) {
       </label>
       <label class="field">
         <span>Tags — comma separated</span>
-        <input id="add-tags" placeholder="quick, vegetarian" value="${escapeAttr(tagsValue)}">
+        <input id="add-tags" placeholder="quick, vegetarian, mom's recipes" value="${escapeAttr(tagsValue)}">
       </label>
+      <div id="add-tag-chips" class="chips" style="margin:-0.6rem 0 1.1rem;">${existingTagChips("pick-add-tag", prefill ? prefill.tags : [])}</div>
       <label class="field">
         <span>Notes</span>
         <textarea id="add-notes" rows="3"></textarea>
@@ -985,6 +1015,7 @@ async function saveEdit(id) {
   const ingredientsInput = document.getElementById("edit-ingredients");
   const stepsInput = document.getElementById("edit-steps");
   const notesInput = document.getElementById("edit-notes");
+  const tagsInput = document.getElementById("edit-tags");
   const errorEl = document.getElementById("edit-error");
   const saveBtn = document.querySelector('[data-action="save-edit"]');
 
@@ -1001,6 +1032,7 @@ async function saveEdit(id) {
     notes: notesInput.value.trim(),
     ingredients: linesFrom(ingredientsInput.value),
     steps: linesFrom(stepsInput.value),
+    tags: tagsInput.value.split(",").map((tag) => tag.trim()).filter(Boolean),
   };
 
   saveBtn.disabled = true;
@@ -1125,7 +1157,7 @@ els.filtersBtn.addEventListener("click", () => {
 });
 
 els.filtersReset.addEventListener("click", () => {
-  state.tag = "all";
+  state.tags = new Set();
   state.favoritesOnly = false;
   state.onlyMakeable = false;
   state.sort = "recent";
@@ -1185,13 +1217,6 @@ document.addEventListener("click", (event) => {
     togglePantry(pantry.dataset.pantry);
     return;
   }
-  const chip = event.target.closest(".chip");
-  if (chip && chip.dataset.kind) {
-    state[chip.dataset.kind] = chip.dataset.value;
-    renderFilters();
-    renderGrid();
-    return;
-  }
 
   const actionEl = event.target.closest("[data-action]");
   if (!actionEl) {
@@ -1218,10 +1243,18 @@ document.addEventListener("click", (event) => {
       break;
     case "filter-tag":
       closeDrawer();
-      state.tag = actionEl.dataset.tag;
+      state.tags = new Set([actionEl.dataset.tag]);
       renderFilters();
       renderGrid();
       break;
+    case "toggle-tag-filter": {
+      const tag = actionEl.dataset.tag;
+      if (state.tags.has(tag)) state.tags.delete(tag);
+      else state.tags.add(tag);
+      renderFilters();
+      renderGrid();
+      break;
+    }
     case "start-edit":
       startEdit(id);
       break;
@@ -1240,6 +1273,19 @@ document.addEventListener("click", (event) => {
     case "pick-add-cuisine": {
       const input = document.getElementById("add-cuisine");
       if (input) input.value = actionEl.dataset.cuisine;
+      break;
+    }
+    case "pick-add-tag":
+    case "pick-edit-tag": {
+      const isEdit = action === "pick-edit-tag";
+      const input = document.getElementById(isEdit ? "edit-tags" : "add-tags");
+      const chipsEl = document.getElementById(isEdit ? "edit-tag-chips" : "add-tag-chips");
+      if (!input) break;
+      toggleTagInInput(input, actionEl.dataset.tag);
+      if (chipsEl) {
+        const selected = input.value.split(",").map((item) => item.trim()).filter(Boolean);
+        chipsEl.innerHTML = existingTagChips(action, selected);
+      }
       break;
     }
     case "add-missing-to-shopping":

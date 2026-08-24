@@ -192,7 +192,7 @@ struct RecipeDetailView: View {
         FlowLayout(spacing: 8) {
             ForEach(recipe.tags, id: \.self) { tag in
                 Button {
-                    store.tagFilter = tag
+                    store.tagFilters = [tag]
                     dismiss()
                 } label: {
                     Text(tag)

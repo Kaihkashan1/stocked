@@ -163,6 +163,7 @@ struct RecipePatch: Encodable {
     var steps: [String]?
     var favorite: Bool?
     var notes: String?
+    var tags: [String]?
 }
 
 /// What POST /api/extract-photo hands back after reading a recipe out of a

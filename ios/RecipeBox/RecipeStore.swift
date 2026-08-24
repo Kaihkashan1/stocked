@@ -5,12 +5,13 @@ final class RecipeStore: ObservableObject {
     @Published var recipes: [Recipe] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
-    /// Tags cover cooking method/appliance (air-fryer, one-pot, ...) as well
-    /// as diet/flavor — whatever Gemini tagged the recipe with — so this is
-    /// the one filter dimension that covers something like "Air Fryer"
-    /// without a hardcoded category list.
-    @Published var tagFilter = "all" {
-        didSet { if oldValue != tagFilter { updateVisible() } }
+    /// Tags cover cooking method/appliance (air-fryer, one-pot, ...), diet
+    /// (vegetarian, non-vegetarian), course (dessert), and source (mom's
+    /// recipes) — whatever a recipe is tagged with — so this is the one
+    /// filter dimension that covers any category without a hardcoded list.
+    /// Multi-select (AND): a recipe must carry every selected tag.
+    @Published var tagFilters: Set<String> = [] {
+        didSet { if oldValue != tagFilters { updateVisible() } }
     }
     @Published var query = "" {
         didSet { if oldValue != query { updateVisible() } }
@@ -303,8 +304,8 @@ final class RecipeStore: ObservableObject {
     }
 
     /// Returns an error message on failure, nil on success.
-    func saveEdits(id: Int, title: String, servings: String?, ingredients: [String], steps: [String], notes: String) async -> String? {
-        let patch = RecipePatch(title: title, servings: servings, ingredients: ingredients, steps: steps, notes: notes)
+    func saveEdits(id: Int, title: String, servings: String?, ingredients: [String], steps: [String], notes: String, tags: [String]) async -> String? {
+        let patch = RecipePatch(title: title, servings: servings, ingredients: ingredients, steps: steps, notes: notes, tags: tags)
         do {
             let saved = try await APIClient(baseURLString: serverURL).updateRecipe(id: id, patch: patch, secret: serverSecret)
             replace(saved)
@@ -389,7 +390,7 @@ final class RecipeStore: ObservableObject {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var rows = recipes.filter { recipe in
             if favoritesOnly, !recipe.favorite { return false }
-            if tagFilter != "all", !recipe.tags.contains(tagFilter) { return false }
+            if !tagFilters.isEmpty, !tagFilters.isSubset(of: Set(recipe.tags)) { return false }
             if needle.isEmpty { return true }
             return recipe.searchBlob.contains(needle)
         }

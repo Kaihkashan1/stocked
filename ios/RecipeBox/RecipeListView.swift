@@ -6,7 +6,7 @@ struct RecipeListView: View {
     @State private var showFilters = false
 
     private var activeFilterCount: Int {
-        [store.tagFilter != "all", store.favoritesOnly, store.onlyMakeable].filter { $0 }.count
+        [!store.tagFilters.isEmpty, store.favoritesOnly, store.onlyMakeable].filter { $0 }.count
     }
 
     var body: some View {
@@ -141,11 +141,18 @@ struct FiltersSheet: View {
                 }
 
                 if !store.tags.isEmpty {
-                    Section("Tag") {
-                        FilterRow(
-                            options: [("all", "All tags")] + store.tags.map { ($0, $0) },
-                            selection: $store.tagFilter
-                        )
+                    Section {
+                        FilterWrap(items: store.tags, selected: store.tagFilters) { tag in
+                            if store.tagFilters.contains(tag) {
+                                store.tagFilters.remove(tag)
+                            } else {
+                                store.tagFilters.insert(tag)
+                            }
+                        }
+                    } header: {
+                        Text("Tag")
+                    } footer: {
+                        Text("Any category — diet, course, source, appliance. Select any that apply.")
                     }
                 }
 
@@ -169,7 +176,7 @@ struct FiltersSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Reset") {
-                        store.tagFilter = "all"
+                        store.tagFilters = []
                         store.favoritesOnly = false
                         store.onlyMakeable = false
                         store.sortOption = .recent
@@ -209,37 +216,6 @@ struct DebouncedTextField: View {
                     }
                 }
             }
-    }
-}
-
-struct FilterRow: View {
-    let options: [(String, String)]
-    @Binding var selection: String
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(options, id: \.0) { option in
-                    Button {
-                        selection = option.0
-                    } label: {
-                        Text(option.1)
-                            .font(Theme.mono(12, weight: .semibold))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(selection == option.0 ? Theme.accent : Theme.surface)
-                            .foregroundStyle(selection == option.0 ? Color.white : Theme.inkSoft)
-                            .overlay(
-                                Capsule().strokeBorder(selection == option.0 ? .clear : Theme.line)
-                            )
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.vertical, 2)
-        }
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
 }
 
