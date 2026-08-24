@@ -2,8 +2,10 @@ import SwiftUI
 
 /// Full-screen form for typing a recipe in by hand — no Instagram link, no
 /// Gemini extraction, just title/ingredients/steps like EditRecipeView, plus
-/// the categorization fields Gemini would normally fill in (cuisine, meal,
-/// time, tags) since nothing else will set them for a manual entry.
+/// the categorization fields Gemini would normally fill in (meal, time,
+/// tags) since nothing else will set them for a manual entry. Cuisine isn't
+/// shown here — it's not used anywhere in the app anymore — but a photo
+/// extraction's own guess still rides along silently if there is one.
 struct AddRecipeView: View {
     @EnvironmentObject private var store: RecipeStore
     @Environment(\.dismiss) private var dismiss
@@ -77,16 +79,6 @@ struct AddRecipeView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                }
-                Section {
-                    TextField("e.g. Italian", text: $cuisine)
-                    if !store.cuisines.isEmpty {
-                        FilterWrap(items: store.cuisines, selected: Set([cuisine])) { picked in
-                            cuisine = (cuisine == picked) ? "" : picked
-                        }
-                    }
-                } header: {
-                    Text("Cuisine")
                 }
                 Section("Time") {
                     TextField("e.g. 20 min", text: $time)

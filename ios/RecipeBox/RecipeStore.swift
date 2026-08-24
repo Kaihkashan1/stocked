@@ -35,12 +35,6 @@ final class RecipeStore: ObservableObject {
     @Published var favoritesOnly = false {
         didSet { if oldValue != favoritesOnly { updateVisible() } }
     }
-    /// SuperCook-style hard filter: when on, only recipes fully covered by
-    /// `have` show at all. Off by default — the score-sorted "closest fit"
-    /// view stays the default the same way it always has.
-    @Published var onlyMakeable = false {
-        didSet { if oldValue != onlyMakeable { updateVisible() } }
-    }
     @Published var sortOption: SortOption = .recent {
         didSet { if oldValue != sortOption { updateVisible() } }
     }
@@ -61,7 +55,6 @@ final class RecipeStore: ObservableObject {
 
     @Published private(set) var visibleRecipes: [Recipe] = []
     @Published private(set) var matchesByID: [Int: RecipeMatch] = [:]
-    @Published private(set) var cuisines: [String] = []
     @Published private(set) var tags: [String] = []
     @Published private(set) var selectedPantryGroups: [PantryGroup] = []
     @Published private(set) var visiblePantryGroups: [PantryGroup] = []
@@ -135,6 +128,7 @@ final class RecipeStore: ObservableObject {
             have.remove(at: index)
         } else {
             have.append(item)
+            ensurePantryGroupContains(item)
             if !pantryQuery.isEmpty {
                 pantryQuery = ""
             }
@@ -162,19 +156,24 @@ final class RecipeStore: ObservableObject {
     func addHaveItem(_ raw: String) {
         let item = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !item.isEmpty, !have.contains(where: { $0 == item || namesMatch($0, item) }) else { return }
-        // The server re-categorizes on the next full reload; this just keeps
-        // a freshly-typed custom item from vanishing from "What I have" (or
-        // being unfindable in the catalog) until then.
-        if !pantryGroups.contains(where: { $0.items.contains(item) }) {
-            if let index = pantryGroups.firstIndex(where: { $0.category == "Other" }) {
-                var items = pantryGroups[index].items
-                items.append(item)
-                pantryGroups[index] = PantryGroup(category: "Other", items: items.sorted())
-            } else {
-                pantryGroups.append(PantryGroup(category: "Other", items: [item]))
-            }
-        }
         toggleIngredient(item)
+    }
+
+    /// The server re-categorizes a brand-new custom item on the next full
+    /// reload (and apply()'s merge carries it forward if a reload lands
+    /// before that happens) — this just keeps it from being unfindable in
+    /// the catalog (and invisible in the shopping list) in the meantime.
+    /// Called from toggleIngredient itself, not just addHaveItem, so any
+    /// path that adds something to `have` keeps this invariant.
+    private func ensurePantryGroupContains(_ item: String) {
+        guard !pantryGroups.contains(where: { $0.items.contains(item) }) else { return }
+        if let index = pantryGroups.firstIndex(where: { $0.category == "Other" }) {
+            var items = pantryGroups[index].items
+            items.append(item)
+            pantryGroups[index] = PantryGroup(category: "Other", items: items.sorted())
+        } else {
+            pantryGroups.append(PantryGroup(category: "Other", items: [item]))
+        }
     }
 
     /// Bulk replace, for the recipebox://have deep link (e.g. a Shortcuts
@@ -380,9 +379,27 @@ final class RecipeStore: ObservableObject {
 
     private func apply(recipes: [Recipe], pantry: [PantryGroup]) {
         self.recipes = recipes
-        pantryGroups = pantry.map { PantryGroup(category: $0.category, items: collapsePantryItems($0.items)) }
+        let fresh = pantry.map { PantryGroup(category: $0.category, items: collapsePantryItems($0.items)) }
+        pantryGroups = mergeCustomPantryItems(into: fresh)
         recipesByID = Dictionary(uniqueKeysWithValues: recipes.map { ($0.id, $0) })
         updateDerived()
+    }
+
+    /// A custom pantry item (typed in free-hand) might not have round-tripped
+    /// to the server yet when this refresh's catalog was fetched — carry it
+    /// forward instead of silently dropping it from "What I have" and the
+    /// shopping list the moment a refresh happens to land in between.
+    private func mergeCustomPantryItems(into fresh: [PantryGroup]) -> [PantryGroup] {
+        let freshItems = Set(fresh.flatMap(\.items))
+        let missing = have.filter { !freshItems.contains($0) }
+        guard !missing.isEmpty else { return fresh }
+        var merged = fresh
+        if let index = merged.firstIndex(where: { $0.category == "Other" }) {
+            merged[index] = PantryGroup(category: "Other", items: (merged[index].items + missing).sorted())
+        } else {
+            merged.append(PantryGroup(category: "Other", items: missing.sorted()))
+        }
+        return merged
     }
 
     private func updateVisible() {
@@ -396,16 +413,13 @@ final class RecipeStore: ObservableObject {
         }
 
         // Unlike the old ingredient-search behavior, marking more pantry
-        // items never hides a recipe on its own — matchRecipe always
-        // returns a score/missing count once `have` is non-empty. The only
-        // hard filter is the explicit "only what I can make" toggle.
+        // items never hides a recipe — matchRecipe always returns a
+        // score/missing count once `have` is non-empty, and that's all
+        // that's used here: closest fit first, nothing filtered out.
         var matches: [Int: RecipeMatch] = [:]
         if !have.isEmpty {
             for recipe in rows {
                 matches[recipe.id] = matchRecipe(recipe, have: have)
-            }
-            if onlyMakeable {
-                rows = rows.filter { matches[$0.id]?.fullyCovered == true }
             }
             rows.sort { lhs, rhs in
                 let left = matches[lhs.id]!
@@ -453,7 +467,6 @@ final class RecipeStore: ObservableObject {
     }
 
     private func updateDerived() {
-        cuisines = Array(Set(recipes.map(\.cuisine).filter { !$0.isEmpty })).sorted()
         tags = Array(Set(recipes.flatMap(\.tags))).sorted()
         updateVisible()
     }
