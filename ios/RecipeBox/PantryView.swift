@@ -23,10 +23,7 @@ struct PantryView: View {
                 DebouncedTextField(placeholder: "Add or find an ingredient…", text: $store.pantryQuery)
 
                 let trimmed = store.pantryQuery.trimmingCharacters(in: .whitespaces)
-                if trimmed.isEmpty {
-                    Text("Type to add or find an ingredient")
-                        .foregroundStyle(.secondary)
-                } else {
+                if !trimmed.isEmpty {
                     ForEach(store.visiblePantryGroups) { group in
                         pantryGroup(group, selected: false)
                     }
