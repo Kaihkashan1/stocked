@@ -217,18 +217,6 @@ final class RecipeStore: ObservableObject {
         }
     }
 
-    /// Returns an error message on failure, nil on success. A real Gemini
-    /// call server-side, so this can take a few seconds.
-    func recategorizeRecipe(_ recipe: Recipe) async -> String? {
-        do {
-            let saved = try await APIClient(baseURLString: serverURL).recategorize(id: recipe.id, secret: serverSecret)
-            replace(saved)
-            return nil
-        } catch {
-            return error.localizedDescription
-        }
-    }
-
     /// Returns an error message on failure, nil on success. Not optimistic —
     /// deletion is destructive enough that it's worth waiting for the server
     /// to confirm before the row disappears from the list.
