@@ -47,6 +47,7 @@ class RecipeUpdate(BaseModel):
     steps: list[str] | None = None
     favorite: bool | None = None
     notes: str | None = None
+    tags: list[str] | None = None
 
 
 class PantryUpdate(BaseModel):

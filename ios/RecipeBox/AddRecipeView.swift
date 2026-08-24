@@ -92,9 +92,16 @@ struct AddRecipeView: View {
                     TextField("e.g. 20 min", text: $time)
                 }
                 Section {
-                    TextField("comma, separated", text: $tagsText)
+                    TextField("quick, vegetarian, mom's recipes", text: $tagsText)
+                    if !store.tags.isEmpty {
+                        FilterWrap(items: store.tags, selected: Set(currentTags)) { picked in
+                            toggleTag(picked)
+                        }
+                    }
                 } header: {
                     Text("Tags")
+                } footer: {
+                    Text("Any category — diet, course, source, appliance. Tap to add or remove.")
                 }
                 Section("Notes") {
                     TextEditor(text: $notes)
@@ -160,5 +167,19 @@ struct AddRecipeView: View {
             .split(separator: "\n", omittingEmptySubsequences: true)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+    }
+
+    private var currentTags: [String] {
+        tagsText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    private func toggleTag(_ tag: String) {
+        var tags = currentTags
+        if let index = tags.firstIndex(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
+            tags.remove(at: index)
+        } else {
+            tags.append(tag)
+        }
+        tagsText = tags.joined(separator: ", ")
     }
 }
