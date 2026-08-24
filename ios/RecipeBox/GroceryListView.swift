@@ -12,9 +12,15 @@ struct GroceryListView: View {
     private var planned: [Recipe] { store.plannedRecipes }
 
     var body: some View {
+        // Bound once per body evaluation — groceryList (and alsoMakeable
+        // below) each do a real pass over the planned recipes' ingredients,
+        // and body reads them more than once.
+        let groceryList = groceryList
+        let alsoMakeable = alsoMakeable
+
         List {
-            if planned.isEmpty {
-                Section {
+            Section("Planned") {
+                if planned.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("No recipes planned yet")
                             .font(.headline)
@@ -22,15 +28,7 @@ struct GroceryListView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
-                }
-            } else {
-                // Bound once per body evaluation — groceryList (and
-                // alsoMakeable below) each do a real pass over the planned
-                // recipes' ingredients, and body reads them more than once.
-                let groceryList = groceryList
-                let alsoMakeable = alsoMakeable
-
-                Section("Planned") {
+                } else {
                     ForEach(planned) { recipe in
                         NavigationLink(value: recipe.id) {
                             Text(recipe.title)
@@ -46,7 +44,51 @@ struct GroceryListView: View {
                         }
                     }
                 }
+            }
 
+            // Ingredients you intend to buy but haven't yet — independent of
+            // any planned recipe. Feeds "You could also make" below the same
+            // way "what I have" and the planned recipes' own ingredients do.
+            if !store.pantryGroups.isEmpty {
+                Section {
+                    ForEach(store.pantryGroups) { group in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(group.category)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                            // A wrapping layout, not FilterWrap's horizontal
+                            // ScrollView — a ScrollView nested inside a List
+                            // row doesn't reliably forward taps to its own
+                            // buttons on this iOS version.
+                            FlowLayout(spacing: 8) {
+                                ForEach(group.items, id: \.self) { item in
+                                    let active = store.shoppingList.contains(item)
+                                    Button {
+                                        store.toggleShoppingItem(item)
+                                    } label: {
+                                        Text(active ? "\(item) ×" : item)
+                                            .font(Theme.mono(12, weight: .semibold))
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 7)
+                                            .background(active ? Theme.accentSoft : Theme.surface)
+                                            .foregroundStyle(active ? Theme.accent : Theme.inkSoft)
+                                            .overlay(Capsule().strokeBorder(active ? .clear : Theme.line))
+                                            .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Shopping list")
+                } footer: {
+                    Text("Ingredients you plan to buy — counted toward \"You could also make\" below, even without planning a recipe around them.")
+                }
+            }
+
+            if !planned.isEmpty {
                 if groceryList.omittedCount > 0 {
                     Text("Grocery list · \(groceryList.omittedCount) item\(groceryList.omittedCount == 1 ? "" : "s") skipped because you already have \(groceryList.omittedCount == 1 ? "it" : "them")")
                         .font(Theme.mono(11, weight: .semibold))
@@ -80,22 +122,24 @@ struct GroceryListView: View {
                         }
                     }
                 }
+            }
 
-                if !alsoMakeable.isEmpty {
-                    Section {
-                        ForEach(alsoMakeable) { recipe in
-                            NavigationLink(value: recipe.id) {
-                                Text(recipe.title)
-                                    .font(Theme.display(15, weight: .semibold))
-                            }
+            if !alsoMakeable.isEmpty {
+                Section {
+                    ForEach(alsoMakeable) { recipe in
+                        NavigationLink(value: recipe.id) {
+                            Text(recipe.title)
+                                .font(Theme.display(15, weight: .semibold))
                         }
-                    } header: {
-                        Text("You could also make")
-                    } footer: {
-                        Text("Fully covered by what you have plus everything on this shopping list.")
                     }
+                } header: {
+                    Text("You could also make")
+                } footer: {
+                    Text("Fully covered by what you have, your shopping list, and everything already needed for planned recipes.")
                 }
+            }
 
+            if !planned.isEmpty {
                 Section {
                     Button("Clear plan", role: .destructive) {
                         store.clearPlan()
@@ -159,12 +203,13 @@ struct GroceryListView: View {
     }
 
     /// Recipes outside the plan that would become fully makeable once you've
-    /// done this shopping — "what I have" plus every ingredient already
-    /// needed for the planned recipes.
+    /// done this shopping — "what I have", the shopping list (things you
+    /// intend to buy, whether or not they belong to a planned recipe), and
+    /// every ingredient already needed for the planned recipes. Works with
+    /// no plan at all — a shopping list alone is enough to surface matches.
     private var alsoMakeable: [Recipe] {
         let plannedIDs = Set(planned.map(\.id))
-        guard !plannedIDs.isEmpty else { return [] }
-        let expanded = store.haveSet.union(planned.flatMap(\.pantry))
+        let expanded = store.haveSet.union(store.shoppingList).union(planned.flatMap(\.pantry))
         return store.recipes
             .filter { !plannedIDs.contains($0.id) && isFullyCovered($0, by: expanded) }
             .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }

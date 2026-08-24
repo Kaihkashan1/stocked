@@ -53,6 +53,10 @@ class PlanUpdate(BaseModel):
     ids: list[int] = Field(default_factory=list)
 
 
+class ShoppingListUpdate(BaseModel):
+    items: list[str] = Field(default_factory=list)
+
+
 class RecipeCategory(BaseModel):
     cuisine: str = "Uncategorized"
     meal: Meal = "other"

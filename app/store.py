@@ -97,22 +97,50 @@ def _state_worksheet():
         return worksheet
 
 
-def get_plan_ids() -> list[int]:
-    """The meal plan is shared across devices (iOS + web) — this is the
-    only piece of client state worth syncing; "what I have" is more of a
-    per-session browsing context than something to carry between devices."""
+def _read_app_state() -> dict:
     raw = _state_worksheet().acell("A1").value or "{}"
     try:
-        data = json.loads(raw)
+        return json.loads(raw)
     except json.JSONDecodeError:
-        data = {}
-    ids = data.get("plan_ids") or []
+        return {}
+
+
+def _write_app_state(**updates) -> None:
+    # Read-modify-write against the whole blob — plan_ids and shopping_list
+    # share this one cell, so writing one key must not clobber the other.
+    data = _read_app_state()
+    data.update(updates)
+    _state_worksheet().update("A1", [[json.dumps(data)]], value_input_option="RAW")
+
+
+def get_plan_ids() -> list[int]:
+    """The meal plan is shared across devices (iOS + web) — this and the
+    shopping list are the only pieces of client state worth syncing;
+    "what I have" is more of a per-session browsing context than something
+    to carry between devices."""
+    ids = _read_app_state().get("plan_ids") or []
     return sorted({int(i) for i in ids if str(i).lstrip("-").isdigit()})
 
 
 def save_plan_ids(ids: list[int]) -> list[int]:
     clean = sorted({int(i) for i in ids})
-    _state_worksheet().update("A1", [[json.dumps({"plan_ids": clean})]], value_input_option="RAW")
+    _write_app_state(plan_ids=clean)
+    return clean
+
+
+def get_shopping_list() -> list[str]:
+    """Ingredients the user intends to buy but hasn't yet — distinct from
+    "what I have" (already possess) and from the plan's own derived grocery
+    list (tied to specific planned recipes). Feeding these into the "you
+    could also make" pool lets the app answer "if I buy X and Y, what else
+    becomes makeable?" even for recipes that aren't currently planned."""
+    items = _read_app_state().get("shopping_list") or []
+    return sorted({str(item).strip().lower() for item in items if str(item).strip()})
+
+
+def save_shopping_list(items: list[str]) -> list[str]:
+    clean = sorted({str(item).strip().lower() for item in items if str(item).strip()})
+    _write_app_state(shopping_list=clean)
     return clean
 
 
