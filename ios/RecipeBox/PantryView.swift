@@ -12,7 +12,7 @@ struct PantryView: View {
         List {
             Section {
                 HStack(spacing: 10) {
-                    TextField("Add something you have (e.g. leftover turkey)", text: $newItem)
+                    TextField("Add something you have", text: $newItem)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .onSubmit(addTypedItem)
@@ -38,7 +38,10 @@ struct PantryView: View {
 
             Section {
                 DebouncedTextField(placeholder: "Find an ingredient…", text: $store.pantryQuery)
-                if store.visiblePantryGroups.isEmpty {
+                if store.pantryQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text("Type to find an ingredient")
+                        .foregroundStyle(.secondary)
+                } else if store.visiblePantryGroups.isEmpty {
                     Text("No matching ingredients")
                         .foregroundStyle(.secondary)
                 } else {

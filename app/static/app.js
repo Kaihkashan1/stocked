@@ -399,13 +399,20 @@ function renderPantryTab() {
     ? pantryGroupsHtml(selected, true)
     : `<span class="status">Nothing marked yet</span>`;
 
+  // Gated behind actually typing something — as the recipe box grows, the
+  // full catalog is too long to skim, so this is a search box, not a
+  // browsable list.
   const needle = state.pantryQuery.trim().toLowerCase();
-  const options = groupPantry(
-    pantryCatalog().filter((item) => !state.have.includes(item) && pantryQueryMatch(item, needle))
-  );
-  els.pantryOptions.innerHTML = options.length
-    ? pantryGroupsHtml(options, false)
-    : `<span class="status">No matching ingredients</span>`;
+  if (!needle) {
+    els.pantryOptions.innerHTML = `<span class="status">Type to find an ingredient</span>`;
+  } else {
+    const options = groupPantry(
+      pantryCatalog().filter((item) => !state.have.includes(item) && pantryQueryMatch(item, needle))
+    );
+    els.pantryOptions.innerHTML = options.length
+      ? pantryGroupsHtml(options, false)
+      : `<span class="status">No matching ingredients</span>`;
+  }
 
   const shoppingGroups = groupPantry(pantryCatalog());
   els.shoppingGroups.innerHTML = shoppingGroups.length

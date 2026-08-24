@@ -427,8 +427,6 @@ final class RecipeStore: ObservableObject {
         updatePantry()
     }
 
-    /// Always browsable — not gated behind typing a search query — so a
-    /// blank Pantry tab still shows something to tap.
     private func updatePantry() {
         haveSet = Set(have)
         let groups = resolvedPantryGroups
@@ -437,10 +435,17 @@ final class RecipeStore: ObservableObject {
             return items.isEmpty ? nil : PantryGroup(category: group.category, items: items)
         }
 
+        // Gated behind actually typing something — as the recipe box grows,
+        // the full catalog is too long to skim, so this is a search box,
+        // not a browsable list.
         let needle = pantryQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !needle.isEmpty else {
+            visiblePantryGroups = []
+            return
+        }
         visiblePantryGroups = groups.compactMap { group in
             let items = group.items.filter { item in
-                !haveSet.contains(item) && (needle.isEmpty || item.contains(needle) || needle.contains(item) || namesMatch(item, needle))
+                !haveSet.contains(item) && (item.contains(needle) || needle.contains(item) || namesMatch(item, needle))
             }
             return items.isEmpty ? nil : PantryGroup(category: group.category, items: items)
         }
