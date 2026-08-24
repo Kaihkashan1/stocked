@@ -402,7 +402,11 @@ def _clean_meal(value: str) -> str:
 
 
 def _clean_tag(value: str) -> str:
-    return re.sub(r"\s+", "-", (value or "").strip().lower()).strip("-")
+    # Collapses stray whitespace but does *not* convert spaces to hyphens —
+    # the fixed tags ("high protein", "mom's recipes") are multi-word on
+    # purpose, and mangling them into kebab-case broke exact-match chip
+    # highlighting and filtering against those exact strings.
+    return re.sub(r"\s+", " ", (value or "").strip().lower())
 
 
 def _format_ingredient(item) -> str:

@@ -48,8 +48,12 @@ final class RecipeStore: ObservableObject {
 
     @Published private(set) var visibleRecipes: [Recipe] = []
     @Published private(set) var matchesByID: [Int: RecipeMatch] = [:]
-    /// The fixed tag vocabulary — see recipeTags in Models.swift.
-    let tags = recipeTags
+    /// The fixed six (see recipeTags in Models.swift), always offered, plus
+    /// whatever else recipes actually carry — tag entry is free text, so
+    /// that "whatever else" can grow.
+    var tags: [String] {
+        Array(Set(recipeTags).union(recipes.flatMap(\.tags))).sorted()
+    }
     @Published private(set) var selectedPantryGroups: [PantryGroup] = []
     @Published private(set) var visiblePantryGroups: [PantryGroup] = []
     @Published private(set) var haveSet: Set<String> = []
@@ -149,6 +153,17 @@ final class RecipeStore: ObservableObject {
         let item = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !item.isEmpty, !have.contains(where: { $0 == item || namesMatch($0, item) }) else { return }
         toggleIngredient(item)
+    }
+
+    /// True once the Pantry search box holds something that doesn't already
+    /// exactly match a catalog ingredient or an existing "have" item —
+    /// that's when "+ Add" is a real option rather than a no-op duplicate
+    /// of just selecting an existing chip.
+    func canAddTypedPantryItem(_ raw: String) -> Bool {
+        let needle = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !needle.isEmpty else { return false }
+        let known = pantryGroups.flatMap(\.items) + have
+        return !known.contains { $0.lowercased() == needle }
     }
 
     /// The server re-categorizes a brand-new custom item on the next full

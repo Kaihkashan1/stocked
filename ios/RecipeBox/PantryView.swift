@@ -2,25 +2,15 @@ import SwiftUI
 
 /// The pantry: ingredients you have on hand. Drives sorting on the Recipes
 /// tab — no meal-planning/grocery-aggregation, no shopping list, just what
-/// you have.
+/// you have. One box does both jobs: type to filter the catalog down to
+/// matching chips to select, and/or add whatever you typed as a new item
+/// if it isn't already one of them.
 struct PantryView: View {
     @EnvironmentObject private var store: RecipeStore
-    @State private var newItem = ""
 
     var body: some View {
         List {
             Section {
-                HStack(spacing: 10) {
-                    TextField("Add something you have", text: $newItem)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onSubmit(addTypedItem)
-                    Button("Add", action: addTypedItem)
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
-                        .disabled(newItem.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-
                 if store.selectedPantryGroups.isEmpty {
                     Text("Nothing marked yet")
                         .foregroundStyle(.secondary)
@@ -29,25 +19,33 @@ struct PantryView: View {
                         pantryGroup(group, selected: true)
                     }
                 }
-            } header: {
-                Text("What I have")
-            } footer: {
-                Text("Tap an ingredient below, or add your own — this drives sorting on the Recipes tab.")
-            }
 
-            Section {
-                DebouncedTextField(placeholder: "Find an ingredient…", text: $store.pantryQuery)
-                if store.pantryQuery.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Text("Type to find an ingredient")
-                        .foregroundStyle(.secondary)
-                } else if store.visiblePantryGroups.isEmpty {
-                    Text("No matching ingredients")
+                DebouncedTextField(placeholder: "Add or find an ingredient…", text: $store.pantryQuery)
+
+                let trimmed = store.pantryQuery.trimmingCharacters(in: .whitespaces)
+                if trimmed.isEmpty {
+                    Text("Type to add or find an ingredient")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(store.visiblePantryGroups) { group in
                         pantryGroup(group, selected: false)
                     }
+                    if store.canAddTypedPantryItem(trimmed) {
+                        Button {
+                            store.addHaveItem(trimmed)
+                            store.pantryQuery = ""
+                        } label: {
+                            Label("Add “\(trimmed)”", systemImage: "plus.circle.fill")
+                        }
+                    } else if store.visiblePantryGroups.isEmpty {
+                        Text("No matching ingredients")
+                            .foregroundStyle(.secondary)
+                    }
                 }
+            } header: {
+                Text("What I have")
+            } footer: {
+                Text("Type to find an ingredient to select, or add something new — this drives sorting on the Recipes tab.")
             }
 
             Color.clear
@@ -56,13 +54,6 @@ struct PantryView: View {
                 .listRowSeparator(.hidden)
         }
         .listStyle(.insetGrouped)
-    }
-
-    private func addTypedItem() {
-        let trimmed = newItem.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        store.addHaveItem(trimmed)
-        newItem = ""
     }
 
     private func pantryGroup(_ group: PantryGroup, selected: Bool) -> some View {
