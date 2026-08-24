@@ -17,7 +17,7 @@ struct AddRecipeView: View {
     @State private var cuisine: String
     @State private var meal: String
     @State private var time: String
-    @State private var tagsText: String
+    @State private var selectedTags: Set<String>
     @State private var notes = ""
     @State private var saving = false
     @State private var errorMessage: String?
@@ -42,7 +42,8 @@ struct AddRecipeView: View {
         _cuisine = State(initialValue: prefill?.cuisine ?? "")
         _meal = State(initialValue: prefill?.meal ?? "other")
         _time = State(initialValue: prefill?.time ?? "")
-        _tagsText = State(initialValue: (prefill?.tags ?? []).joined(separator: ", "))
+        let known = (prefill?.tags ?? []).filter { tag in recipeTags.contains { $0.caseInsensitiveCompare(tag) == .orderedSame } }
+        _selectedTags = State(initialValue: Set(known))
     }
 
     var body: some View {
@@ -84,16 +85,15 @@ struct AddRecipeView: View {
                     TextField("e.g. 20 min", text: $time)
                 }
                 Section {
-                    TextField("quick, vegetarian, mom's recipes", text: $tagsText)
-                    if !store.tags.isEmpty {
-                        FilterWrap(items: store.tags, selected: Set(currentTags)) { picked in
-                            toggleTag(picked)
+                    FilterWrap(items: recipeTags, selected: selectedTags) { tag in
+                        if selectedTags.contains(tag) {
+                            selectedTags.remove(tag)
+                        } else {
+                            selectedTags.insert(tag)
                         }
                     }
                 } header: {
                     Text("Tags")
-                } footer: {
-                    Text("Any category — diet, course, source, appliance. Tap to add or remove.")
                 }
                 Section("Notes") {
                     TextEditor(text: $notes)
@@ -131,10 +131,6 @@ struct AddRecipeView: View {
 
         let trimmedServings = servings.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedTime = time.trimmingCharacters(in: .whitespacesAndNewlines)
-        let tags = tagsText
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
         let draft = RecipeCreate(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             servings: trimmedServings.isEmpty ? nil : trimmedServings,
@@ -144,7 +140,7 @@ struct AddRecipeView: View {
                 ? "Uncategorized" : cuisine.trimmingCharacters(in: .whitespacesAndNewlines),
             meal: meal,
             time: trimmedTime.isEmpty ? nil : trimmedTime,
-            tags: tags,
+            tags: Array(selectedTags),
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         if let failure = await store.addRecipe(draft) {
@@ -159,19 +155,5 @@ struct AddRecipeView: View {
             .split(separator: "\n", omittingEmptySubsequences: true)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-    }
-
-    private var currentTags: [String] {
-        tagsText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-    }
-
-    private func toggleTag(_ tag: String) {
-        var tags = currentTags
-        if let index = tags.firstIndex(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
-            tags.remove(at: index)
-        } else {
-            tags.append(tag)
-        }
-        tagsText = tags.joined(separator: ", ")
     }
 }

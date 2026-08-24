@@ -10,6 +10,11 @@ const MEAL_LABELS = {
 
 const STAPLES = new Set(["salt", "water", "oil", "pepper", "black pepper", "sugar"]);
 
+// The whole tag vocabulary, on purpose — kept short and closed rather than
+// letting every recipe accumulate its own free-form set. Filtering and the
+// Add/Edit forms only ever offer these; there's no way to type a new one in.
+const RECIPE_TAGS = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"];
+
 // Mirrors app/match.py's UNITS and Models.swift's ingredientUnits, so a
 // quantity gets called out the same way on every surface.
 const INGREDIENT_UNITS = new Set([
@@ -23,7 +28,6 @@ const INGREDIENT_UNITS = new Set([
 
 const SECRET_KEY = "recipeBox.secret";
 const HAVE_KEY = "recipeBox.have";
-const SHOPPING_LIST_KEY = "recipeBox.shoppingList";
 
 const state = {
   recipes: [],
@@ -35,7 +39,6 @@ const state = {
   pantryQuery: "",
   favoritesOnly: false,
   sort: "recent",
-  shoppingList: loadShoppingList(),
   openRecipeId: null,
   editingId: null,
   addingRecipe: false,
@@ -60,7 +63,6 @@ const els = {
   pantrySelected: document.getElementById("pantry-selected"),
   pantrySearch: document.getElementById("pantry-search"),
   pantryOptions: document.getElementById("pantry-options"),
-  shoppingGroups: document.getElementById("shopping-groups"),
   settingsBtn: document.getElementById("settings-btn"),
   addRecipeBtn: document.getElementById("add-recipe-btn"),
   addRecipeMenu: document.getElementById("add-recipe-menu"),
@@ -86,7 +88,6 @@ async function load() {
   renderPantryBadge();
   maybeOpenFromHash();
   await fetchHave();
-  await fetchShoppingList();
   renderPantryBadge();
   renderGrid();
   if (state.tab === "pantry") renderPantryTab();
@@ -176,7 +177,7 @@ function splitIngredientQuantity(line) {
   return { quantity: quantityParts.join(" "), text: rest };
 }
 
-// ---------- pantry ("what I have") / shopping list ----------
+// ---------- pantry ("what I have") ----------
 
 // The pantry syncs through GET/PUT /api/pantry (same one this app's iOS
 // counterpart uses) so it matches between devices — it's a real inventory
@@ -275,122 +276,10 @@ function renderPantryBadge() {
   els.pantryBadge.textContent = String(count);
 }
 
-// Ingredients the user intends to buy but hasn't yet — distinct from "have"
-// (already possess). Synced through GET/PUT /api/shopping-list, same
-// pattern as the pantry.
-function loadShoppingList() {
-  try {
-    const raw = localStorage.getItem(SHOPPING_LIST_KEY);
-    return new Set(raw ? JSON.parse(raw) : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function cacheShoppingList() {
-  localStorage.setItem(SHOPPING_LIST_KEY, JSON.stringify([...state.shoppingList]));
-}
-
-async function fetchShoppingList() {
-  try {
-    const response = await fetch("/api/shopping-list");
-    if (!response.ok) return;
-    const data = await response.json();
-    state.shoppingList = new Set(data.items || []);
-    cacheShoppingList();
-  } catch {
-    // keep whatever the local cache had
-  }
-}
-
-async function putShoppingList(items) {
-  const response = await fetch("/api/shopping-list", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ items: [...items] }),
-  });
-  if (!response.ok) throw await errorForResponse(response);
-  return (await response.json()).items;
-}
-
-// Optimistic, like togglePantry.
-async function toggleShoppingItem(item) {
-  const previous = new Set(state.shoppingList);
-  if (state.shoppingList.has(item)) {
-    state.shoppingList.delete(item);
-  } else {
-    state.shoppingList.add(item);
-  }
-  cacheShoppingList();
-  if (state.tab === "pantry") renderPantryTab();
-
-  try {
-    const confirmed = await putShoppingList(state.shoppingList);
-    state.shoppingList = new Set(confirmed);
-  } catch (err) {
-    state.shoppingList = previous;
-    window.alert(`Couldn't save the shopping list: ${err.message}`);
-  }
-  cacheShoppingList();
-  if (state.tab === "pantry") renderPantryTab();
-}
-
-// Bulk version of toggleShoppingItem, for the recipe detail view's "add
-// missing to shopping list" button — one request for the whole gap rather
-// than N toggles racing to write the last (possibly stale) state.
-async function addMissingToShoppingList(id) {
-  id = Number(id);
-  const recipe = state.recipes.find((item) => item.id === id);
-  if (!recipe) return;
-  const missing = missingIngredients(recipe);
-  if (!missing.length) return;
-
-  const btn = document.querySelector(`[data-action="add-missing-to-shopping"][data-id="${id}"]`);
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Adding…";
-  }
-
-  const previous = new Set(state.shoppingList);
-  missing.forEach((item) => state.shoppingList.add(item));
-  cacheShoppingList();
-
-  try {
-    const confirmed = await putShoppingList(state.shoppingList);
-    state.shoppingList = new Set(confirmed);
-    if (btn) btn.textContent = "Added ✓";
-  } catch (err) {
-    state.shoppingList = previous;
-    cacheShoppingList();
-    window.alert(`Couldn't save the shopping list: ${err.message}`);
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Add to shopping list";
-    }
-    return;
-  }
-  cacheShoppingList();
-  if (state.tab === "pantry") renderPantryTab();
-}
-
-function shoppingGroupsHtml(groups) {
-  return groups
-    .map((group) => {
-      const chips = group.items
-        .map((item) => {
-          const active = state.shoppingList.has(item);
-          return `<button class="chip${active ? " active" : ""}" type="button" data-action="toggle-shopping" data-item="${escapeAttr(item)}">${escapeHtml(item)}${active ? " ×" : ""}</button>`;
-        })
-        .join("");
-      return `<div class="pantry-group"><h3 class="pantry-heading">${escapeHtml(group.category)}</h3><div class="chips">${chips}</div></div>`;
-    })
-    .join("");
-}
-
-// Renders the three dynamic pieces of the Pantry tab (selected chips, the
-// browsable/searchable catalog, and the shopping list) without touching the
-// two static text inputs — replacing those on every keystroke would wipe
-// whatever the user is mid-typing.
+// Renders the two dynamic pieces of the Pantry tab (selected chips and the
+// browsable/searchable catalog) without touching the two static text
+// inputs — replacing those on every keystroke would wipe whatever the user
+// is mid-typing.
 function renderPantryTab() {
   const selected = groupPantry(state.have);
   els.pantrySelected.innerHTML = selected.length
@@ -411,11 +300,6 @@ function renderPantryTab() {
       ? pantryGroupsHtml(options, false)
       : `<span class="status">No matching ingredients</span>`;
   }
-
-  const shoppingGroups = groupPantry(fullPantryCatalog());
-  els.shoppingGroups.innerHTML = shoppingGroups.length
-    ? shoppingGroupsHtml(shoppingGroups)
-    : `<span class="status">No ingredients known yet</span>`;
 }
 
 // ---------- tabs ----------
@@ -431,13 +315,8 @@ function setTab(tab) {
 // ---------- filters / recipe grid (existing browse behavior) ----------
 
 function renderFilters() {
-  // Tags cover cooking method/appliance (air-fryer, one-pot, ...), diet
-  // (vegetarian, non-vegetarian), course (dessert), and source (mom's
-  // recipes) — anything you've tagged a recipe with — so this is the one
-  // place any category becomes a real filter without hardcoding a fixed
-  // list. Multi-select (AND): a recipe must carry every selected tag.
-  const tags = unique(state.recipes.flatMap((recipe) => recipe.tags || []));
-  els.tagFilters.innerHTML = tags
+  // Multi-select (AND): a recipe must carry every selected tag.
+  els.tagFilters.innerHTML = RECIPE_TAGS
     .map((tag) => {
       const active = state.tags.has(tag);
       return `<button class="chip${active ? " active" : ""}" type="button" data-action="toggle-tag-filter" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}${active ? " ×" : ""}</button>`;
@@ -493,14 +372,6 @@ function pantryCatalog() {
   return unique(state.recipes.flatMap((recipe) => recipe.pantry || [])).filter(
     (item) => !STAPLES.has(item)
   );
-}
-
-// Recipe-derived ingredients plus anything already known from "What I have"
-// (including custom, non-recipe items like "leftover turkey") — the full
-// universe of things you might want on a shopping list, not just what
-// recipes happen to use.
-function fullPantryCatalog() {
-  return unique([...pantryCatalog(), ...state.pantryGroups.flatMap((group) => group.items)]);
 }
 
 function groupPantry(items) {
@@ -563,8 +434,8 @@ function recipeMatch(recipe) {
 }
 
 // The ingredients from `recipe.pantry` you don't have — used both to sort
-// the grid (closest fit first) and to prefill "add missing to shopping
-// list" on the detail view.
+// the grid (closest fit first) and to call out what's missing on the
+// detail view.
 function missingIngredients(recipe) {
   const core = (recipe.pantry || []).filter((item) => !STAPLES.has(item));
   return core.filter((item) => !state.have.some((have) => namesMatch(item, have)));
@@ -765,7 +636,6 @@ function recipeHtml(recipe) {
     : missing.length
       ? `<div class="pantry-match missing">
           <span>Missing ${missing.length} ingredient${missing.length === 1 ? "" : "s"} from your pantry: ${escapeHtml(missing.join(", "))}</span>
-          <button class="link-btn" type="button" data-action="add-missing-to-shopping" data-id="${recipe.id}">Add to shopping list</button>
         </div>`
       : `<div class="pantry-match covered">You have everything for this.</div>`;
 
@@ -834,29 +704,31 @@ function editFormHtml(recipe) {
         <span>Notes</span>
         <textarea id="edit-notes" rows="3">${escapeHtml(recipe.notes || "")}</textarea>
       </label>
-      <label class="field">
-        <span>Tags — comma separated</span>
-        <input id="edit-tags" placeholder="quick, vegetarian, mom's recipes" value="${escapeAttr((recipe.tags || []).join(", "))}">
-      </label>
-      <div id="edit-tag-chips" class="chips" style="margin:-0.6rem 0 1.1rem;">${existingTagChips("pick-edit-tag", recipe.tags || [])}</div>
+      <div class="field">
+        <span>Tags</span>
+        <input type="hidden" id="edit-tags" value="${escapeAttr(knownTagsOnly(recipe.tags).join(", "))}">
+        <div id="edit-tag-chips" class="chips">${existingTagChips("pick-edit-tag", knownTagsOnly(recipe.tags))}</div>
+      </div>
       <p id="edit-error" class="edit-error" hidden></p>
       <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">Save</button>
     </div>`;
 }
 
-// Recipe categories (diet, course, source, appliance, ...) are all just
-// tags — this is the one place every known tag becomes a quick-pick chip
-// when adding or editing a recipe, rather than requiring someone to
-// remember and retype "vegetarian" or "mom's recipes" exactly each time.
+// The fixed tag vocabulary, as quick-pick chips, when adding or editing a
+// recipe — tapping is the only way to set a tag; there's no free-text entry.
 function existingTagChips(action, selectedTags) {
-  const known = unique(state.recipes.flatMap((recipe) => recipe.tags || []));
-  if (!known.length) return "";
-  return known
-    .map((tag) => {
-      const active = selectedTags.some((selected) => selected.toLowerCase() === tag.toLowerCase());
-      return `<button class="pill pill-btn-plain${active ? " active" : ""}" type="button" data-action="${action}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`;
-    })
-    .join("");
+  return RECIPE_TAGS.map((tag) => {
+    const active = selectedTags.some((selected) => selected.toLowerCase() === tag.toLowerCase());
+    return `<button class="pill pill-btn-plain${active ? " active" : ""}" type="button" data-action="${action}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`;
+  }).join("");
+}
+
+// Keeps only tags within the fixed vocabulary — legacy free-form tags from
+// before this limit (or from an old Gemini extraction) quietly drop off the
+// next time a recipe is saved through the form, rather than being carried
+// forward indefinitely.
+function knownTagsOnly(tags) {
+  return (tags || []).filter((tag) => RECIPE_TAGS.some((known) => known.toLowerCase() === tag.toLowerCase()));
 }
 
 function toggleTagInInput(inputEl, tag) {
@@ -874,7 +746,7 @@ function addRecipeFormHtml(prefill) {
     .join("");
   const ingredientsValue = prefill ? prefill.ingredients.join("\n") : "";
   const stepsValue = prefill ? prefill.steps.join("\n") : "";
-  const tagsValue = prefill ? prefill.tags.join(", ") : "";
+  const prefillTags = prefill ? knownTagsOnly(prefill.tags) : [];
 
   return `
     <div class="drawer-actions">
@@ -911,11 +783,11 @@ function addRecipeFormHtml(prefill) {
         <span>Time</span>
         <input id="add-time" placeholder="e.g. 20 min" value="${escapeAttr(prefill?.time || "")}">
       </label>
-      <label class="field">
-        <span>Tags — comma separated</span>
-        <input id="add-tags" placeholder="quick, vegetarian, mom's recipes" value="${escapeAttr(tagsValue)}">
-      </label>
-      <div id="add-tag-chips" class="chips" style="margin:-0.6rem 0 1.1rem;">${existingTagChips("pick-add-tag", prefill ? prefill.tags : [])}</div>
+      <div class="field">
+        <span>Tags</span>
+        <input type="hidden" id="add-tags" value="${escapeAttr(prefillTags.join(", "))}">
+        <div id="add-tag-chips" class="chips">${existingTagChips("pick-add-tag", prefillTags)}</div>
+      </div>
       <label class="field">
         <span>Notes</span>
         <textarea id="add-notes" rows="3"></textarea>
@@ -1272,9 +1144,6 @@ document.addEventListener("click", (event) => {
       }
       break;
     }
-    case "add-missing-to-shopping":
-      addMissingToShoppingList(id);
-      break;
     case "open-add-recipe":
       els.addRecipeMenu.hidden = true;
       openAddRecipe();
@@ -1283,9 +1152,6 @@ document.addEventListener("click", (event) => {
       els.addRecipeMenu.hidden = true;
       els.photoInput.value = "";
       els.photoInput.click();
-      break;
-    case "toggle-shopping":
-      toggleShoppingItem(actionEl.dataset.item);
       break;
     default:
       break;

@@ -17,17 +17,15 @@ from app.auth import require_secret
 from app.config import ROOT, settings
 from app.extract import extract_recipe
 from app.match import STAPLES, grouped_pantry
-from app.models import FetchedPost, PantryUpdate, RecipeCreate, RecipeUpdate, ShoppingListUpdate
+from app.models import FetchedPost, PantryUpdate, RecipeCreate, RecipeUpdate
 from app.pipeline import jobs, process_recipe
 from app.store import (
     create_recipe,
     delete_recipe,
     get_have_items,
     get_recipe,
-    get_shopping_list,
     list_recipes,
     save_have_items,
-    save_shopping_list,
     update_recipe,
 )
 
@@ -182,16 +180,6 @@ async def api_get_pantry():
 @app.put("/api/pantry", dependencies=[Depends(require_secret)])
 async def api_put_pantry(body: PantryUpdate):
     return {"items": save_have_items(body.items)}
-
-
-@app.get("/api/shopping-list")
-async def api_get_shopping_list():
-    return {"items": get_shopping_list()}
-
-
-@app.put("/api/shopping-list", dependencies=[Depends(require_secret)])
-async def api_put_shopping_list(body: ShoppingListUpdate):
-    return {"items": save_shopping_list(body.items)}
 
 
 @app.get("/jobs", dependencies=[Depends(require_secret)])

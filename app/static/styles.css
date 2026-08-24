@@ -525,10 +525,6 @@ button { font-family: inherit; }
 .hero-plain h2 { color: var(--ink); font-size: 1.9rem; line-height: 1.15; margin: 0; }
 
 .pantry-match {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
   padding: 0.8rem 1.4rem;
   font-size: 0.85rem;
   border-bottom: 1px solid var(--line);
@@ -536,7 +532,6 @@ button { font-family: inherit; }
 
 .pantry-match.missing { color: var(--ink-soft); }
 .pantry-match.covered { color: var(--accent); font-weight: 600; }
-.pantry-match .link-btn { color: var(--accent); white-space: nowrap; }
 
 .recipe-body { padding: 1.6rem 1.4rem 3rem; }
 
@@ -697,8 +692,6 @@ ol.steps li {
   cursor: pointer;
   white-space: nowrap;
 }
-
-.grocery-groups { display: flex; flex-direction: column; gap: 1.3rem; }
 
 .photo-loading-overlay {
   position: fixed;

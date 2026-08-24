@@ -259,69 +259,11 @@ struct APIClient {
         return try Self.decoder.decode(PantryResponse.self, from: data).items
     }
 
-    func fetchShoppingList() async throws -> [String] {
-        guard let base = URL(string: trimmedBase),
-              let url = URL(string: "/api/shopping-list", relativeTo: base)
-        else { throw APIError.badURL }
-
-        var request = URLRequest(url: url.absoluteURL)
-        request.timeoutInterval = 15
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await Self.session.data(for: request)
-        } catch {
-            throw APIError.unreachable(trimmedBase)
-        }
-
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200 ..< 300).contains(status) else {
-            try throwForStatus(status, data: data)
-        }
-        return try Self.decoder.decode(ShoppingListResponse.self, from: data).items
-    }
-
-    func updateShoppingList(items: [String], secret: String) async throws -> [String] {
-        guard let base = URL(string: trimmedBase),
-              let url = URL(string: "/api/shopping-list", relativeTo: base)
-        else { throw APIError.badURL }
-
-        var request = URLRequest(url: url.absoluteURL)
-        request.httpMethod = "PUT"
-        request.timeoutInterval = 15
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedSecret.isEmpty {
-            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
-        }
-        request.httpBody = try JSONEncoder().encode(ShoppingListResponse(items: items))
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await Self.session.data(for: request)
-        } catch {
-            throw APIError.unreachable(trimmedBase)
-        }
-
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200 ..< 300).contains(status) else {
-            try throwForStatus(status, data: data)
-        }
-        return try Self.decoder.decode(ShoppingListResponse.self, from: data).items
-    }
-
     private var trimmedBase: String {
         baseURLString.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 }
 
 struct PantryResponse: Codable {
-    let items: [String]
-}
-
-struct ShoppingListResponse: Codable {
     let items: [String]
 }
