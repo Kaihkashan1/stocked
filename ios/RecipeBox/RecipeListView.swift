@@ -5,31 +5,15 @@ struct RecipeListView: View {
     @EnvironmentObject private var store: RecipeStore
     @State private var showFilters = false
 
-    static let meals = [
-        ("all", "All meals"),
-        ("breakfast", "Breakfast"),
-        ("lunch", "Lunch"),
-        ("dinner", "Dinner"),
-        ("snack", "Snack"),
-        ("dessert", "Dessert"),
-        ("drink", "Drink"),
-        ("other", "Other"),
-    ]
-
     private var activeFilterCount: Int {
-        [store.mealFilter != "all", store.cuisineFilter != "all", store.tagFilter != "all", store.favoritesOnly]
-            .filter { $0 }
-            .count
+        [store.tagFilter != "all", store.favoritesOnly, store.onlyMakeable].filter { $0 }.count
     }
 
     var body: some View {
         List {
             Section {
                 HStack(spacing: 10) {
-                    DebouncedTextField(
-                        placeholder: "Search recipes or ingredients you have…",
-                        text: $store.query
-                    )
+                    DebouncedTextField(placeholder: "Search title, ingredient, tag…", text: $store.query)
                     Button {
                         showFilters = true
                     } label: {
@@ -39,34 +23,10 @@ struct RecipeListView: View {
                     .foregroundStyle(activeFilterCount > 0 ? Theme.accent : Theme.inkSoft)
                     .accessibilityLabel("Filters")
                 }
-                ForEach(store.selectedPantryGroups) { group in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(group.category)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-                        FilterWrap(items: group.items, selected: store.haveSet) { item in
-                            store.toggleIngredient(item)
-                        }
-                    }
-                    .id("have-\(group.category)")
-                }
-                if !store.visiblePantryGroups.isEmpty {
-                    ForEach(store.visiblePantryGroups) { group in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Add \(group.category.lowercased())")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-                            FilterWrap(items: group.items, selected: store.haveSet) { item in
-                                store.toggleIngredient(item)
-                            }
-                        }
-                        .id("pantry-\(group.category)")
-                    }
-                }
             } footer: {
-                Text("Type a dish, tag, or ingredient. Tap an ingredient to keep it as something you have.")
+                if !store.have.isEmpty {
+                    Text("Sorted by closest fit to your pantry — manage \"What I have\" on the Pantry tab.")
+                }
             }
 
             if let message = store.errorMessage, store.recipes.isEmpty {
@@ -101,17 +61,6 @@ struct RecipeListView: View {
                             }
                             .tint(Theme.warm)
                         }
-                        .swipeActions(edge: .trailing) {
-                            Button {
-                                store.togglePlan(recipe)
-                            } label: {
-                                Label(
-                                    store.planIDs.contains(recipe.id) ? "Remove" : "Add to plan",
-                                    systemImage: store.planIDs.contains(recipe.id) ? "cart.badge.minus" : "cart.badge.plus"
-                                )
-                            }
-                            .tint(Theme.accent)
-                        }
                     }
                 }
             }
@@ -134,7 +83,7 @@ struct RecipeListView: View {
             }
         }
         .sheet(isPresented: $showFilters) {
-            FiltersSheet(meals: Self.meals)
+            FiltersSheet()
                 .environmentObject(store)
                 .presentationDetents([.medium, .large])
         }
@@ -156,13 +105,11 @@ struct RecipeListView: View {
 struct FiltersSheet: View {
     @EnvironmentObject private var store: RecipeStore
     @Environment(\.dismiss) private var dismiss
-    let meals: [(String, String)]
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Meal") {
-                    FilterRow(options: meals, selection: $store.mealFilter)
+                Section {
                     Button {
                         store.favoritesOnly.toggle()
                     } label: {
@@ -174,14 +121,22 @@ struct FiltersSheet: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(store.favoritesOnly ? Theme.warm : Theme.inkSoft)
-                }
 
-                if !store.cuisines.isEmpty {
-                    Section("Cuisine") {
-                        FilterRow(
-                            options: [("all", "All cuisines")] + store.cuisines.map { ($0, $0) },
-                            selection: $store.cuisineFilter
+                    Button {
+                        store.onlyMakeable.toggle()
+                    } label: {
+                        Label(
+                            store.onlyMakeable ? "Showing only what I can make" : "Only what I can make",
+                            systemImage: store.onlyMakeable ? "checkmark.circle.fill" : "checkmark.circle"
                         )
+                        .font(Theme.mono(12.5, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(store.onlyMakeable ? Theme.accent : Theme.inkSoft)
+                    .disabled(store.have.isEmpty)
+                } footer: {
+                    if store.have.isEmpty {
+                        Text("Mark ingredients as \"What I have\" on the Pantry tab to use this.")
                     }
                 }
 
@@ -214,10 +169,9 @@ struct FiltersSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Reset") {
-                        store.mealFilter = "all"
-                        store.cuisineFilter = "all"
                         store.tagFilter = "all"
                         store.favoritesOnly = false
+                        store.onlyMakeable = false
                         store.sortOption = .recent
                     }
                 }
@@ -339,8 +293,6 @@ struct RecipeRow: View, Equatable {
         lhs.recipe.id == rhs.recipe.id
             && lhs.recipe.title == rhs.recipe.title
             && lhs.recipe.thumbnail == rhs.recipe.thumbnail
-            && lhs.recipe.cuisine == rhs.recipe.cuisine
-            && lhs.recipe.meal == rhs.recipe.meal
             && lhs.match?.label == rhs.match?.label
     }
 
@@ -350,15 +302,8 @@ struct RecipeRow: View, Equatable {
                 .font(Theme.display(17, weight: .semibold))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
-            HStack(spacing: 6) {
-                if let match {
-                    pill(match.label, background: Theme.accent, foreground: .white)
-                } else {
-                    pill(recipe.cuisine, background: Theme.accentSoft, foreground: Theme.accent)
-                }
-                if match == nil, recipe.meal != "other" {
-                    pill(recipe.mealLabel, background: Theme.warmSoft, foreground: Theme.warm)
-                }
+            if let match {
+                pill(match.label, background: Theme.accent, foreground: .white)
             }
         }
         .padding(.vertical, 8)

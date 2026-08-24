@@ -18,7 +18,7 @@
       </div>
       <nav class="tabs" aria-label="Sections">
         <button class="tab active" type="button" data-tab="recipes">Recipes</button>
-        <button class="tab" type="button" data-tab="plan">Plan<span id="plan-badge" class="tab-badge" hidden>0</span></button>
+        <button class="tab" type="button" data-tab="pantry">Pantry<span id="pantry-badge" class="tab-badge" hidden>0</span></button>
       </nav>
       <div class="menu-anchor">
         <button id="add-recipe-btn" class="icon-round" type="button" aria-label="Add recipe" aria-haspopup="true" aria-expanded="false">
@@ -46,14 +46,6 @@
         </button>
         <div id="filters-panel" class="filters-panel" hidden>
           <section>
-            <h2 class="eyebrow">Meal</h2>
-            <div id="meal-filters" class="chips"></div>
-          </section>
-          <section>
-            <h2 class="eyebrow">Cuisine</h2>
-            <div id="cuisine-filters" class="chips"></div>
-          </section>
-          <section>
             <h2 class="eyebrow">Tag</h2>
             <div id="tag-filters" class="chips"></div>
           </section>
@@ -61,6 +53,10 @@
             <button id="favorites-toggle" class="favorites-toggle" type="button">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
               Favorites only
+            </button>
+            <button id="makeable-toggle" class="favorites-toggle" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6L9 17l-5-5"/></svg>
+              Only what I can make
             </button>
           </section>
           <section>
@@ -78,23 +74,31 @@
   </header>
 
   <div class="shell" id="recipes-view">
-    <aside class="filters" aria-label="What I have">
-      <section>
-        <h2 class="eyebrow">What I have</h2>
-        <input id="pantry-search" class="pantry-search" type="search" placeholder="Find an ingredient…">
-        <div id="pantry-selected"></div>
-        <div id="pantry-options" class="pantry-options"></div>
-      </section>
-    </aside>
-
     <main>
       <p id="status" class="status"></p>
       <div id="grid" class="grid"></div>
     </main>
   </div>
 
-  <div class="shell plan-shell" id="plan-view" hidden>
-    <div id="plan-content" class="plan-content"></div>
+  <div class="shell pantry-shell" id="pantry-view" hidden>
+    <div class="pantry-content">
+      <section>
+        <h2>What I have</h2>
+        <p class="eyebrow" style="margin-bottom:0.8rem;">Tap an ingredient below, or add your own — this drives sorting and "Only what I can make" on the Recipes tab.</p>
+        <div class="pantry-add">
+          <input id="pantry-add-input" type="text" placeholder="Add something you have">
+          <button id="pantry-add-btn" type="button">Add</button>
+        </div>
+        <div id="pantry-selected"></div>
+        <input id="pantry-search" class="pantry-search" type="search" placeholder="Find an ingredient…">
+        <div id="pantry-options" class="pantry-options"></div>
+      </section>
+      <section>
+        <h2>Shopping list</h2>
+        <p class="eyebrow" style="margin-bottom:0.8rem;">Ingredients you plan to buy — check them off once they've made it into "What I have" above.</p>
+        <div id="shopping-groups" class="grocery-groups"></div>
+      </section>
+    </div>
   </div>
 
   <div id="drawer" class="drawer" hidden>

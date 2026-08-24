@@ -205,9 +205,9 @@ struct APIClient {
         }
     }
 
-    func fetchPlan() async throws -> [Int] {
+    func fetchPantry() async throws -> [String] {
         guard let base = URL(string: trimmedBase),
-              let url = URL(string: "/api/plan", relativeTo: base)
+              let url = URL(string: "/api/pantry", relativeTo: base)
         else { throw APIError.badURL }
 
         var request = URLRequest(url: url.absoluteURL)
@@ -226,12 +226,12 @@ struct APIClient {
         guard (200 ..< 300).contains(status) else {
             try throwForStatus(status, data: data)
         }
-        return try Self.decoder.decode(PlanResponse.self, from: data).ids
+        return try Self.decoder.decode(PantryResponse.self, from: data).items
     }
 
-    func updatePlan(ids: [Int], secret: String) async throws -> [Int] {
+    func updatePantry(items: [String], secret: String) async throws -> [String] {
         guard let base = URL(string: trimmedBase),
-              let url = URL(string: "/api/plan", relativeTo: base)
+              let url = URL(string: "/api/pantry", relativeTo: base)
         else { throw APIError.badURL }
 
         var request = URLRequest(url: url.absoluteURL)
@@ -242,7 +242,7 @@ struct APIClient {
         if !trimmedSecret.isEmpty {
             request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
         }
-        request.httpBody = try JSONEncoder().encode(PlanResponse(ids: ids))
+        request.httpBody = try JSONEncoder().encode(PantryResponse(items: items))
 
         let data: Data
         let response: URLResponse
@@ -256,7 +256,7 @@ struct APIClient {
         guard (200 ..< 300).contains(status) else {
             try throwForStatus(status, data: data)
         }
-        return try Self.decoder.decode(PlanResponse.self, from: data).ids
+        return try Self.decoder.decode(PantryResponse.self, from: data).items
     }
 
     func fetchShoppingList() async throws -> [String] {
@@ -318,8 +318,8 @@ struct APIClient {
     }
 }
 
-struct PlanResponse: Codable {
-    let ids: [Int]
+struct PantryResponse: Codable {
+    let items: [String]
 }
 
 struct ShoppingListResponse: Codable {

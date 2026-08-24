@@ -27,12 +27,12 @@ struct RootView: View {
             .tag(0)
 
             NavigationStack {
-                GroceryListView()
-                    .navigationTitle("Plan")
+                PantryView()
+                    .navigationTitle("Pantry")
                     .toolbar { settingsButton }
             }
-            .tabItem { Label("Plan", systemImage: "cart") }
-            .badge(store.planIDs.isEmpty ? nil : "\(store.planIDs.count)")
+            .tabItem { Label("Pantry", systemImage: "basket") }
+            .badge(store.have.isEmpty ? nil : "\(store.have.count)")
             .tag(1)
         }
         .tint(Theme.accent)
@@ -152,12 +152,12 @@ struct RootView: View {
     private func handle(_ route: DeepLinkRoute?) {
         guard let route else { return }
         switch route {
-        case .plan:
+        case .pantry:
             selectedTab = 1
         case .have(let items):
             selectedTab = 0
             recipesPath = NavigationPath()
-            store.have = items
+            store.setHave(items)
         case .surprise:
             selectedTab = 0
             if let recipe = store.recipes.randomElement() {

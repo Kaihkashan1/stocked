@@ -10,6 +10,7 @@ struct RecipeDetailView: View {
     @State private var deleteError: String?
     @State private var showCookMode = false
     @State private var scale: Double = 1.0
+    @State private var addedMissingToShoppingList = false
 
     private var recipe: Recipe? { store.recipe(id: id) }
 
@@ -112,6 +113,9 @@ struct RecipeDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 hero(for: recipe)
+                if !store.have.isEmpty {
+                    pantryMatch(for: recipe)
+                }
                 VStack(alignment: .leading, spacing: 22) {
                     if !recipe.steps.isEmpty {
                         cookButton
@@ -149,8 +153,36 @@ struct RecipeDetailView: View {
         .background(Theme.surface)
     }
 
+    private func pantryMatch(for recipe: Recipe) -> some View {
+        let missing = missingIngredients(recipe, have: store.have)
+        return HStack(alignment: .top, spacing: 10) {
+            if missing.isEmpty {
+                Text("You have everything for this.")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+            } else {
+                Text("Missing \(missing.count) ingredient\(missing.count == 1 ? "" : "s") from your pantry: \(missing.joined(separator: ", "))")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.inkSoft)
+                Spacer(minLength: 8)
+                Button(addedMissingToShoppingList ? "Added ✓" : "Add to shopping list") {
+                    store.addToShoppingList(missing)
+                    addedMissingToShoppingList = true
+                }
+                .font(Theme.mono(11.5, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .disabled(addedMissingToShoppingList)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface2)
+        .onChange(of: recipe.id) { _, _ in addedMissingToShoppingList = false }
+    }
+
     private func metaLine(for recipe: Recipe) -> String {
-        [recipe.cuisine, recipe.mealLabel, recipe.servings.map { "\($0) servings" }, recipe.time]
+        [recipe.servings.map { "\($0) servings" }, recipe.time]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
             .joined(separator: " · ")

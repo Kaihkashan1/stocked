@@ -5,12 +5,6 @@ final class RecipeStore: ObservableObject {
     @Published var recipes: [Recipe] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var mealFilter = "all" {
-        didSet { if oldValue != mealFilter { updateVisible() } }
-    }
-    @Published var cuisineFilter = "all" {
-        didSet { if oldValue != cuisineFilter { updateVisible() } }
-    }
     /// Tags cover cooking method/appliance (air-fryer, one-pot, ...) as well
     /// as diet/flavor — whatever Gemini tagged the recipe with — so this is
     /// the one filter dimension that covers something like "Air Fryer"
@@ -21,11 +15,30 @@ final class RecipeStore: ObservableObject {
     @Published var query = "" {
         didSet { if oldValue != query { updateVisible() } }
     }
+    /// The pantry — ingredients you currently have on hand. Synced across
+    /// devices via /api/pantry, same as the shopping list, so it's a real
+    /// inventory rather than a per-session browsing filter.
     @Published var have: [String] = [] {
-        didSet { if oldValue != have { updateVisible() } }
+        didSet {
+            if oldValue != have {
+                UserDefaults.standard.set(have, forKey: Self.haveKey)
+                updateVisible()
+            }
+        }
+    }
+    /// Search box on the Pantry tab, separate from the recipe list's
+    /// `query` — filters the browsable catalog, not the recipe list.
+    @Published var pantryQuery = "" {
+        didSet { if oldValue != pantryQuery { updatePantry() } }
     }
     @Published var favoritesOnly = false {
         didSet { if oldValue != favoritesOnly { updateVisible() } }
+    }
+    /// SuperCook-style hard filter: when on, only recipes fully covered by
+    /// `have` show at all. Off by default — the score-sorted "closest fit"
+    /// view stays the default the same way it always has.
+    @Published var onlyMakeable = false {
+        didSet { if oldValue != onlyMakeable { updateVisible() } }
     }
     @Published var sortOption: SortOption = .recent {
         didSet { if oldValue != sortOption { updateVisible() } }
@@ -38,15 +51,9 @@ final class RecipeStore: ObservableObject {
     /// Set by RecipeBoxApp's onOpenURL; consumed once by RootView.
     @Published var pendingRoute: DeepLinkRoute?
 
-    @Published var planIDs: Set<Int> {
-        didSet { UserDefaults.standard.set(Array(planIDs), forKey: Self.planKey) }
-    }
-
     /// Ingredients the user intends to buy but hasn't yet — distinct from
-    /// "have" (already possess, per-session/not synced) and from the plan's
-    /// own derived grocery list (tied to specific planned recipes). Synced
-    /// across devices like the plan itself, so it feeds "you could also
-    /// make" the same way everywhere.
+    /// "have" (already possess). Synced across devices, same pattern as the
+    /// pantry.
     @Published var shoppingList: Set<String> {
         didSet { UserDefaults.standard.set(Array(shoppingList), forKey: Self.shoppingListKey) }
     }
@@ -73,7 +80,7 @@ final class RecipeStore: ObservableObject {
 
     private static let urlKey = "recipeBox.serverURL"
     private static let secretKey = "recipeBox.serverSecret"
-    private static let planKey = "recipeBox.planIDs"
+    private static let haveKey = "recipeBox.have"
     private static let shoppingListKey = "recipeBox.shoppingList"
     private static let legacyLANDefault = "http://192.168.0.54:8000"
     private static let legacyHostedHosts: Set<String> = [
@@ -91,7 +98,7 @@ final class RecipeStore: ObservableObject {
         serverURL = resolved
         UserDefaults.standard.set(resolved, forKey: Self.urlKey)
         serverSecret = UserDefaults.standard.string(forKey: Self.secretKey) ?? ""
-        planIDs = Set(UserDefaults.standard.array(forKey: Self.planKey) as? [Int] ?? [])
+        have = UserDefaults.standard.array(forKey: Self.haveKey) as? [String] ?? []
         shoppingList = Set(UserDefaults.standard.array(forKey: Self.shoppingListKey) as? [String] ?? [])
         loadCache()
     }
@@ -118,64 +125,83 @@ final class RecipeStore: ObservableObject {
         recipesByID[id]
     }
 
+    /// Optimistic, same shape as toggleShoppingItem: flips locally (so the
+    /// UI is instant) then pushes the whole pantry to the server so it
+    /// matches on every device. Reverts on failure.
     func toggleIngredient(_ item: String) {
+        let previous = have
         if let index = have.firstIndex(of: item) {
             have.remove(at: index)
         } else {
             have.append(item)
-            if !query.isEmpty {
-                query = ""
+            if !pantryQuery.isEmpty {
+                pantryQuery = ""
             }
         }
-    }
-
-    /// Optimistic, like toggleFavorite: flips locally (so the badge/UI is
-    /// instant) then pushes the whole set to the server so the plan matches
-    /// on every device. Reverts on failure.
-    func togglePlan(_ recipe: Recipe) {
-        let previous = planIDs
-        if planIDs.contains(recipe.id) {
-            planIDs.remove(recipe.id)
-        } else {
-            planIDs.insert(recipe.id)
-        }
-        let updated = planIDs
+        let updated = have
         Task {
             do {
-                let confirmed = try await APIClient(baseURLString: serverURL).updatePlan(ids: Array(updated), secret: serverSecret)
-                if planIDs == updated {
-                    planIDs = Set(confirmed)
+                let confirmed = try await APIClient(baseURLString: serverURL).updatePantry(items: updated, secret: serverSecret)
+                if have == updated {
+                    have = confirmed
                 }
             } catch {
-                if planIDs == updated {
-                    planIDs = previous
+                if have == updated {
+                    have = previous
                 }
                 actionError = error.localizedDescription
             }
         }
     }
 
-    /// One request for the whole clear, rather than N concurrent togglePlan
-    /// calls racing each other to write the last (possibly stale) state.
-    func clearPlan() {
-        let previous = planIDs
-        planIDs = []
+    /// A free-text addition — for something you have that isn't derived from
+    /// any recipe (a specific brand, a leftover, whatever). Normalized like
+    /// the server does (trimmed, lowercased) so it still matches recipe
+    /// ingredients via namesMatch just like a catalog pick would.
+    func addHaveItem(_ raw: String) {
+        let item = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !item.isEmpty, !have.contains(where: { $0 == item || namesMatch($0, item) }) else { return }
+        // The server re-categorizes on the next full reload; this just keeps
+        // a freshly-typed custom item from vanishing from "What I have" (or
+        // being unfindable in the catalog) until then.
+        if !pantryGroups.contains(where: { $0.items.contains(item) }) {
+            if let index = pantryGroups.firstIndex(where: { $0.category == "Other" }) {
+                var items = pantryGroups[index].items
+                items.append(item)
+                pantryGroups[index] = PantryGroup(category: "Other", items: items.sorted())
+            } else {
+                pantryGroups.append(PantryGroup(category: "Other", items: [item]))
+            }
+        }
+        toggleIngredient(item)
+    }
+
+    /// Bulk replace, for the recipebox://have deep link (e.g. a Shortcuts
+    /// pantry scan) — one request for the whole set rather than N toggles.
+    func setHave(_ items: [String]) {
+        let previous = have
+        have = items
+        let updated = items
         Task {
             do {
-                let confirmed = try await APIClient(baseURLString: serverURL).updatePlan(ids: [], secret: serverSecret)
-                planIDs = Set(confirmed)
+                let confirmed = try await APIClient(baseURLString: serverURL).updatePantry(items: updated, secret: serverSecret)
+                if have == updated {
+                    have = confirmed
+                }
             } catch {
-                planIDs = previous
+                if have == updated {
+                    have = previous
+                }
                 actionError = error.localizedDescription
             }
         }
     }
 
-    /// Pulls the latest plan from the server — called after each refresh so
-    /// a change made on another device shows up here too.
-    private func syncPlanFromServer() async {
-        guard let ids = try? await APIClient(baseURLString: serverURL).fetchPlan() else { return }
-        planIDs = Set(ids)
+    /// Pulls the latest pantry from the server — called after each refresh
+    /// so a change made on another device shows up here too.
+    private func syncPantryFromServer() async {
+        guard let items = try? await APIClient(baseURLString: serverURL).fetchPantry() else { return }
+        have = items
     }
 
     private func syncShoppingListFromServer() async {
@@ -183,7 +209,7 @@ final class RecipeStore: ObservableObject {
         shoppingList = Set(items)
     }
 
-    /// Optimistic, same shape as togglePlan.
+    /// Optimistic, same shape as toggleIngredient.
     func toggleShoppingItem(_ item: String) {
         let previous = shoppingList
         if shoppingList.contains(item) {
@@ -207,8 +233,27 @@ final class RecipeStore: ObservableObject {
         }
     }
 
-    var plannedRecipes: [Recipe] {
-        recipes.filter { planIDs.contains($0.id) }
+    /// Bulk version of toggleShoppingItem, for the recipe detail view's "add
+    /// missing to shopping list" button — one request for the whole gap
+    /// rather than N toggles racing to write the last (possibly stale) state.
+    func addToShoppingList(_ items: [String]) {
+        guard !items.isEmpty else { return }
+        let previous = shoppingList
+        shoppingList.formUnion(items)
+        let updated = shoppingList
+        Task {
+            do {
+                let confirmed = try await APIClient(baseURLString: serverURL).updateShoppingList(items: Array(updated), secret: serverSecret)
+                if shoppingList == updated {
+                    shoppingList = Set(confirmed)
+                }
+            } catch {
+                if shoppingList == updated {
+                    shoppingList = previous
+                }
+                actionError = error.localizedDescription
+            }
+        }
     }
 
     /// Optimistic: flips the star immediately, then confirms with the server.
@@ -277,9 +322,6 @@ final class RecipeStore: ObservableObject {
             try await APIClient(baseURLString: serverURL).deleteRecipe(id: recipe.id, secret: serverSecret)
             recipesByID.removeValue(forKey: recipe.id)
             recipes.removeAll { $0.id == recipe.id }
-            if planIDs.remove(recipe.id) != nil {
-                _ = try? await APIClient(baseURLString: serverURL).updatePlan(ids: Array(planIDs), secret: serverSecret)
-            }
             updateDerived()
             persistCache()
             return nil
@@ -319,7 +361,7 @@ final class RecipeStore: ObservableObject {
             apply(recipes: payload.recipes, pantry: payload.pantry)
             errorMessage = nil
             persistCache()
-            await syncPlanFromServer()
+            await syncPantryFromServer()
             await syncShoppingListFromServer()
             return true
         } catch {
@@ -347,25 +389,28 @@ final class RecipeStore: ObservableObject {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var rows = recipes.filter { recipe in
             if favoritesOnly, !recipe.favorite { return false }
-            if mealFilter != "all", recipe.meal != mealFilter { return false }
-            if cuisineFilter != "all", recipe.cuisine != cuisineFilter { return false }
             if tagFilter != "all", !recipe.tags.contains(tagFilter) { return false }
             if needle.isEmpty { return true }
             return recipe.searchBlob.contains(needle)
         }
 
+        // Unlike the old ingredient-search behavior, marking more pantry
+        // items never hides a recipe on its own — matchRecipe always
+        // returns a score/missing count once `have` is non-empty. The only
+        // hard filter is the explicit "only what I can make" toggle.
         var matches: [Int: RecipeMatch] = [:]
         if !have.isEmpty {
-            rows = rows.compactMap { recipe in
-                guard let match = matchRecipe(recipe, have: have) else { return nil }
-                matches[recipe.id] = match
-                return recipe
+            for recipe in rows {
+                matches[recipe.id] = matchRecipe(recipe, have: have)
+            }
+            if onlyMakeable {
+                rows = rows.filter { matches[$0.id]?.fullyCovered == true }
             }
             rows.sort { lhs, rhs in
                 let left = matches[lhs.id]!
                 let right = matches[rhs.id]!
                 if left.score != right.score { return left.score > right.score }
-                return left.extraCount < right.extraCount
+                return left.missingCount < right.missingCount
             }
         } else {
             switch sortOption {
@@ -390,7 +435,10 @@ final class RecipeStore: ObservableObject {
             return items.isEmpty ? nil : PantryGroup(category: group.category, items: items)
         }
 
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // Gated behind actually typing something — as the recipe box grows,
+        // the full catalog is too long to skim, so this is a search box,
+        // not a browsable list.
+        let needle = pantryQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !needle.isEmpty else {
             visiblePantryGroups = []
             return

@@ -20,7 +20,15 @@ struct AddRecipeView: View {
     @State private var saving = false
     @State private var errorMessage: String?
 
-    private static let meals = RecipeListView.meals.filter { $0.0 != "all" }
+    private static let meals = [
+        ("breakfast", "Breakfast"),
+        ("lunch", "Lunch"),
+        ("dinner", "Dinner"),
+        ("snack", "Snack"),
+        ("dessert", "Dessert"),
+        ("drink", "Drink"),
+        ("other", "Other"),
+    ]
 
     /// `prefill` comes from a photo extraction (POST /api/extract-photo) —
     /// nothing is saved until Save is tapped, same as typing it in by hand.
