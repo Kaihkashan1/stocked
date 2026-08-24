@@ -156,8 +156,8 @@ async def api_extract_photo(photo: UploadFile = File(...)):
 
 @app.patch("/api/recipes/{row_id}", dependencies=[Depends(require_secret)])
 async def api_update_recipe(row_id: int, body: RecipeUpdate):
-    if not get_recipe(row_id):
-        raise HTTPException(status_code=404, detail="Recipe not found")
+    # update_recipe() does its own get_recipe() existence check internally —
+    # checking again here would be a second full-sheet read for nothing.
     updated = update_recipe(row_id, **body.model_dump(exclude_unset=True))
     if not updated:
         raise HTTPException(status_code=404, detail="Recipe not found")

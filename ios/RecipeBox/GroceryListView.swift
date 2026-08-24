@@ -24,6 +24,12 @@ struct GroceryListView: View {
                     .padding(.vertical, 4)
                 }
             } else {
+                // Bound once per body evaluation — groceryList (and
+                // alsoMakeable below) each do a real pass over the planned
+                // recipes' ingredients, and body reads them more than once.
+                let groceryList = groceryList
+                let alsoMakeable = alsoMakeable
+
                 Section("Planned") {
                     ForEach(planned) { recipe in
                         NavigationLink(value: recipe.id) {
@@ -41,14 +47,14 @@ struct GroceryListView: View {
                     }
                 }
 
-                if omittedHaveCount > 0 {
-                    Text("Grocery list · \(omittedHaveCount) item\(omittedHaveCount == 1 ? "" : "s") skipped because you already have \(omittedHaveCount == 1 ? "it" : "them")")
+                if groceryList.omittedCount > 0 {
+                    Text("Grocery list · \(groceryList.omittedCount) item\(groceryList.omittedCount == 1 ? "" : "s") skipped because you already have \(groceryList.omittedCount == 1 ? "it" : "them")")
                         .font(Theme.mono(11, weight: .semibold))
                         .foregroundStyle(Theme.inkSoft)
                         .listRowSeparator(.hidden)
                 }
 
-                ForEach(groupedIngredients, id: \.key) { group in
+                ForEach(groceryList.groups, id: \.key) { group in
                     Section(group.key.capitalized) {
                         ForEach(group.lines, id: \.self) { line in
                             let parsed = splitIngredientQuantity(line)
@@ -117,41 +123,39 @@ struct GroceryListView: View {
         }
     }
 
+    private struct GroceryList {
+        let groups: [(key: String, lines: [String])]
+        let omittedCount: Int
+    }
+
     /// Ingredient lines from every planned recipe, grouped by whichever of
     /// the recipe's already-canonicalized pantry names (server-computed —
     /// see app/match.py) the line mentions, so "2 cups basmati rice" and
     /// "1 cup rice" both land under "rice" without re-parsing quantities.
     /// Skips anything already in "what I have" — this is a shopping list,
-    /// not a full ingredient list.
-    private var groupedIngredients: [(key: String, lines: [String])] {
+    /// not a full ingredient list. Grouping and the skipped-item count used
+    /// to be two separate computed properties that each re-walked every
+    /// planned recipe's ingredients; combined into one pass since they were
+    /// doing identical work to produce complementary results.
+    private var groceryList: GroceryList {
         var buckets: [String: [String]] = [:]
         var seenLines: Set<String> = []
+        var omitted = 0
         for recipe in planned {
             for line in recipe.ingredients {
                 guard seenLines.insert(line).inserted else { continue }
                 let key = canonicalKey(for: line, pantry: recipe.pantry)
-                guard !store.haveSet.contains(where: { namesMatch($0, key) }) else { continue }
+                if store.haveSet.contains(where: { namesMatch($0, key) }) {
+                    omitted += 1
+                    continue
+                }
                 buckets[key, default: []].append(line)
             }
         }
-        return buckets
+        let groups = buckets
             .map { (key: $0.key, lines: $0.value.sorted()) }
             .sorted { $0.key < $1.key }
-    }
-
-    /// How many distinct ingredient lines were left off the list above
-    /// because they matched something in "what I have".
-    private var omittedHaveCount: Int {
-        var seenLines: Set<String> = []
-        var count = 0
-        for recipe in planned {
-            for line in recipe.ingredients {
-                guard seenLines.insert(line).inserted else { continue }
-                let key = canonicalKey(for: line, pantry: recipe.pantry)
-                if store.haveSet.contains(where: { namesMatch($0, key) }) { count += 1 }
-            }
-        }
-        return count
+        return GroceryList(groups: groups, omittedCount: omitted)
     }
 
     /// Recipes outside the plan that would become fully makeable once you've

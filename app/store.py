@@ -180,6 +180,9 @@ def create_recipe(
     ingredients_text = "\n".join(f"- {line}" for line in ingredients)
     steps_text = "\n".join(f"{i}. {line}" for i, line in enumerate(steps, start=1))
     saved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    clean_cuisine = _clean_cuisine(cuisine)
+    clean_meal = _clean_meal(meal)
+    clean_tags = [_clean_tag(tag) for tag in tags if _clean_tag(tag)]
     row = [
         title,
         servings or "",
@@ -190,10 +193,10 @@ def create_recipe(
         "high",  # Confidence: user-authored, not a model guess
         "",  # Thumbnail
         saved_at,
-        _clean_cuisine(cuisine),
-        _clean_meal(meal),
+        clean_cuisine,
+        clean_meal,
         time or "",
-        ", ".join(_clean_tag(tag) for tag in tags if _clean_tag(tag)),
+        ", ".join(clean_tags),
         "",  # Favorite
         notes,
     ]
@@ -203,7 +206,30 @@ def create_recipe(
     row_id = len(worksheet.col_values(1)) + 1
     worksheet.update(f"A{row_id}:{LAST_COL_LETTER}{row_id}", [row], value_input_option="USER_ENTERED")
     logger.info("Created row %s (%r) via manual entry", row_id, title)
-    return get_recipe(row_id)
+
+    # Build the response from what we just wrote instead of a second read —
+    # same reasoning as update_recipe: one Sheets API round trip, not two.
+    return {
+        "id": row_id,
+        "title": title,
+        "servings": servings or None,
+        "ingredients": ingredients,
+        "pantry": pantry_items(ingredients),
+        "steps": steps,
+        "source": "",
+        "caption": "",
+        "confidence": "high",
+        "thumbnail": "",
+        "saved_at": saved_at,
+        "cuisine": clean_cuisine,
+        "meal": clean_meal,
+        "time": time or None,
+        "tags": clean_tags,
+        "favorite": False,
+        "notes": notes,
+        "ingredients_text": ingredients_text,
+        "steps_text": steps_text,
+    }
 
 
 def delete_recipe(row_id: int) -> bool:
