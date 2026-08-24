@@ -10,8 +10,6 @@ struct RecipeDetailView: View {
     @State private var deleteError: String?
     @State private var showCookMode = false
     @State private var scale: Double = 1.0
-    @State private var recategorizing = false
-    @State private var recategorizeError: String?
 
     private var recipe: Recipe? { store.recipe(id: id) }
 
@@ -53,18 +51,11 @@ struct RecipeDetailView: View {
                             Link("Original post", destination: url)
                         }
                         Button("Edit") { showEdit = true }
-                        Button("Recategorize") {
-                            Task { await recategorize(recipe) }
-                        }
                         Button("Delete", role: .destructive) { showDeleteConfirm = true }
                     } label: {
-                        if recategorizing {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "ellipsis.circle")
-                        }
+                        Image(systemName: "ellipsis.circle")
                     }
-                    .disabled(deleting || recategorizing)
+                    .disabled(deleting)
                 }
             }
         }
@@ -105,18 +96,6 @@ struct RecipeDetailView: View {
         } message: { message in
             Text(message)
         }
-        .alert(
-            "Couldn't recategorize",
-            isPresented: Binding(
-                get: { recategorizeError != nil },
-                set: { shown in if !shown { recategorizeError = nil } }
-            ),
-            presenting: recategorizeError
-        ) { _ in
-            Button("OK", role: .cancel) {}
-        } message: { message in
-            Text(message)
-        }
     }
 
     private func delete(_ recipe: Recipe) async {
@@ -126,14 +105,6 @@ struct RecipeDetailView: View {
             deleteError = error
         } else {
             dismiss()
-        }
-    }
-
-    private func recategorize(_ recipe: Recipe) async {
-        recategorizing = true
-        defer { recategorizing = false }
-        if let error = await store.recategorizeRecipe(recipe) {
-            recategorizeError = error
         }
     }
 

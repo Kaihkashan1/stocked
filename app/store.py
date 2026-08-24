@@ -9,7 +9,6 @@ from functools import lru_cache
 import gspread
 
 from app.config import settings
-from app.extract import categorize_recipe
 from app.fetch import normalize_url
 from app.match import pantry_items
 from app.models import FetchedPost, Recipe
@@ -288,31 +287,6 @@ def update_recipe(row_id: int, **fields) -> dict | None:
         "ingredients_text": ingredients_text,
         "steps_text": steps_text,
     }
-
-
-def recategorize(row_id: int) -> dict | None:
-    """Re-runs the same Gemini categorization used at save time (see
-    app/extract.py's categorize_recipe) against the recipe's current
-    title/ingredients/steps/caption, and writes back cuisine/meal/time/tags.
-    A deliberate, manually-triggered action (each call is a real Gemini
-    request) for fixing a recipe Gemini filed as Uncategorized/Other."""
-    current = get_recipe(row_id)
-    if current is None:
-        return None
-    category = categorize_recipe(
-        title=current["title"],
-        ingredients=current["ingredients_text"],
-        steps=current["steps_text"],
-        caption=current["caption"],
-        servings=current["servings"] or "",
-    )
-    return update_recipe(
-        row_id,
-        cuisine=category.cuisine,
-        meal=category.meal,
-        time=category.time,
-        tags=category.tags,
-    )
 
 
 def list_recipes() -> list[dict]:
