@@ -42,6 +42,15 @@ final class RecipeStore: ObservableObject {
         didSet { UserDefaults.standard.set(Array(planIDs), forKey: Self.planKey) }
     }
 
+    /// Ingredients the user intends to buy but hasn't yet — distinct from
+    /// "have" (already possess, per-session/not synced) and from the plan's
+    /// own derived grocery list (tied to specific planned recipes). Synced
+    /// across devices like the plan itself, so it feeds "you could also
+    /// make" the same way everywhere.
+    @Published var shoppingList: Set<String> {
+        didSet { UserDefaults.standard.set(Array(shoppingList), forKey: Self.shoppingListKey) }
+    }
+
     @Published private(set) var visibleRecipes: [Recipe] = []
     @Published private(set) var matchesByID: [Int: RecipeMatch] = [:]
     @Published private(set) var cuisines: [String] = []
@@ -65,6 +74,7 @@ final class RecipeStore: ObservableObject {
     private static let urlKey = "recipeBox.serverURL"
     private static let secretKey = "recipeBox.serverSecret"
     private static let planKey = "recipeBox.planIDs"
+    private static let shoppingListKey = "recipeBox.shoppingList"
     private static let legacyLANDefault = "http://192.168.0.54:8000"
     private static let legacyHostedHosts: Set<String> = [
         "recipe-box-ashen-alpha.vercel.app",
@@ -82,6 +92,7 @@ final class RecipeStore: ObservableObject {
         UserDefaults.standard.set(resolved, forKey: Self.urlKey)
         serverSecret = UserDefaults.standard.string(forKey: Self.secretKey) ?? ""
         planIDs = Set(UserDefaults.standard.array(forKey: Self.planKey) as? [Int] ?? [])
+        shoppingList = Set(UserDefaults.standard.array(forKey: Self.shoppingListKey) as? [String] ?? [])
         loadCache()
     }
 
@@ -165,6 +176,35 @@ final class RecipeStore: ObservableObject {
     private func syncPlanFromServer() async {
         guard let ids = try? await APIClient(baseURLString: serverURL).fetchPlan() else { return }
         planIDs = Set(ids)
+    }
+
+    private func syncShoppingListFromServer() async {
+        guard let items = try? await APIClient(baseURLString: serverURL).fetchShoppingList() else { return }
+        shoppingList = Set(items)
+    }
+
+    /// Optimistic, same shape as togglePlan.
+    func toggleShoppingItem(_ item: String) {
+        let previous = shoppingList
+        if shoppingList.contains(item) {
+            shoppingList.remove(item)
+        } else {
+            shoppingList.insert(item)
+        }
+        let updated = shoppingList
+        Task {
+            do {
+                let confirmed = try await APIClient(baseURLString: serverURL).updateShoppingList(items: Array(updated), secret: serverSecret)
+                if shoppingList == updated {
+                    shoppingList = Set(confirmed)
+                }
+            } catch {
+                if shoppingList == updated {
+                    shoppingList = previous
+                }
+                actionError = error.localizedDescription
+            }
+        }
     }
 
     var plannedRecipes: [Recipe] {
@@ -280,6 +320,7 @@ final class RecipeStore: ObservableObject {
             errorMessage = nil
             persistCache()
             await syncPlanFromServer()
+            await syncShoppingListFromServer()
             return true
         } catch {
             guard !Task.isCancelled else { return false }

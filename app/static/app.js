@@ -23,6 +23,7 @@ const INGREDIENT_UNITS = new Set([
 
 const SECRET_KEY = "recipeBox.secret";
 const PLAN_KEY = "recipeBox.plan";
+const SHOPPING_LIST_KEY = "recipeBox.shoppingList";
 
 const state = {
   recipes: [],
@@ -37,6 +38,7 @@ const state = {
   favoritesOnly: false,
   sort: "recent",
   planIDs: loadPlanIDs(),
+  shoppingList: loadShoppingList(),
   checkedItems: new Set(),
   openRecipeId: null,
   editingId: null,
@@ -89,6 +91,7 @@ async function load() {
   renderPlanBadge();
   maybeOpenFromHash();
   await fetchPlan();
+  await fetchShoppingList();
   renderPlanBadge();
   renderGrid();
   if (state.tab === "plan") renderPlan();
@@ -195,6 +198,67 @@ function loadPlanIDs() {
 
 function cachePlanIDs() {
   localStorage.setItem(PLAN_KEY, JSON.stringify([...state.planIDs]));
+}
+
+// Ingredients the user intends to buy but hasn't yet — distinct from "have"
+// (already possess) and from the plan's own derived grocery list (tied to
+// specific planned recipes). Synced through GET/PUT /api/shopping-list, same
+// pattern as the plan, so it feeds "you could also make" on every device.
+function loadShoppingList() {
+  try {
+    const raw = localStorage.getItem(SHOPPING_LIST_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function cacheShoppingList() {
+  localStorage.setItem(SHOPPING_LIST_KEY, JSON.stringify([...state.shoppingList]));
+}
+
+async function fetchShoppingList() {
+  try {
+    const response = await fetch("/api/shopping-list");
+    if (!response.ok) return;
+    const data = await response.json();
+    state.shoppingList = new Set(data.items || []);
+    cacheShoppingList();
+  } catch {
+    // keep whatever the local cache had
+  }
+}
+
+async function putShoppingList(items) {
+  const response = await fetch("/api/shopping-list", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ items: [...items] }),
+  });
+  if (!response.ok) throw await errorForResponse(response);
+  return (await response.json()).items;
+}
+
+// Optimistic, like togglePlan.
+async function toggleShoppingItem(item) {
+  const previous = new Set(state.shoppingList);
+  if (state.shoppingList.has(item)) {
+    state.shoppingList.delete(item);
+  } else {
+    state.shoppingList.add(item);
+  }
+  cacheShoppingList();
+  if (state.tab === "plan") renderPlan();
+
+  try {
+    const confirmed = await putShoppingList(state.shoppingList);
+    state.shoppingList = new Set(confirmed);
+  } catch (err) {
+    state.shoppingList = previous;
+    window.alert(`Couldn't save the shopping list: ${err.message}`);
+  }
+  cacheShoppingList();
+  if (state.tab === "plan") renderPlan();
 }
 
 async function fetchPlan() {
@@ -336,63 +400,104 @@ function isFullyCovered(recipe, available) {
 // alsoMakeable.
 function alsoMakeable(planned) {
   const plannedIDs = new Set(planned.map((recipe) => recipe.id));
-  if (!plannedIDs.size) return [];
-  const expanded = new Set([...state.have, ...planned.flatMap((recipe) => recipe.pantry || [])]);
+  const expanded = new Set([...state.have, ...state.shoppingList, ...planned.flatMap((recipe) => recipe.pantry || [])]);
   return state.recipes
     .filter((recipe) => !plannedIDs.has(recipe.id) && isFullyCovered(recipe, expanded))
     .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
 }
 
+function shoppingGroupsHtml(groups) {
+  return groups
+    .map((group) => {
+      const chips = group.items
+        .map((item) => {
+          const active = state.shoppingList.has(item);
+          return `<button class="chip${active ? " active" : ""}" type="button" data-action="toggle-shopping" data-item="${escapeAttr(item)}">${escapeHtml(item)}${active ? " ×" : ""}</button>`;
+        })
+        .join("");
+      return `<div class="pantry-group"><h3 class="pantry-heading">${escapeHtml(group.category)}</h3><div class="chips">${chips}</div></div>`;
+    })
+    .join("");
+}
+
 function renderPlan() {
   const planned = state.recipes.filter((r) => state.planIDs.has(r.id));
-  if (!planned.length) {
-    els.planContent.innerHTML = `<div class="empty">No recipes planned yet. Tap the cart icon on a recipe to add it here.</div>`;
-    return;
-  }
 
-  const rows = planned
-    .map(
-      (recipe) => `
+  const plannedSection = `
+    <section>
+      <h2 class="eyebrow">Planned · ${planned.length} recipe${planned.length === 1 ? "" : "s"}</h2>
+      ${
+        planned.length
+          ? `<div class="plan-rows">${planned
+              .map(
+                (recipe) => `
         <div class="plan-row">
           <button class="plan-title" type="button" data-action="open-recipe" data-id="${recipe.id}">${escapeHtml(recipe.title)}</button>
           <button class="icon-btn" type="button" data-action="toggle-plan" data-id="${recipe.id}">Remove</button>
         </div>`
-    )
-    .join("");
+              )
+              .join("")}</div>`
+          : `<div class="empty">No recipes planned yet. Tap the cart icon on a recipe to add it here.</div>`
+      }
+    </section>`;
 
-  const groups = groupedIngredients(planned)
-    .map((group) => {
-      const items = group.lines
-        .map((line) => {
-          const { quantity, text } = splitIngredientQuantity(line);
-          const checked = state.checkedItems.has(line);
-          return `
+  // Ingredients you intend to buy but haven't yet — independent of any
+  // planned recipe. Feeds "You could also make" below the same way "what I
+  // have" and the planned recipes' own ingredients do.
+  const shoppingGroups = groupPantry(pantryCatalog());
+  const shoppingSection = `
+    <section>
+      <h2>Shopping list</h2>
+      <p class="eyebrow" style="margin-bottom:0.8rem;">Ingredients you plan to buy — counted toward "You could also make" below, even without planning a recipe around them.</p>
+      <div class="grocery-groups">${shoppingGroups.length ? shoppingGroupsHtml(shoppingGroups) : `<span class="status">No ingredients known yet</span>`}</div>
+    </section>`;
+
+  let groceryListSection = "";
+  if (planned.length) {
+    const groups = groupedIngredients(planned)
+      .map((group) => {
+        const items = group.lines
+          .map((line) => {
+            const { quantity, text } = splitIngredientQuantity(line);
+            const checked = state.checkedItems.has(line);
+            return `
             <label class="grocery-item${checked ? " checked" : ""}">
               <input type="checkbox" data-line="${escapeAttr(line)}" ${checked ? "checked" : ""}>
               ${quantity ? `<span class="qty">${escapeHtml(quantity)}</span>` : ""}
               <span>${escapeHtml(text)}</span>
             </label>`;
-        })
-        .join("");
-      return `
+          })
+          .join("");
+        return `
         <div>
           <h3 class="pantry-heading">${escapeHtml(capitalize(group.key))}</h3>
           <div class="grocery-list">${items}</div>
         </div>`;
-    })
-    .join("");
+      })
+      .join("");
 
-  const omitted = omittedHaveCount(planned);
-  const omittedNote = omitted
-    ? `<p class="omitted-note">${omitted} item${omitted === 1 ? "" : "s"} skipped because you already have ${omitted === 1 ? "it" : "them"}</p>`
-    : "";
+    const omitted = omittedHaveCount(planned);
+    const omittedNote = omitted
+      ? `<p class="omitted-note">${omitted} item${omitted === 1 ? "" : "s"} skipped because you already have ${omitted === 1 ? "it" : "them"}</p>`
+      : "";
+
+    groceryListSection = `
+    <section>
+      <div class="grocery-header">
+        <h2>Grocery list</h2>
+        <button class="link-btn" type="button" data-action="clear-plan">Clear plan</button>
+      </div>
+      ${omittedNote}
+      <div class="grocery-groups">${groups}</div>
+    </section>`;
+  }
 
   const bonus = alsoMakeable(planned);
   const bonusSection = bonus.length
     ? `
     <section>
       <h2>You could also make</h2>
-      <p class="eyebrow" style="margin-bottom:0.8rem;">Fully covered by what you have plus everything on this shopping list.</p>
+      <p class="eyebrow" style="margin-bottom:0.8rem;">Fully covered by what you have, your shopping list, and everything already needed for planned recipes.</p>
       <div class="plan-rows">
         ${bonus
           .map(
@@ -406,20 +511,7 @@ function renderPlan() {
     </section>`
     : "";
 
-  els.planContent.innerHTML = `
-    <section>
-      <h2 class="eyebrow">Planned · ${planned.length} recipe${planned.length === 1 ? "" : "s"}</h2>
-      <div class="plan-rows">${rows}</div>
-    </section>
-    <section>
-      <div class="grocery-header">
-        <h2>Grocery list</h2>
-        <button class="link-btn" type="button" data-action="clear-plan">Clear plan</button>
-      </div>
-      ${omittedNote}
-      <div class="grocery-groups">${groups}</div>
-    </section>
-    ${bonusSection}`;
+  els.planContent.innerHTML = `${plannedSection}${shoppingSection}${groceryListSection}${bonusSection}`;
 }
 
 function capitalize(value) {
@@ -1288,6 +1380,9 @@ document.addEventListener("click", (event) => {
       els.addRecipeMenu.hidden = true;
       els.photoInput.value = "";
       els.photoInput.click();
+      break;
+    case "toggle-shopping":
+      toggleShoppingItem(actionEl.dataset.item);
       break;
     default:
       break;
