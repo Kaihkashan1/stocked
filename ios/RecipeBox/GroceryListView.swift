@@ -46,6 +46,47 @@ struct GroceryListView: View {
                 }
             }
 
+            // Grocery list right after Planned — it's the actionable thing
+            // you came for. The shopping-list catalog below (everything
+            // across every recipe) is a much bigger, browsier list, so it
+            // comes after rather than pushing the actual grocery list off
+            // the initial screen.
+            if !planned.isEmpty {
+                if groceryList.omittedCount > 0 {
+                    Text("Grocery list · \(groceryList.omittedCount) item\(groceryList.omittedCount == 1 ? "" : "s") skipped because you already have \(groceryList.omittedCount == 1 ? "it" : "them")")
+                        .font(Theme.mono(11, weight: .semibold))
+                        .foregroundStyle(Theme.inkSoft)
+                        .listRowSeparator(.hidden)
+                }
+
+                ForEach(groceryList.groups, id: \.key) { group in
+                    Section(group.key.capitalized) {
+                        ForEach(group.lines, id: \.self) { line in
+                            let parsed = splitIngredientQuantity(line)
+                            let isChecked = checked.contains(line)
+                            Button {
+                                toggle(line)
+                            } label: {
+                                HStack(alignment: .firstTextBaseline, spacing: 9) {
+                                    Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                                        .foregroundStyle(isChecked ? Theme.accent : Theme.inkSoft)
+                                    if let quantity = parsed.quantity {
+                                        Text(quantity)
+                                            .font(Theme.mono(11.5, weight: .semibold))
+                                            .foregroundStyle(isChecked ? Theme.inkSoft : Theme.accent)
+                                            .strikethrough(isChecked)
+                                    }
+                                    Text(parsed.text)
+                                        .strikethrough(isChecked)
+                                        .foregroundStyle(isChecked ? Theme.inkSoft : Theme.ink)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
             // Ingredients you intend to buy but haven't yet — independent of
             // any planned recipe. Feeds "You could also make" below the same
             // way "what I have" and the planned recipes' own ingredients do.
@@ -88,55 +129,25 @@ struct GroceryListView: View {
                 }
             }
 
-            if !planned.isEmpty {
-                if groceryList.omittedCount > 0 {
-                    Text("Grocery list · \(groceryList.omittedCount) item\(groceryList.omittedCount == 1 ? "" : "s") skipped because you already have \(groceryList.omittedCount == 1 ? "it" : "them")")
-                        .font(Theme.mono(11, weight: .semibold))
-                        .foregroundStyle(Theme.inkSoft)
-                        .listRowSeparator(.hidden)
-                }
-
-                ForEach(groceryList.groups, id: \.key) { group in
-                    Section(group.key.capitalized) {
-                        ForEach(group.lines, id: \.self) { line in
-                            let parsed = splitIngredientQuantity(line)
-                            let isChecked = checked.contains(line)
-                            Button {
-                                toggle(line)
-                            } label: {
-                                HStack(alignment: .firstTextBaseline, spacing: 9) {
-                                    Image(systemName: isChecked ? "checkmark.square.fill" : "square")
-                                        .foregroundStyle(isChecked ? Theme.accent : Theme.inkSoft)
-                                    if let quantity = parsed.quantity {
-                                        Text(quantity)
-                                            .font(Theme.mono(11.5, weight: .semibold))
-                                            .foregroundStyle(isChecked ? Theme.inkSoft : Theme.accent)
-                                            .strikethrough(isChecked)
-                                    }
-                                    Text(parsed.text)
-                                        .strikethrough(isChecked)
-                                        .foregroundStyle(isChecked ? Theme.inkSoft : Theme.ink)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-
-            if !alsoMakeable.isEmpty {
-                Section {
+            // Always shown, even empty — otherwise an empty match list reads
+            // as "this feature doesn't exist" rather than "nothing qualifies
+            // yet".
+            Section {
+                if alsoMakeable.isEmpty {
+                    Text("Nothing yet — mark ingredients as \"What I have\" on the Recipes tab, or tap items in the shopping list above, and matches will show up here.")
+                        .foregroundStyle(.secondary)
+                } else {
                     ForEach(alsoMakeable) { recipe in
                         NavigationLink(value: recipe.id) {
                             Text(recipe.title)
                                 .font(Theme.display(15, weight: .semibold))
                         }
                     }
-                } header: {
-                    Text("You could also make")
-                } footer: {
-                    Text("Fully covered by what you have, your shopping list, and everything already needed for planned recipes.")
                 }
+            } header: {
+                Text("You could also make")
+            } footer: {
+                Text("Fully covered by what you have, your shopping list, and everything already needed for planned recipes.")
             }
 
             if !planned.isEmpty {
