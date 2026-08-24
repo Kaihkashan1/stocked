@@ -8,19 +8,32 @@ struct AddRecipeView: View {
     @EnvironmentObject private var store: RecipeStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var title = ""
-    @State private var servings = ""
-    @State private var ingredientsText = ""
-    @State private var stepsText = ""
-    @State private var cuisine = ""
-    @State private var meal = "other"
-    @State private var time = ""
-    @State private var tagsText = ""
+    @State private var title: String
+    @State private var servings: String
+    @State private var ingredientsText: String
+    @State private var stepsText: String
+    @State private var cuisine: String
+    @State private var meal: String
+    @State private var time: String
+    @State private var tagsText: String
     @State private var notes = ""
     @State private var saving = false
     @State private var errorMessage: String?
 
     private static let meals = RecipeListView.meals.filter { $0.0 != "all" }
+
+    /// `prefill` comes from a photo extraction (POST /api/extract-photo) —
+    /// nothing is saved until Save is tapped, same as typing it in by hand.
+    init(prefill: RecipeExtraction? = nil) {
+        _title = State(initialValue: prefill?.title ?? "")
+        _servings = State(initialValue: prefill?.servings ?? "")
+        _ingredientsText = State(initialValue: (prefill?.ingredients ?? []).joined(separator: "\n"))
+        _stepsText = State(initialValue: (prefill?.steps ?? []).joined(separator: "\n"))
+        _cuisine = State(initialValue: prefill?.cuisine ?? "")
+        _meal = State(initialValue: prefill?.meal ?? "other")
+        _time = State(initialValue: prefill?.time ?? "")
+        _tagsText = State(initialValue: (prefill?.tags ?? []).joined(separator: ", "))
+    }
 
     var body: some View {
         NavigationStack {

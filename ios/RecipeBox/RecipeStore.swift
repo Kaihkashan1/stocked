@@ -189,6 +189,18 @@ final class RecipeStore: ObservableObject {
         }
     }
 
+    /// Returns the extraction on success, or an error message on failure.
+    /// Doesn't touch `recipes` — nothing is saved until the user reviews the
+    /// pre-filled Add Recipe form and taps Save.
+    func extractRecipePhoto(_ imageData: Data) async -> (RecipeExtraction?, String?) {
+        do {
+            let extraction = try await APIClient(baseURLString: serverURL).extractPhoto(imageData: imageData, secret: serverSecret)
+            return (extraction, nil)
+        } catch {
+            return (nil, error.localizedDescription)
+        }
+    }
+
     /// Returns an error message on failure, nil on success. Not optimistic —
     /// there's no local id to assign until the server hands back the row
     /// number, so the new recipe only appears once it's actually saved.

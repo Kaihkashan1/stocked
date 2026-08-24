@@ -3,17 +3,21 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from google.genai.errors import APIError as GeminiAPIError
 
 from app.auth import require_secret
 from app.config import ROOT, settings
+from app.extract import extract_recipe
 from app.match import STAPLES, grouped_pantry
-from app.models import PlanUpdate, RecipeCreate, RecipeUpdate
+from app.models import FetchedPost, PlanUpdate, RecipeCreate, RecipeUpdate
 from app.pipeline import jobs, process_recipe
 from app.store import (
     create_recipe,
@@ -98,6 +102,56 @@ async def api_create_recipe(body: RecipeCreate):
     if not created:
         raise HTTPException(status_code=500, detail="Could not save recipe")
     return _public(created)
+
+
+MAX_PHOTO_BYTES = 4 * 1024 * 1024  # Vercel's request body limit is ~4.5MB; stay under it.
+
+
+@app.post("/api/extract-photo", dependencies=[Depends(require_secret)])
+async def api_extract_photo(photo: UploadFile = File(...)):
+    """Reads a recipe out of a photo (a card, a cookbook page, a screenshot —
+    Gemini isn't picky) via the same vision extraction used for a
+    video/thumbnail capture. Doesn't save anything — the app pre-fills the
+    manual Add Recipe form with the result so the user reviews/edits before
+    committing, since a single still photo has no caption text to fall back
+    on and is more error-prone than a normal capture."""
+    content = await photo.read()
+    if len(content) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=413, detail="That photo is too large. Please use a smaller image.")
+
+    suffix = Path(photo.filename or "").suffix or ".jpg"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = Path(tmp.name)
+
+    try:
+        post = FetchedPost(url="", caption="", video_path=None, thumbnail_path=str(tmp_path))
+        try:
+            recipe = extract_recipe(post)
+        except GeminiAPIError as exc:
+            if exc.code == 429:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Gemini's free daily quota (20 requests/day) is used up. Try again after it resets — usually around midnight Pacific time.",
+                ) from exc
+            raise HTTPException(status_code=502, detail=f"Gemini error: {exc.message or exc}") from exc
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    ingredients = [
+        " ".join(part for part in (item.quantity, item.unit, item.item) if part).strip() for item in recipe.ingredients
+    ]
+    return {
+        "title": recipe.title,
+        "servings": recipe.servings,
+        "ingredients": ingredients,
+        "steps": recipe.steps,
+        "cuisine": recipe.cuisine,
+        "meal": recipe.meal,
+        "time": recipe.time,
+        "tags": recipe.tags,
+        "confidence": recipe.confidence,
+    }
 
 
 @app.patch("/api/recipes/{row_id}", dependencies=[Depends(require_secret)])

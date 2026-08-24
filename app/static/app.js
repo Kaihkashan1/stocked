@@ -65,6 +65,8 @@ const els = {
   planBadge: document.getElementById("plan-badge"),
   settingsBtn: document.getElementById("settings-btn"),
   addRecipeBtn: document.getElementById("add-recipe-btn"),
+  addRecipeMenu: document.getElementById("add-recipe-menu"),
+  photoInput: document.getElementById("photo-input"),
   tabs: document.querySelectorAll(".tab"),
 };
 
@@ -609,11 +611,77 @@ function openRecipe(id) {
   els.drawer.hidden = false;
 }
 
-function openAddRecipe() {
+// Downscales to at most maxDimension on the longest side and re-encodes as
+// JPEG — a recipe card/cookbook page stays perfectly legible to Gemini at
+// this size, and it keeps the upload well under Vercel's request body limit.
+function resizeImageFile(file, maxDimension = 1600, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const longest = Math.max(img.width, img.height);
+      const scale = longest > maxDimension ? maxDimension / longest : 1;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Could not process that photo."));
+      }, "image/jpeg", quality);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read that photo."));
+    };
+    img.src = url;
+  });
+}
+
+function showPhotoLoading(show) {
+  let overlay = document.getElementById("photo-loading-overlay");
+  if (show) {
+    if (overlay) return;
+    overlay = document.createElement("div");
+    overlay.id = "photo-loading-overlay";
+    overlay.className = "photo-loading-overlay";
+    overlay.innerHTML = `<div class="photo-loading-box"><div class="spinner"></div><span>Reading the recipe…</span></div>`;
+    document.body.appendChild(overlay);
+  } else if (overlay) {
+    overlay.remove();
+  }
+}
+
+async function handlePhotoSelected(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  showPhotoLoading(true);
+  try {
+    const blob = await resizeImageFile(file);
+    const formData = new FormData();
+    formData.append("photo", blob, "photo.jpg");
+    const response = await fetch("/api/extract-photo", {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData,
+    });
+    if (!response.ok) throw await errorForResponse(response);
+    const extraction = await response.json();
+    openAddRecipe(extraction);
+  } catch (err) {
+    window.alert(`Couldn't read that photo: ${err.message}`);
+  } finally {
+    showPhotoLoading(false);
+  }
+}
+
+function openAddRecipe(prefill) {
   state.openRecipeId = null;
   state.editingId = null;
   state.addingRecipe = true;
-  els.detail.innerHTML = addRecipeFormHtml();
+  els.detail.innerHTML = addRecipeFormHtml(prefill || null);
   els.drawer.hidden = false;
 }
 
@@ -719,14 +787,18 @@ function editFormHtml(recipe) {
     </div>`;
 }
 
-function addRecipeFormHtml() {
+function addRecipeFormHtml(prefill) {
   const cuisines = unique(state.recipes.map((recipe) => recipe.cuisine));
+  const mealValue = prefill?.meal || "other";
   const mealOptions = Object.entries(MEAL_LABELS)
-    .map(([value, label]) => `<option value="${escapeAttr(value)}"${value === "other" ? " selected" : ""}>${escapeHtml(label)}</option>`)
+    .map(([value, label]) => `<option value="${escapeAttr(value)}"${value === mealValue ? " selected" : ""}>${escapeHtml(label)}</option>`)
     .join("");
   const cuisineChips = cuisines
     .map((cuisine) => `<button class="pill pill-btn-plain" type="button" data-action="pick-add-cuisine" data-cuisine="${escapeAttr(cuisine)}">${escapeHtml(cuisine)}</button>`)
     .join("");
+  const ingredientsValue = prefill ? prefill.ingredients.join("\n") : "";
+  const stepsValue = prefill ? prefill.steps.join("\n") : "";
+  const tagsValue = prefill ? prefill.tags.join(", ") : "";
 
   return `
     <div class="drawer-actions">
@@ -737,21 +809,22 @@ function addRecipeFormHtml() {
     </div>
     <div class="recipe recipe-body">
       <h2 style="margin-bottom:1.2rem;">Add recipe</h2>
+      ${prefill ? `<p style="margin:-0.8rem 0 1.2rem; color:var(--ink-soft); font-size:0.85rem;">Read from your photo — check it over before saving.</p>` : ""}
       <label class="field">
         <span>Title</span>
-        <input id="add-title" placeholder="Title">
+        <input id="add-title" placeholder="Title" value="${escapeAttr(prefill?.title || "")}">
       </label>
       <label class="field">
         <span>Servings</span>
-        <input id="add-servings" placeholder="e.g. 4">
+        <input id="add-servings" placeholder="e.g. 4" value="${escapeAttr(prefill?.servings || "")}">
       </label>
       <label class="field">
         <span>Ingredients — one per line</span>
-        <textarea id="add-ingredients" rows="8"></textarea>
+        <textarea id="add-ingredients" rows="8">${escapeHtml(ingredientsValue)}</textarea>
       </label>
       <label class="field">
         <span>Steps — one per line</span>
-        <textarea id="add-steps" rows="10"></textarea>
+        <textarea id="add-steps" rows="10">${escapeHtml(stepsValue)}</textarea>
       </label>
       <label class="field">
         <span>Meal</span>
@@ -759,16 +832,16 @@ function addRecipeFormHtml() {
       </label>
       <label class="field">
         <span>Cuisine</span>
-        <input id="add-cuisine" placeholder="e.g. Italian">
+        <input id="add-cuisine" placeholder="e.g. Italian" value="${escapeAttr(prefill?.cuisine || "")}">
       </label>
       ${cuisineChips ? `<div class="chips" style="margin:-0.6rem 0 1.1rem;">${cuisineChips}</div>` : ""}
       <label class="field">
         <span>Time</span>
-        <input id="add-time" placeholder="e.g. 20 min">
+        <input id="add-time" placeholder="e.g. 20 min" value="${escapeAttr(prefill?.time || "")}">
       </label>
       <label class="field">
         <span>Tags — comma separated</span>
-        <input id="add-tags" placeholder="quick, vegetarian">
+        <input id="add-tags" placeholder="quick, vegetarian" value="${escapeAttr(tagsValue)}">
       </label>
       <label class="field">
         <span>Notes</span>
@@ -1026,7 +1099,19 @@ document.addEventListener("keydown", (event) => {
 });
 
 els.settingsBtn.addEventListener("click", openSettings);
-els.addRecipeBtn.addEventListener("click", openAddRecipe);
+els.addRecipeBtn.addEventListener("click", () => {
+  els.addRecipeMenu.hidden = !els.addRecipeMenu.hidden;
+  els.addRecipeBtn.setAttribute("aria-expanded", String(!els.addRecipeMenu.hidden));
+});
+
+document.addEventListener("click", (event) => {
+  if (els.addRecipeMenu.hidden) return;
+  if (els.addRecipeMenu.contains(event.target) || els.addRecipeBtn.contains(event.target)) return;
+  els.addRecipeMenu.hidden = true;
+  els.addRecipeBtn.setAttribute("aria-expanded", "false");
+});
+
+els.photoInput.addEventListener("change", handlePhotoSelected);
 
 els.tabs.forEach((btn) => {
   btn.addEventListener("click", () => setTab(btn.dataset.tab));
@@ -1102,6 +1187,15 @@ document.addEventListener("click", (event) => {
     case "clear-plan":
       state.checkedItems.clear();
       clearPlan();
+      break;
+    case "open-add-recipe":
+      els.addRecipeMenu.hidden = true;
+      openAddRecipe();
+      break;
+    case "open-add-photo":
+      els.addRecipeMenu.hidden = true;
+      els.photoInput.value = "";
+      els.photoInput.click();
       break;
     default:
       break;
