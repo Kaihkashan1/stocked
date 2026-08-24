@@ -113,9 +113,6 @@ struct RecipeDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 hero(for: recipe)
                 VStack(alignment: .leading, spacing: 22) {
-                    if !recipe.tags.isEmpty {
-                        tags(for: recipe)
-                    }
                     if !recipe.steps.isEmpty {
                         cookButton
                     }
@@ -127,6 +124,9 @@ struct RecipeDetailView: View {
                     }
                     if !recipe.notes.isEmpty {
                         notesSection(for: recipe)
+                    }
+                    if !recipe.tags.isEmpty {
+                        tags(for: recipe)
                     }
                 }
                 .padding(20)

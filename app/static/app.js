@@ -824,12 +824,12 @@ function recipeHtml(recipe) {
       <h2 id="recipe-title">${escapeHtml(recipe.title)}</h2>
     </div>
     <div class="recipe recipe-body">
-      <div class="meta">${tags}</div>
       <h3>Ingredients</h3>
       <ul class="ingredients">${ingredients || "<li>None listed</li>"}</ul>
       <h3>Steps</h3>
       <ol class="steps">${steps || "<li>None listed</li>"}</ol>
       ${notesSection}
+      ${tags ? `<div class="meta">${tags}</div>` : ""}
     </div>`;
 }
 

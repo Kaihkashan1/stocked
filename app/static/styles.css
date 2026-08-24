@@ -527,7 +527,7 @@ button { font-family: inherit; }
 
 .recipe-body { padding: 1.6rem 1.4rem 3rem; }
 
-.recipe-body .meta { margin-bottom: 1.8rem; }
+.recipe-body .meta { margin-top: 1.8rem; }
 
 .recipe h3 {
   font-size: 1.25rem;
