@@ -75,6 +75,48 @@ struct APIClient {
         return try Self.decoder.decode(RecipesResponse.self, from: data)
     }
 
+    /// Reads a recipe out of a photo (card, cookbook page, screenshot — a
+    /// real Gemini vision call). Nothing is saved server-side; the result
+    /// pre-fills the Add Recipe form for review.
+    func extractPhoto(imageData: Data, secret: String) async throws -> RecipeExtraction {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/extract-photo", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"photo\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(RecipeExtraction.self, from: data)
+    }
+
     /// Saves a recipe typed straight into the app — no capture pipeline.
     func createRecipe(_ draft: RecipeCreate, secret: String) async throws -> Recipe {
         guard let base = URL(string: trimmedBase),

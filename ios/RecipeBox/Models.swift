@@ -165,6 +165,23 @@ struct RecipePatch: Encodable {
     var notes: String?
 }
 
+/// What POST /api/extract-photo hands back after reading a recipe out of a
+/// photo — not saved yet. The app pre-fills AddRecipeView with this so the
+/// user can review/fix it before it's actually created, since a single
+/// still photo (no caption text to fall back on) is more error-prone than
+/// a normal capture.
+struct RecipeExtraction: Decodable {
+    let title: String
+    let servings: String?
+    let ingredients: [String]
+    let steps: [String]
+    let cuisine: String
+    let meal: String
+    let time: String?
+    let tags: [String]
+    let confidence: String
+}
+
 /// A recipe typed straight into the app, sent to POST /api/recipes.
 /// Unlike RecipePatch every field is required — there's no existing row
 /// to fall back on.
