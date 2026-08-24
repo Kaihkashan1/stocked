@@ -663,35 +663,6 @@ ol.steps li {
   cursor: pointer;
 }
 
-.pantry-add {
-  display: flex;
-  gap: 0.6rem;
-  margin-bottom: 1rem;
-}
-
-.pantry-add input {
-  flex: 1;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink);
-  border-radius: 8px;
-  padding: 0.55rem 0.75rem;
-  font: inherit;
-  font-size: 0.9rem;
-}
-
-.pantry-add button {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-radius: 8px;
-  padding: 0.55rem 1.1rem;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
 
 .photo-loading-overlay {
   position: fixed;

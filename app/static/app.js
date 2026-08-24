@@ -58,8 +58,6 @@ const els = {
   recipesView: document.getElementById("recipes-view"),
   pantryView: document.getElementById("pantry-view"),
   pantryBadge: document.getElementById("pantry-badge"),
-  pantryAddInput: document.getElementById("pantry-add-input"),
-  pantryAddBtn: document.getElementById("pantry-add-btn"),
   pantrySelected: document.getElementById("pantry-selected"),
   pantrySearch: document.getElementById("pantry-search"),
   pantryOptions: document.getElementById("pantry-options"),
@@ -280,26 +278,41 @@ function renderPantryBadge() {
 // browsable/searchable catalog) without touching the two static text
 // inputs — replacing those on every keystroke would wipe whatever the user
 // is mid-typing.
+// True once you've typed something that doesn't already exactly match a
+// catalog ingredient or an existing "have" item — that's when "+ Add" is a
+// real option rather than a no-op duplicate of selecting an existing chip.
+function canAddTypedPantryItem(trimmedNeedle) {
+  if (!trimmedNeedle) return false;
+  const lower = trimmedNeedle.toLowerCase();
+  return !pantryCatalog().concat(state.have).some((item) => item.toLowerCase() === lower);
+}
+
 function renderPantryTab() {
   const selected = groupPantry(state.have);
   els.pantrySelected.innerHTML = selected.length
     ? pantryGroupsHtml(selected, true)
     : `<span class="status">Nothing marked yet</span>`;
 
-  // Gated behind actually typing something — as the recipe box grows, the
-  // full catalog is too long to skim, so this is a search box, not a
-  // browsable list.
-  const needle = state.pantryQuery.trim().toLowerCase();
-  if (!needle) {
-    els.pantryOptions.innerHTML = `<span class="status">Type to find an ingredient</span>`;
-  } else {
-    const options = groupPantry(
-      pantryCatalog().filter((item) => !state.have.includes(item) && pantryQueryMatch(item, needle))
-    );
-    els.pantryOptions.innerHTML = options.length
-      ? pantryGroupsHtml(options, false)
-      : `<span class="status">No matching ingredients</span>`;
+  // One box does both jobs: type to filter the catalog down to matching
+  // chips to select, and/or add whatever you typed as a new item if it
+  // isn't already one of them. Gated behind typing at all — as the recipe
+  // box grows, the full catalog is too long to skim as a browsable list.
+  const trimmed = state.pantryQuery.trim();
+  const needle = trimmed.toLowerCase();
+  if (!trimmed) {
+    els.pantryOptions.innerHTML = `<span class="status">Type to add or find an ingredient</span>`;
+    return;
   }
+
+  const matches = pantryCatalog().filter((item) => !state.have.includes(item) && pantryQueryMatch(item, needle));
+  const options = groupPantry(matches);
+  const canAdd = canAddTypedPantryItem(trimmed);
+  const addButton = canAdd
+    ? `<div class="chips" style="margin-top:0.6rem;"><button class="chip active" type="button" data-action="add-pantry-item" data-item="${escapeAttr(trimmed)}">+ Add "${escapeHtml(trimmed)}"</button></div>`
+    : "";
+  const optionsHtml = options.length ? pantryGroupsHtml(options, false) : "";
+  const emptyHtml = !options.length && !canAdd ? `<span class="status">No matching ingredients</span>` : "";
+  els.pantryOptions.innerHTML = optionsHtml + emptyHtml + addButton;
 }
 
 // ---------- tabs ----------
@@ -315,8 +328,12 @@ function setTab(tab) {
 // ---------- filters / recipe grid (existing browse behavior) ----------
 
 function renderFilters() {
-  // Multi-select (AND): a recipe must carry every selected tag.
-  els.tagFilters.innerHTML = RECIPE_TAGS
+  // The fixed six are always offered, even before any recipe carries one,
+  // plus whatever else recipes actually carry — tag entry is free text, so
+  // that "whatever else" can grow. Multi-select (AND): a recipe must carry
+  // every selected tag.
+  const tags = unique([...RECIPE_TAGS, ...state.recipes.flatMap((recipe) => recipe.tags || [])]);
+  els.tagFilters.innerHTML = tags
     .map((tag) => {
       const active = state.tags.has(tag);
       return `<button class="chip${active ? " active" : ""}" type="button" data-action="toggle-tag-filter" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}${active ? " ×" : ""}</button>`;
@@ -704,31 +721,24 @@ function editFormHtml(recipe) {
         <span>Notes</span>
         <textarea id="edit-notes" rows="3">${escapeHtml(recipe.notes || "")}</textarea>
       </label>
-      <div class="field">
-        <span>Tags</span>
-        <input type="hidden" id="edit-tags" value="${escapeAttr(knownTagsOnly(recipe.tags).join(", "))}">
-        <div id="edit-tag-chips" class="chips">${existingTagChips("pick-edit-tag", knownTagsOnly(recipe.tags))}</div>
-      </div>
+      <label class="field">
+        <span>Tags — comma separated</span>
+        <input id="edit-tags" placeholder="quick, mom's recipes" value="${escapeAttr((recipe.tags || []).join(", "))}">
+      </label>
+      <div id="edit-tag-chips" class="chips" style="margin:-0.6rem 0 1.1rem;">${existingTagChips("pick-edit-tag", recipe.tags || [])}</div>
       <p id="edit-error" class="edit-error" hidden></p>
       <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">Save</button>
     </div>`;
 }
 
-// The fixed tag vocabulary, as quick-pick chips, when adding or editing a
-// recipe — tapping is the only way to set a tag; there's no free-text entry.
+// The fixed six as quick-pick chips, when adding or editing a recipe — tap
+// one to toggle it in the tags field. The field itself is still free text,
+// so anything else can be typed in too.
 function existingTagChips(action, selectedTags) {
   return RECIPE_TAGS.map((tag) => {
     const active = selectedTags.some((selected) => selected.toLowerCase() === tag.toLowerCase());
     return `<button class="pill pill-btn-plain${active ? " active" : ""}" type="button" data-action="${action}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`;
   }).join("");
-}
-
-// Keeps only tags within the fixed vocabulary — legacy free-form tags from
-// before this limit (or from an old Gemini extraction) quietly drop off the
-// next time a recipe is saved through the form, rather than being carried
-// forward indefinitely.
-function knownTagsOnly(tags) {
-  return (tags || []).filter((tag) => RECIPE_TAGS.some((known) => known.toLowerCase() === tag.toLowerCase()));
 }
 
 function toggleTagInInput(inputEl, tag) {
@@ -746,7 +756,7 @@ function addRecipeFormHtml(prefill) {
     .join("");
   const ingredientsValue = prefill ? prefill.ingredients.join("\n") : "";
   const stepsValue = prefill ? prefill.steps.join("\n") : "";
-  const prefillTags = prefill ? knownTagsOnly(prefill.tags) : [];
+  const prefillTags = prefill ? prefill.tags : [];
 
   return `
     <div class="drawer-actions">
@@ -783,11 +793,11 @@ function addRecipeFormHtml(prefill) {
         <span>Time</span>
         <input id="add-time" placeholder="e.g. 20 min" value="${escapeAttr(prefill?.time || "")}">
       </label>
-      <div class="field">
-        <span>Tags</span>
-        <input type="hidden" id="add-tags" value="${escapeAttr(prefillTags.join(", "))}">
-        <div id="add-tag-chips" class="chips">${existingTagChips("pick-add-tag", prefillTags)}</div>
-      </div>
+      <label class="field">
+        <span>Tags — comma separated</span>
+        <input id="add-tags" placeholder="quick, mom's recipes" value="${escapeAttr(prefillTags.join(", "))}">
+      </label>
+      <div id="add-tag-chips" class="chips" style="margin:-0.6rem 0 1.1rem;">${existingTagChips("pick-add-tag", prefillTags)}</div>
       <label class="field">
         <span>Notes</span>
         <textarea id="add-notes" rows="3"></textarea>
@@ -995,16 +1005,16 @@ els.pantrySearch.addEventListener("input", () => {
   renderPantryTab();
 });
 
-els.pantryAddBtn.addEventListener("click", () => {
-  addHaveItem(els.pantryAddInput.value);
-  els.pantryAddInput.value = "";
-  els.pantryAddInput.focus();
-});
-
-els.pantryAddInput.addEventListener("keydown", (event) => {
+// Enter submits the typed text as a new item, same as tapping "+ Add" —
+// but only when it isn't just re-adding something already selectable.
+els.pantrySearch.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
-  addHaveItem(els.pantryAddInput.value);
-  els.pantryAddInput.value = "";
+  const trimmed = els.pantrySearch.value.trim();
+  if (!canAddTypedPantryItem(trimmed)) return;
+  addHaveItem(trimmed);
+  state.pantryQuery = "";
+  els.pantrySearch.value = "";
+  renderPantryTab();
 });
 
 els.favoritesToggle.addEventListener("click", () => {
@@ -1116,6 +1126,12 @@ document.addEventListener("click", (event) => {
       renderGrid();
       break;
     }
+    case "add-pantry-item":
+      addHaveItem(actionEl.dataset.item);
+      state.pantryQuery = "";
+      els.pantrySearch.value = "";
+      renderPantryTab();
+      break;
     case "start-edit":
       startEdit(id);
       break;

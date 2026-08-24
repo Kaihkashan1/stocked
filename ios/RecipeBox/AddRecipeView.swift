@@ -18,6 +18,7 @@ struct AddRecipeView: View {
     @State private var meal: String
     @State private var time: String
     @State private var selectedTags: Set<String>
+    @State private var newTag = ""
     @State private var notes = ""
     @State private var saving = false
     @State private var errorMessage: String?
@@ -42,8 +43,7 @@ struct AddRecipeView: View {
         _cuisine = State(initialValue: prefill?.cuisine ?? "")
         _meal = State(initialValue: prefill?.meal ?? "other")
         _time = State(initialValue: prefill?.time ?? "")
-        let known = (prefill?.tags ?? []).filter { tag in recipeTags.contains { $0.caseInsensitiveCompare(tag) == .orderedSame } }
-        _selectedTags = State(initialValue: Set(known))
+        _selectedTags = State(initialValue: Set(prefill?.tags ?? []))
     }
 
     var body: some View {
@@ -86,14 +86,25 @@ struct AddRecipeView: View {
                 }
                 Section {
                     FilterWrap(items: recipeTags, selected: selectedTags) { tag in
-                        if selectedTags.contains(tag) {
-                            selectedTags.remove(tag)
-                        } else {
-                            selectedTags.insert(tag)
+                        toggleTag(tag)
+                    }
+                    let custom = selectedTags.subtracting(recipeTags).sorted()
+                    if !custom.isEmpty {
+                        FilterWrap(items: custom, selected: selectedTags) { tag in
+                            toggleTag(tag)
                         }
+                    }
+                    HStack {
+                        TextField("Add a custom tag", text: $newTag)
+                            .textInputAutocapitalization(.never)
+                            .onSubmit(addCustomTag)
+                        Button("Add", action: addCustomTag)
+                            .disabled(newTag.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 } header: {
                     Text("Tags")
+                } footer: {
+                    Text("Tap a preset above, or type your own.")
                 }
                 Section("Notes") {
                     TextEditor(text: $notes)
@@ -155,5 +166,20 @@ struct AddRecipeView: View {
             .split(separator: "\n", omittingEmptySubsequences: true)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+    }
+
+    private func toggleTag(_ tag: String) {
+        if selectedTags.contains(tag) {
+            selectedTags.remove(tag)
+        } else {
+            selectedTags.insert(tag)
+        }
+    }
+
+    private func addCustomTag() {
+        let trimmed = newTag.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        selectedTags.insert(trimmed)
+        newTag = ""
     }
 }
