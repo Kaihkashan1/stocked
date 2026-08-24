@@ -487,18 +487,22 @@ function renderPlan() {
         <h2>Grocery list</h2>
         <button class="link-btn" type="button" data-action="clear-plan">Clear plan</button>
       </div>
+      <p class="eyebrow" style="margin-bottom:0.8rem;">Everything needed for your planned recipes — skips anything marked as "What I have" on the Recipes tab.</p>
       ${omittedNote}
       <div class="grocery-groups">${groups}</div>
     </section>`;
   }
 
+  // Always shown, even empty — otherwise an empty match list reads as "this
+  // feature doesn't exist" rather than "nothing qualifies yet".
   const bonus = alsoMakeable(planned);
-  const bonusSection = bonus.length
-    ? `
+  const bonusSection = `
     <section>
       <h2>You could also make</h2>
       <p class="eyebrow" style="margin-bottom:0.8rem;">Fully covered by what you have, your shopping list, and everything already needed for planned recipes.</p>
-      <div class="plan-rows">
+      ${
+        bonus.length
+          ? `<div class="plan-rows">
         ${bonus
           .map(
             (recipe) => `
@@ -507,11 +511,16 @@ function renderPlan() {
           </div>`
           )
           .join("")}
-      </div>
-    </section>`
-    : "";
+      </div>`
+          : `<div class="empty">Nothing yet — mark ingredients as "What I have" on the Recipes tab, or tap items in the shopping list below, and matches will show up here.</div>`
+      }
+    </section>`;
 
-  els.planContent.innerHTML = `${plannedSection}${shoppingSection}${groceryListSection}${bonusSection}`;
+  // Grocery list right after Planned — it's the actionable thing you came
+  // for. The shopping-list catalog (everything across every recipe) is a
+  // much bigger, browsier list, so it comes after rather than pushing the
+  // actual grocery list below the fold.
+  els.planContent.innerHTML = `${plannedSection}${groceryListSection}${shoppingSection}${bonusSection}`;
 }
 
 function capitalize(value) {
