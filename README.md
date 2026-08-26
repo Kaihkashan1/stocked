@@ -78,8 +78,10 @@ In `.env`:
 
 1. Create a free Apify account at [apify.com](https://apify.com) — no credit card required. The free plan includes $5/month of usage; a single post/reel fetch through `apidojo/instagram-scraper-api` costs about $0.005, so personal use won't come close to that (that actor's own free tier is capped at 5 runs/month regardless — upgrading past that is optional and your choice, never automatic).
 2. Find your API token in Apify Console → **Settings → API & Integrations**.
-3. Set `APIFY_API_TOKEN` in `.env` to that token. Leave `APIFY_INSTAGRAM_ACTOR` at its default unless you want to try a different actor from the Apify Store.
+3. Set `APIFY_API_TOKEN` in `.env` to that token. Leave `APIFY_INSTAGRAM_ACTOR`/`APIFY_COMMENTS_ACTOR` at their defaults unless you want to try different actors from the Apify Store.
 4. No card, no automatic charges: the free plan can't spend past its $5/month credit — it just blocks further runs until the next cycle, never bills you.
+
+Some recipe accounts post the actual ingredients/steps as a follow-up comment rather than putting them in the caption. When Apify fetching is on, the app also pulls that post's top comments (15/post free via `apidojo/instagram-comments-scraper-api`) and folds in the post owner's own comment — the likely recipe continuation — into what Gemini reads, falling back to the first couple of comments chronologically if the owner didn't comment. This is best-effort: any problem fetching comments is silently skipped rather than failing the save, since it's extra context, not a requirement. It's also **skipped entirely when running on Vercel** — the main post fetch alone has been observed taking the full 60 seconds on its own, which is `/ingest`'s whole function budget there (see below), so a second sequential call has no safe room left. It only runs locally / in a background task, where nothing enforces that ceiling.
 
 ### Option B — Instagram cookies (fallback; uses your real login session)
 

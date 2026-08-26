@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # is an opt-in swap, not a hard requirement. See README for setup.
     apify_api_token: str = ""
     apify_instagram_actor: str = "apidojo~instagram-scraper-api"
+    # Best-effort extra context: many recipe accounts post the actual
+    # ingredients/steps as a follow-up comment rather than in the caption.
+    apify_comments_actor: str = "apidojo~instagram-comments-scraper-api"
 
     def has_service_account(self) -> bool:
         return bool(self.google_service_account_json.strip()) or self.google_service_account_file.exists()

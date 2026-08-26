@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from html.parser import HTMLParser
 from pathlib import Path
@@ -163,6 +164,59 @@ def _looks_like_apify_limit(text: str) -> bool:
     return any(marker in lowered for marker in _APIFY_LIMIT_MARKERS)
 
 
+def _fetch_instagram_comments(url: str, token: str, owner_username: str, max_items: int = 15) -> str:
+    """Best-effort extra context: some recipe accounts post the actual
+    ingredients/steps as a follow-up comment rather than in the caption.
+    Fetches top-level comments (15/post is free) via a companion Apify
+    actor, prefers the post owner's own comments — the likely recipe
+    continuation — over an early commenter's "😍", falling back to the
+    first couple of comments chronologically if the owner didn't comment.
+
+    Never raises and never counts as a hard failure: this is a nice-to-have
+    on top of the caption, not something worth failing the whole save over,
+    so any problem here (including hitting this actor's own usage limit)
+    is just logged and skipped rather than surfaced like the main post
+    fetch's ApifyLimitError.
+
+    Kept on a short timeout deliberately: this is a second sequential,
+    community-actor call (observed taking anywhere from ~15s to a full
+    timeout) stacked on top of the main post fetch, and /ingest has a hard
+    60s ceiling on Vercel — this must not be the thing that blows that
+    budget, even at the cost of sometimes missing a slow comment fetch.
+    """
+    # Wrapped as one broad try/except — this is a nice-to-have side channel,
+    # so any surprise here (network, bad JSON, unexpected field shapes from
+    # an unofficial actor) should degrade to "no extra context", never
+    # bubble up and fail the save.
+    try:
+        response = httpx.post(
+            f"{APIFY_API_BASE}/acts/{settings.apify_comments_actor}/run-sync-get-dataset-items",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"startUrls": [url], "fetchReplies": False, "maxItems": max_items},
+            timeout=25,
+        )
+        response.raise_for_status()
+        items = response.json()
+        if not isinstance(items, list):
+            return ""
+
+        comments = [item for item in items if isinstance(item, dict) and item.get("type") == "comment" and item.get("message")]
+        if not comments:
+            return ""
+        comments.sort(key=lambda c: c.get("createdAt") or "")
+
+        owner_lower = owner_username.lower()
+        from_owner = [c for c in comments if ((c.get("user") or {}).get("username") or "").lower() == owner_lower]
+        chosen = from_owner or comments[:2]
+
+        return "\n\n".join(
+            f"Comment by @{(c.get('user') or {}).get('username') or 'unknown'}: {c['message']}" for c in chosen[:5]
+        )
+    except Exception as exc:
+        logger.info("Skipping comments for %s: %s", url, exc)
+        return ""
+
+
 def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
     """Caption + media for a single Instagram post/reel via a paid Apify
     actor instead of yt-dlp + personal cookies — no Instagram login involved
@@ -213,6 +267,17 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
 
     caption = (item.get("caption") or "").strip()
     media_id = str(item.get("id") or item.get("code") or "")
+    owner_username = (item.get("owner") or {}).get("username", "")
+
+    # Skipped entirely on Vercel: the main post fetch alone has been
+    # observed taking the full 60s a couple of times, which is /ingest's
+    # whole function budget there — a second sequential call has no safe
+    # room left, not even on a short timeout. Fine locally / in a
+    # background task, where nothing enforces that ceiling.
+    if not os.environ.get("VERCEL"):
+        comments_text = _fetch_instagram_comments(url, token, owner_username)
+        if comments_text:
+            caption = f"{caption}\n\n{comments_text}".strip()
 
     video_url = None
     video = item.get("video")
