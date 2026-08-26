@@ -67,20 +67,30 @@ The first save creates the header row: Title, Servings, Ingredients, Steps, Sour
 
 If you skip that last share step, every save will fail with “Spreadsheet not found.”
 
-## 4. Shared secret and Instagram cookies
+## 4. Shared secret and Instagram fetching
 
 In `.env`:
 
 - Set `RECIPE_BOX_SECRET` to any random string. The iPhone Shortcut will send it as a header so random LAN traffic can’t ingest into your sheet. Leave `change-me` only while you are testing with curl.
-- Point `YTDLP_COOKIES_FILE` at `./instagram_cookies.txt`. Instagram usually blocks anonymous downloads. Export **only** `instagram.com` cookies into that file so the app never reads your Safari cookie jar.
+- For Instagram links, pick **one** of the two setups below. Apify is recommended — it never touches your Instagram account, so there's no risk of it being flagged or restricted for automated behavior. Cookies are the fallback used automatically if `APIFY_API_TOKEN` is unset or the Apify call fails.
 
-### Export Instagram-only cookies
+### Option A — Apify (recommended, no Instagram login involved)
+
+1. Create a free Apify account at [apify.com](https://apify.com) — no credit card required. The free plan includes $5/month of usage; a single post/reel fetch through `apidojo/instagram-scraper-api` costs about $0.005, so personal use won't come close to that (that actor's own free tier is capped at 5 runs/month regardless — upgrading past that is optional and your choice, never automatic).
+2. Find your API token in Apify Console → **Settings → API & Integrations**.
+3. Set `APIFY_API_TOKEN` in `.env` to that token. Leave `APIFY_INSTAGRAM_ACTOR` at its default unless you want to try a different actor from the Apify Store.
+4. No card, no automatic charges: the free plan can't spend past its $5/month credit — it just blocks further runs until the next cycle, never bills you.
+
+### Option B — Instagram cookies (fallback; uses your real login session)
+
+Only needed if you skip Apify, or want it as a backup. Be aware this authenticates *as you* — Instagram can flag automated cookie-based access as suspicious activity on your account. Consider using a secondary/throwaway Instagram account for this rather than your personal one.
 
 1. Log into Instagram in **Chrome or Firefox** (extensions for this are reliable there; Safari is not).
 2. Install a cookies exporter such as [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) (Chrome) or the Firefox equivalent.
 3. While on `instagram.com`, export cookies. Prefer an option that limits the export to `instagram.com` / `.instagram.com`.
 4. Save the file in this project as `instagram_cookies.txt` (same folder as `README.md`). It should look like a Netscape cookie file (lines with `instagram.com` and tab-separated fields).
 5. This file is a login token. It is gitignored. Don’t share it.
+6. Point `YTDLP_COOKIES_FILE` at `./instagram_cookies.txt` in `.env`.
 
 When Instagram logs you out, export a fresh file and replace this one.
 
@@ -170,7 +180,8 @@ The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in 
    | `GOOGLE_SHEET_ID` | same as `.env` |
    | `GOOGLE_SERVICE_ACCOUNT_JSON` | full contents of `service_account.json` |
    | `RECIPE_BOX_SECRET` | same as `.env` |
-   | `YTDLP_COOKIES` | full contents of `instagram_cookies.txt` (only if you want cloud ingest) |
+   | `APIFY_API_TOKEN` | same as `.env` (recommended over cookies for Instagram) |
+   | `YTDLP_COOKIES` | full contents of `instagram_cookies.txt` (fallback if `APIFY_API_TOKEN` is unset) |
    | `NTFY_TOPIC` | optional |
 
 4. Redeploy after saving env vars. Production is [https://kaihkashan-recipe-box.vercel.app/](https://kaihkashan-recipe-box.vercel.app/).
@@ -182,8 +193,8 @@ Browsing the box works well on Vercel. Ingest has a **60 second** function limit
 - **The app.** Production is `https://kaihkashan-recipe-box.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install the personal iOS app — see [`ios/README.md`](ios/README.md). Google Sheets remains the database.
 - **Duplicates.** The same source URL is not written twice.
 - **Rate limits.** Gemini 429s are retried with backoff.
-- **Sources.** Instagram, YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. `yt-dlp` isn't an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If fetches start failing, update with `pip install -U yt-dlp` and re-export `instagram_cookies.txt`.
-- **Photos** (sharing a picture directly, rather than a link) are not wired yet.
+- **Sources.** Instagram goes through Apify when `APIFY_API_TOKEN` is set (falling back to yt-dlp + cookies otherwise). YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption directly — no login needed for those. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. Neither yt-dlp nor the Apify actor is an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If yt-dlp fetches start failing, update with `pip install -U yt-dlp` and (if still using cookies) re-export `instagram_cookies.txt`.
+- **Photos** (a card, cookbook page, or screenshot) are added via the app's "Add from a photo" flow — reviewed and saved manually, not auto-ingested like a link.
 
 ## Layout
 
