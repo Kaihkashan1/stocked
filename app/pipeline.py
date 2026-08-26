@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app import notify
+from app.errors import friendly_message
 from app.extract import extract_recipe
 from app.fetch import extract_url, fetch_post
 from app.store import save_recipe, source_exists
@@ -43,13 +44,14 @@ def process_recipe(raw_content: str) -> dict:
         }
     except Exception as exc:
         logger.exception("Failed to process recipe")
-        _record(url=url, status="error", error=str(exc))
-        notify.send("Recipe Box failed", str(exc)[:400])
+        message = friendly_message(exc)
+        _record(url=url, status="error", error=message)
+        notify.send("Recipe Box failed", message[:400])
         return {
             "status": "error",
             "url": url,
-            "error": str(exc),
-            "message": str(exc),
+            "error": message,
+            "message": message,
         }
 
 
