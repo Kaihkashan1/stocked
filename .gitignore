@@ -6,7 +6,6 @@ __pycache__/
 .mypy_cache/
 .env
 service_account.json
-instagram_cookies.txt
 *cookies.txt
 credentials/
 downloads/

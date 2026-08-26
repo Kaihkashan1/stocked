@@ -5,7 +5,7 @@ Share a recipe reel, video, or blog link from your iPhone. The hosted backend fe
 This is the free-tier MVP: Google Sheets storage, Vercel in production (optional local Mac for development). Browse at `https://kaihkashan-recipe-box.vercel.app/`, locally at `http://127.0.0.1:8000/`, or in the personal iPhone app in `ios/`.
 
 ```
-iPhone Share → POST /ingest → yt-dlp (or a plain page fetch) → Gemini → Google Sheets
+iPhone Share → POST /ingest → Apify (Instagram) / yt-dlp (YouTube, TikTok, ...) / plain page fetch (everything else) → Gemini → Google Sheets
 ```
 
 ## 1. Install the app
@@ -50,7 +50,7 @@ https://docs.google.com/spreadsheets/d/GOOGLE_SHEET_ID/edit
 
 3. Put that id in `.env` as `GOOGLE_SHEET_ID`.
 
-The first save creates the header row: Title, Servings, Ingredients, Steps, Source, Caption, Confidence, Thumbnail, Saved at.
+The first save creates the header row: Title, Servings, Ingredients, Steps, Source, Caption, Confidence, Thumbnail, Saved at, Cuisine, Meal, Time, Tags, Favorite, Notes.
 
 ### Create a service account
 
@@ -72,29 +72,18 @@ If you skip that last share step, every save will fail with “Spreadsheet not f
 In `.env`:
 
 - Set `RECIPE_BOX_SECRET` to any random string. The iPhone Shortcut will send it as a header so random LAN traffic can’t ingest into your sheet. Leave `change-me` only while you are testing with curl.
-- For Instagram links, pick **one** of the two setups below. Apify is recommended — it never touches your Instagram account, so there's no risk of it being flagged or restricted for automated behavior. Cookies are the fallback used automatically if `APIFY_API_TOKEN` is unset or the Apify call fails.
+- Set up Apify for Instagram links (below). There is no other way to fetch Instagram content in this app — no personal login, no cookies. Without a token, Instagram links will fail with a clear error; every other source (YouTube, TikTok, blog links) works without Apify.
 
-### Option A — Apify (recommended, no Instagram login involved)
+### Apify (required for Instagram — no login involved)
 
-1. Create a free Apify account at [apify.com](https://apify.com) — no credit card required. The free plan includes $5/month of usage; a single post/reel fetch through `apidojo/instagram-scraper-api` costs about $0.005, so personal use won't come close to that (that actor's own free tier is capped at 5 runs/month regardless — upgrading past that is optional and your choice, never automatic).
+1. Create a free Apify account at [apify.com](https://apify.com) — no credit card required.
 2. Find your API token in Apify Console → **Settings → API & Integrations**.
-3. Set `APIFY_API_TOKEN` in `.env` to that token. Leave `APIFY_INSTAGRAM_ACTOR`/`APIFY_COMMENTS_ACTOR` at their defaults unless you want to try different actors from the Apify Store.
-4. No card, no automatic charges: the free plan can't spend past its $5/month credit — it just blocks further runs until the next cycle, never bills you.
+3. Set `APIFY_API_TOKEN` in `.env` to that token. Leave `APIFY_INSTAGRAM_ACTOR` at its default (`apify~instagram-post-scraper`) unless you want to try a different one from the Apify Store.
+4. No card, no automatic charges: the free plan gives $5/month of usage and can't spend past it — it just blocks further runs until the next cycle, never bills you.
 
-Some recipe accounts post the actual ingredients/steps as a follow-up comment rather than putting them in the caption. When Apify fetching is on, the app also pulls that post's top comments (15/post free via `apidojo/instagram-comments-scraper-api`) and folds in the post owner's own comment — the likely recipe continuation — into what Gemini reads, falling back to the first couple of comments chronologically if the owner didn't comment. This is best-effort: any problem fetching comments is silently skipped rather than failing the save, since it's extra context, not a requirement. It's also **skipped entirely when running on Vercel** — the main post fetch alone has been observed taking the full 60 seconds on its own, which is `/ingest`'s whole function budget there (see below), so a second sequential call has no safe room left. It only runs locally / in a background task, where nothing enforces that ceiling.
+**Which actor, and why**: this uses Apify's own officially-maintained `apify/instagram-post-scraper` — not a third-party community actor. That choice matters in practice: several community actors from the same developer (e.g. `apidojo/instagram-scraper-api`) impose their own extra "free users: 5 runs/month" throttle *on top of* Apify's platform billing, which would cap you at ~5 Instagram saves a month regardless of how much of your $5 credit is left. The official actor used here has no such throttle, a much larger track record (100K+ users vs. low thousands), and costs less per post (~$0.001 vs ~$0.005) — the real ceiling is just Apify's $5/month credit, which at this actor's pricing is roughly 1,000 saves/month.
 
-### Option B — Instagram cookies (fallback; uses your real login session)
-
-Only needed if you skip Apify, or want it as a backup. Be aware this authenticates *as you* — Instagram can flag automated cookie-based access as suspicious activity on your account. Consider using a secondary/throwaway Instagram account for this rather than your personal one.
-
-1. Log into Instagram in **Chrome or Firefox** (extensions for this are reliable there; Safari is not).
-2. Install a cookies exporter such as [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) (Chrome) or the Firefox equivalent.
-3. While on `instagram.com`, export cookies. Prefer an option that limits the export to `instagram.com` / `.instagram.com`.
-4. Save the file in this project as `instagram_cookies.txt` (same folder as `README.md`). It should look like a Netscape cookie file (lines with `instagram.com` and tab-separated fields).
-5. This file is a login token. It is gitignored. Don’t share it.
-6. Point `YTDLP_COOKIES_FILE` at `./instagram_cookies.txt` in `.env`.
-
-When Instagram logs you out, export a fresh file and replace this one.
+Some recipe accounts post the actual ingredients/steps as a follow-up comment rather than putting them in the caption. This actor returns a post's first comment and a handful of its most recent comments as part of the same request — no separate call, no extra cost tier to think about — and the app prefers the post owner's own comment among those (the reliable "this is the actual recipe continuation" signal, since an early comment is often just a stray emoji from a random fan) before falling back to the first comment plus a couple of recent ones. This is a heuristic, not a guarantee: on a very popular, older post, the owner's original comment may no longer be among the handful of "latest" ones returned. It's also best-effort in the sense that any problem fetching comments never fails the save — it's extra context on top of the caption, not a requirement.
 
 ## 5. Run
 
@@ -157,6 +146,21 @@ curl -X POST http://127.0.0.1:8000/ingest \
 
 Then `curl http://127.0.0.1:8000/jobs -H "X-Recipe-Box-Key: change-me"` and refresh the Sheet.
 
+### Where errors actually show up
+
+There's no error screen in the app itself for a failed `/ingest` call — the message reaches you through whichever of these you've set up:
+
+- **The Shortcut's own notification** (step 5 above) — an iOS notification banner right after sharing, showing the real message. This is the main channel if you built the Shortcut as described.
+- **ntfy push** (next section) — a second, optional channel, useful as a backup or if you don't want the Shortcut's own notification.
+- **`curl .../jobs`** — a protected debug endpoint showing recent job history; not really "in the app," more a manual check.
+
+If you skip both the Shortcut's notification step and ntfy, a failed save is silent — you'd only notice because the recipe never showed up.
+
+Two specific messages worth knowing about, since both are common on a personal/free setup:
+
+- **"Gemini's free daily quota (20 requests/day) is used up."** — Gemini's free tier caps at 20 requests/day across every save method except manual typing (photos, Instagram, YouTube/TikTok, and blog links all call Gemini; typing a recipe in by hand doesn't). Resets at midnight Pacific.
+- **"Apify's monthly usage limit has been reached."** — your Apify account's $5/month credit is used up. Resets at the start of your next monthly cycle, or upgrade your Apify plan to raise it.
+
 ## 7. Optional: failure pushes
 
 Create a unique topic name at [ntfy.sh](https://ntfy.sh), subscribe in the ntfy iOS app, and set `NTFY_TOPIC` in `.env`. You’ll get a ping when a save fails (or when a duplicate is skipped).
@@ -169,7 +173,7 @@ Short version: open `ios/RecipeBox.xcodeproj` in **Xcode.app**, sign with your P
 
 ## 9. Deploy to Vercel
 
-The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in Vercel env vars — never commit `.env`, `service_account.json`, or `instagram_cookies.txt`.
+The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in Vercel env vars — never commit `.env` or `service_account.json`.
 
 1. Install the [Vercel CLI](https://vercel.com/docs/cli) and log in: `vercel login`
 2. From this folder: `vercel --prod --yes --name recipe-box`
@@ -182,8 +186,7 @@ The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in 
    | `GOOGLE_SHEET_ID` | same as `.env` |
    | `GOOGLE_SERVICE_ACCOUNT_JSON` | full contents of `service_account.json` |
    | `RECIPE_BOX_SECRET` | same as `.env` |
-   | `APIFY_API_TOKEN` | same as `.env` (recommended over cookies for Instagram) |
-   | `YTDLP_COOKIES` | full contents of `instagram_cookies.txt` (fallback if `APIFY_API_TOKEN` is unset) |
+   | `APIFY_API_TOKEN` | same as `.env` — required for Instagram links |
    | `NTFY_TOPIC` | optional |
 
 4. Redeploy after saving env vars. Production is [https://kaihkashan-recipe-box.vercel.app/](https://kaihkashan-recipe-box.vercel.app/).
@@ -194,9 +197,11 @@ Browsing the box works well on Vercel. Ingest has a **60 second** function limit
 
 - **The app.** Production is `https://kaihkashan-recipe-box.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install the personal iOS app — see [`ios/README.md`](ios/README.md). Google Sheets remains the database.
 - **Duplicates.** The same source URL is not written twice.
-- **Rate limits.** Gemini 429s are retried with backoff.
-- **Sources.** Instagram goes through Apify when `APIFY_API_TOKEN` is set (falling back to yt-dlp + cookies otherwise). YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption directly — no login needed for those. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. Neither yt-dlp nor the Apify actor is an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If yt-dlp fetches start failing, update with `pip install -U yt-dlp` and (if still using cookies) re-export `instagram_cookies.txt`.
+- **Rate limits.** Gemini 429s are retried with backoff; a quota exhausted after retries surfaces the friendly message described above rather than a raw error.
+- **Sources.** Instagram goes through Apify — required, no fallback (see section 4). YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption directly — no login needed for those, since they don't require it the way Instagram does. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. Neither yt-dlp nor the Apify actor is an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If yt-dlp fetches start failing (YouTube/TikTok/blog links, not Instagram), update with `pip install -U yt-dlp`.
 - **Photos** (a card, cookbook page, or screenshot) are added via the app's "Add from a photo" flow — reviewed and saved manually, not auto-ingested like a link.
+- **Pantry / What I have.** A separate tab tracks ingredients you have on hand — the Recipes tab automatically sorts by closest fit to what you have, with a "% fit" badge per recipe. Independent of the ingest pipeline described above.
+- **Tags.** A small fixed set (mom's recipes, veg, non-veg, dessert, high protein, airfryer) shown as quick-pick chips when adding/editing a recipe, plus free-text entry for anything else — multi-select filtering on the Recipes tab.
 
 ## Layout
 
@@ -205,7 +210,8 @@ app/
   main.py       FastAPI: app UI, GET /api/recipes, POST /ingest
   static/       Recipe box web app
   pipeline.py   Background job: fetch → extract → save
-  fetch.py      yt-dlp for video sources, plain HTTP + text extraction otherwise
+  fetch.py      Apify for Instagram, yt-dlp for other video sources, plain HTTP + text extraction otherwise
+  errors.py     Shared friendly-error-message mapping (Gemini quota, Apify limit)
   extract.py    Gemini video/image/text → structured JSON
   store.py      Google Sheets append, list, categories
 vercel.json     Vercel function timeout

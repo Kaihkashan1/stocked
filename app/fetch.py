@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 from html.parser import HTMLParser
 from pathlib import Path
@@ -80,27 +79,34 @@ def _ydl_opts(out_dir: Path, download: bool) -> dict:
     }
     if download:
         opts["format"] = "best[ext=mp4][height<=720]/best[height<=720]/best"
-    cookie_file = settings.cookies_file_path()
-    browser = settings.ytdlp_cookies_from_browser.strip().lower()
-    if cookie_file:
-        opts["cookiefile"] = str(cookie_file)
-    elif browser:
-        opts["cookiesfrombrowser"] = (browser,)
     return opts
 
 
 def fetch_post(url: str, out_dir: Path) -> FetchedPost:
     """Download the reel/post/video. Anything yt-dlp doesn't recognize falls
     back to a plain-text article fetch — Gemini can extract a recipe from
-    either a video+caption or plain article text."""
+    either a video+caption or plain article text.
+
+    Instagram is handled entirely separately, through Apify — there is no
+    cookie-based fallback. If Apify isn't configured or the fetch fails,
+    that's a real, visible error rather than a silent degrade, since Apify
+    is now the only way this app fetches Instagram content at all."""
     out_dir.mkdir(parents=True, exist_ok=True)
     url = normalize_url(url)
 
-    if _is_instagram_url(url) and settings.apify_api_token.strip():
+    if _is_instagram_url(url):
+        if not settings.apify_api_token.strip():
+            raise RuntimeError(
+                "Instagram fetching needs an Apify token (APIFY_API_TOKEN) — there's no "
+                "other way to fetch Instagram content in this app. See README."
+            )
         apify_post = _fetch_instagram_via_apify(url, out_dir)
-        if apify_post is not None:
-            return apify_post
-        logger.info("Apify fetch didn't pan out for %s; falling back to yt-dlp", url)
+        if apify_post is None:
+            raise RuntimeError(
+                "Could not fetch that Instagram post via Apify. It may be private, "
+                "deleted, or the actor had a transient failure — try again shortly."
+            )
+        return apify_post
 
     if not _has_dedicated_extractor(url):
         logger.info("No yt-dlp extractor for %s; treating as an article", url)
@@ -144,18 +150,16 @@ def _is_instagram_url(url: str) -> bool:
 
 
 class ApifyLimitError(RuntimeError):
-    """Apify's usage limit was hit — either the account's monthly platform
-    credit or this specific actor's own free-tier run cap. Raised (not
-    swallowed) so it surfaces as a real error instead of silently falling
-    back to Instagram cookies, which would quietly reintroduce the exact
-    account risk this integration exists to avoid."""
+    """Apify's account-wide usage limit (monthly platform credit) was hit.
+    Raised (not swallowed) so it surfaces as a real error instead of
+    silently degrading, since there's no other way to fetch Instagram
+    content in this app."""
 
 
-# Substrings seen in real Apify limit responses (e.g. "Monthly usage hard
-# limit exceeded" — github.com/apify/apify-mcp-server#263) or documented as
-# the platform's own error type ("monthly-usage-hard-limit-exceeded"),
-# plus generic terms for an actor's own self-imposed free-tier cap, which
-# has no standardized wording since each actor author writes its own.
+# Substrings seen in a real reported Apify limit response ("Monthly usage
+# hard limit exceeded" — github.com/apify/apify-mcp-server#263) or
+# documented as the platform's own error type
+# ("monthly-usage-hard-limit-exceeded"), plus generic related wording.
 _APIFY_LIMIT_MARKERS = ("usage hard limit", "usage limit", "monthly usage", "insufficient", "free plan", "free tier")
 
 
@@ -164,79 +168,73 @@ def _looks_like_apify_limit(text: str) -> bool:
     return any(marker in lowered for marker in _APIFY_LIMIT_MARKERS)
 
 
-def _fetch_instagram_comments(url: str, token: str, owner_username: str, max_items: int = 15) -> str:
-    """Best-effort extra context: some recipe accounts post the actual
-    ingredients/steps as a follow-up comment rather than in the caption.
-    Fetches top-level comments (15/post is free) via a companion Apify
-    actor, prefers the post owner's own comments — the likely recipe
-    continuation — over an early commenter's "😍", falling back to the
-    first couple of comments chronologically if the owner didn't comment.
+def _pick_comment_text(item: dict, owner_username: str) -> str:
+    """Some recipe accounts post the actual ingredients/steps as a
+    follow-up comment rather than in the caption. This actor returns
+    `firstComment` (the literal first comment on the post, author unknown)
+    and `latestComments` (a handful of recent ones, each with an owner
+    username) as part of the same post fetch — no separate call needed.
 
-    Never raises and never counts as a hard failure: this is a nice-to-have
-    on top of the caption, not something worth failing the whole save over,
-    so any problem here (including hitting this actor's own usage limit)
-    is just logged and skipped rather than surfaced like the main post
-    fetch's ApifyLimitError.
+    Prefers the post owner's own comment among latestComments — the far
+    more reliable "this is the actual recipe continuation" signal than an
+    early fan's "😍" — falling back to firstComment plus a couple of the
+    most recent comments if the owner isn't among them.
 
-    Kept on a short timeout deliberately: this is a second sequential,
-    community-actor call (observed taking anywhere from ~15s to a full
-    timeout) stacked on top of the main post fetch, and /ingest has a hard
-    60s ceiling on Vercel — this must not be the thing that blows that
-    budget, even at the cost of sometimes missing a slow comment fetch.
+    Heuristic, not a guarantee: latestComments is only "a few" recent
+    comments per the actor's own docs, so on an old, very popular post the
+    owner's original comment may no longer be among the "latest", and
+    firstComment's author is unknown so it might not be the owner either.
     """
-    # Wrapped as one broad try/except — this is a nice-to-have side channel,
-    # so any surprise here (network, bad JSON, unexpected field shapes from
-    # an unofficial actor) should degrade to "no extra context", never
-    # bubble up and fail the save.
-    try:
-        response = httpx.post(
-            f"{APIFY_API_BASE}/acts/{settings.apify_comments_actor}/run-sync-get-dataset-items",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"startUrls": [url], "fetchReplies": False, "maxItems": max_items},
-            timeout=25,
-        )
-        response.raise_for_status()
-        items = response.json()
-        if not isinstance(items, list):
-            return ""
+    latest = item.get("latestComments")
+    latest = latest if isinstance(latest, list) else []
 
-        comments = [item for item in items if isinstance(item, dict) and item.get("type") == "comment" and item.get("message")]
-        if not comments:
-            return ""
-        comments.sort(key=lambda c: c.get("createdAt") or "")
+    owner_lower = (owner_username or "").lower()
+    from_owner = [
+        c for c in latest
+        if isinstance(c, dict) and c.get("text") and (c.get("ownerUsername") or "").lower() == owner_lower
+    ]
+    if from_owner:
+        from_owner.sort(key=lambda c: c.get("timestamp") or "")
+        return "\n\n".join(f"Comment by @{c.get('ownerUsername')}: {c['text']}" for c in from_owner[:3])
 
-        owner_lower = owner_username.lower()
-        from_owner = [c for c in comments if ((c.get("user") or {}).get("username") or "").lower() == owner_lower]
-        chosen = from_owner or comments[:2]
-
-        return "\n\n".join(
-            f"Comment by @{(c.get('user') or {}).get('username') or 'unknown'}: {c['message']}" for c in chosen[:5]
-        )
-    except Exception as exc:
-        logger.info("Skipping comments for %s: %s", url, exc)
-        return ""
+    parts = []
+    first_comment = (item.get("firstComment") or "").strip()
+    if first_comment:
+        parts.append(f"First comment: {first_comment}")
+    for c in latest[:2]:
+        if isinstance(c, dict) and c.get("text"):
+            parts.append(f"Comment by @{c.get('ownerUsername') or 'unknown'}: {c['text']}")
+    return "\n\n".join(parts)
 
 
 def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
-    """Caption + media for a single Instagram post/reel via a paid Apify
-    actor instead of yt-dlp + personal cookies — no Instagram login involved
-    at all, so it carries no risk to any Instagram account. Returns None on
-    an ordinary/transient failure so fetch_post() falls back to the
-    yt-dlp+cookies path; raises ApifyLimitError instead when the failure
-    looks like a usage-limit block, so that one surfaces as a real error
-    rather than a silent, risk-reintroducing fallback.
+    """Caption + media + comments for a single Instagram post/reel via
+    Apify's official instagram-post-scraper actor — no Instagram login
+    involved at all, so it carries no risk to any Instagram account.
+    Returns None on an ordinary/transient failure; raises ApifyLimitError
+    when the failure looks like a usage-limit block, so that surfaces as a
+    real error rather than a silent degrade.
 
-    Schema is per apidojo/instagram-scraper-api's documented output (not
-    guaranteed by any contract — it's an unofficial community actor, same
-    caveat as yt-dlp itself): {"caption": str, "isVideo": bool,
-    "video": {"url": str}, "image"/"displayUrl": str, "id"/"code": str}.
+    Chosen over the community (API Dojo) actors used earlier because this
+    one is officially maintained by Apify, has a much larger track record
+    (122K+ users vs. low thousands), is cheaper per post, and — critically —
+    doesn't impose a "free users: 5 runs/month" throttle the way every
+    API Dojo actor checked did. It also returns comments as part of the
+    same request, so there's no second sequential call and no Vercel
+    60-second-budget tradeoff to design around.
+
+    Schema is per apify/instagram-post-scraper's documented output (not a
+    contractual guarantee — it's a third-party scraper, same caveat as
+    yt-dlp itself): {"caption": str, "videoUrl": str, "images": [str],
+    "ownerUsername": str, "id"/"shortCode": str, "firstComment": str,
+    "latestComments": [{"text": str, "ownerUsername": str, ...}]}.
     """
     token = settings.apify_api_token.strip()
     try:
         response = httpx.post(
             f"{APIFY_API_BASE}/acts/{settings.apify_instagram_actor}/run-sync-get-dataset-items",
             headers={"Authorization": f"Bearer {token}"},
-            json={"startUrls": [url], "maxItems": 1},
+            json={"username": [url], "resultsLimit": 1},
             timeout=60,
         )
         response.raise_for_status()
@@ -245,10 +243,8 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
         body = exc.response.text or ""
         if _looks_like_apify_limit(body):
             raise ApifyLimitError(
-                "Apify's usage limit has been reached (monthly platform credit, or this "
-                "actor's own free-tier run cap). The recipe wasn't fetched. Wait for next "
-                "month's reset, upgrade your Apify plan, or fall back to Instagram cookies "
-                "(see README)."
+                "Apify's monthly usage limit has been reached. The recipe wasn't "
+                "fetched. Wait for next month's reset, or upgrade your Apify plan."
             ) from exc
         logger.warning("Apify Instagram fetch failed for %s: %s", url, body[:300])
         return None
@@ -261,37 +257,25 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
         return None
 
     item = items[0]
-    if item.get("noResults") or item.get("error"):
+    if item.get("error"):
         logger.warning("Apify returned an error item for %s: %s", url, item)
         return None
 
     caption = (item.get("caption") or "").strip()
-    media_id = str(item.get("id") or item.get("code") or "")
-    owner_username = (item.get("owner") or {}).get("username", "")
+    media_id = str(item.get("id") or item.get("shortCode") or "")
+    owner_username = item.get("ownerUsername") or ""
 
-    # Skipped entirely on Vercel: the main post fetch alone has been
-    # observed taking the full 60s a couple of times, which is /ingest's
-    # whole function budget there — a second sequential call has no safe
-    # room left, not even on a short timeout. Fine locally / in a
-    # background task, where nothing enforces that ceiling.
-    if not os.environ.get("VERCEL"):
-        comments_text = _fetch_instagram_comments(url, token, owner_username)
-        if comments_text:
-            caption = f"{caption}\n\n{comments_text}".strip()
+    comments_text = _pick_comment_text(item, owner_username)
+    if comments_text:
+        caption = f"{caption}\n\n{comments_text}".strip()
 
-    video_url = None
-    video = item.get("video")
-    if item.get("isVideo") and isinstance(video, dict):
-        video_url = video.get("url")
-
+    video_url = item.get("videoUrl")
     image_url = None
     if not video_url:
-        image = item.get("image")
-        if isinstance(image, dict):
-            image_url = image.get("url")
-        elif isinstance(image, str):
-            image_url = image
-        image_url = image_url or item.get("displayUrl") or item.get("thumbnailUrl")
+        images = item.get("images")
+        if isinstance(images, list) and images:
+            image_url = images[0]
+        image_url = image_url or item.get("displayUrl")
 
     video_path = _download_apify_media(video_url, out_dir, media_id, video=True) if video_url else None
     thumbnail_path = _download_apify_media(image_url, out_dir, media_id, video=False) if image_url else None
