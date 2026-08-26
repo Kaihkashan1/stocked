@@ -42,12 +42,10 @@ STATIC = ROOT / "app" / "static"
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info(
-        "Recipe Box ready  model=%s  sheet=%s  cookies=%s",
+        "Recipe Box ready  model=%s  sheet=%s  apify=%s",
         settings.gemini_model,
         "yes" if settings.google_sheet_id else "MISSING",
-        settings.ytdlp_cookies_from_browser
-        or settings.ytdlp_cookies_file
-        or ("env" if settings.ytdlp_cookies.strip() else "none"),
+        "yes" if settings.apify_api_token.strip() else "MISSING",
     )
     if not settings.gemini_api_key:
         logger.warning("GEMINI_API_KEY is not set")
