@@ -244,7 +244,9 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
         if _looks_like_apify_limit(body):
             raise ApifyLimitError(
                 "Apify's monthly usage limit has been reached. The recipe wasn't "
-                "fetched. Wait for next month's reset, or upgrade your Apify plan."
+                "fetched. It resets on your personal Apify billing-cycle date (Apify "
+                "Console > Billing > Current period shows exactly when) — not the 1st "
+                "of the calendar month — or you can upgrade your Apify plan sooner."
             ) from exc
         logger.warning("Apify Instagram fetch failed for %s: %s", url, body[:300])
         return None

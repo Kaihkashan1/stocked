@@ -122,18 +122,24 @@ On the iPhone:
      - `X-Recipe-Box-Key` = the same value as `RECIPE_BOX_SECRET`
    - Request Body: JSON
    - Add a field `content` whose value is **Shortcut Input**
-4. Add **Get Dictionary Value**. Key: `status`. Dictionary: **Contents of URL**.
-5. Add **If**. Input: **Dictionary Value**. Condition: **is** `error`.
-   - Inside the If, add **Show Notification**.
-     - Title: `Recipe Box`
-     - Body: **Get Dictionary Value**, key `error`, dictionary **Contents of URL**
-   - Leave **Otherwise** empty so a successful save (or duplicate) is silent.
-6. Tap **i** on the shortcut and turn **off Show When Run**.
-7. In Instagram: Reel → Share → **More** → enable **Save Recipe**.
+   - Tap **Show More** and set **Request Timeout** to `65` — a few seconds past Vercel's own 60s ceiling (below), so this action isn't the thing that cuts the request short.
+4. Add **If**. Input: **Contents of URL**. Condition: **Contains**. Value: `status` (as plain text — this checks the raw response text, not a parsed field).
+   - **This distinguishes a real timeout from everything else**: a genuine response from this app is always JSON with a `status` key, whether it's a success, a duplicate, or a caught error (Gemini quota, Apify limit, anything else `errors.py` handles) — the backend deliberately returns HTTP 200 with `status: "error"` for all of those (see `app/pipeline.py`), specifically so this check can tell them apart from a hard failure. A genuine timeout or network failure means Vercel's platform killed the function before the app ever got to respond, so the reply has no `status` key at all — it's a Vercel-branded error, not this app's JSON.
+   - **Inside the If (has "status" — a real response came back):**
+     - Add **Get Dictionary Value**. Key: `status`. Dictionary: **Contents of URL**.
+     - Add a nested **If**. Input: **Dictionary Value**. Condition: **is** `error`.
+       - Inside: **Show Notification** — Title: `Recipe Box`, Body: **Get Dictionary Value**, key `error`, dictionary **Contents of URL**. This is where the Gemini-quota and Apify-limit messages actually show up — each has distinct wording (see section below), so the notification itself tells you which one it was.
+       - Leave that inner **Otherwise** empty — a successful save or a duplicate stays silent.
+   - **In the outer If's Otherwise (no "status" — the request never got a real response):**
+     - Add **Show Notification** — Title: `Recipe Box`, Body: `Request timed out or failed before the server could respond (Vercel's ingest limit is 60s). The recipe probably wasn't saved — try again in a bit.`
+5. Tap **i** on the shortcut and turn **off Show When Run**.
+6. In Instagram: Reel → Share → **More** → enable **Save Recipe**.
 
-If this shortcut already exists, delete the old always-on **Show Notification**, then add the If above.
+If this shortcut already exists from before, delete the old flat "get status → if error → notify" chain and rebuild it with the outer If above wrapped around it — that outer check is what actually catches a timeout instead of letting it pass silently as if nothing happened, which is what the older version did.
 
-On Vercel the Shortcut waits until the recipe is saved (up to 60 seconds). A timeout still counts as an error. You can fall back to a local Mac ingest URL if that happens.
+I can't see your actual Shortcuts app screen, so if a step doesn't match what you see (Apple does shuffle this UI between iOS versions), tell me exactly what you're looking at and we'll adjust together.
+
+On Vercel the Shortcut waits until the recipe is saved (up to 60 seconds). You can fall back to a local Mac ingest URL if timeouts are a recurring problem.
 
 Test without the phone, from the Mac:
 
@@ -159,7 +165,7 @@ If you skip both the Shortcut's notification step and ntfy, a failed save is sil
 Two specific messages worth knowing about, since both are common on a personal/free setup:
 
 - **"Gemini's free daily quota (20 requests/day) is used up."** — Gemini's free tier caps at 20 requests/day across every save method except manual typing (photos, Instagram, YouTube/TikTok, and blog links all call Gemini; typing a recipe in by hand doesn't). Resets at midnight Pacific.
-- **"Apify's monthly usage limit has been reached."** — your Apify account's $5/month credit is used up. Resets at the start of your next monthly cycle, or upgrade your Apify plan to raise it.
+- **"Apify's monthly usage limit has been reached."** — your Apify account's $5/month credit is used up. This resets on your personal Apify **billing-cycle anniversary** (visible in Apify Console → Billing → Current period) — not the 1st of the calendar month, which is a common mix-up since Apify's own usage charts default to calendar-month view. Or upgrade your Apify plan to raise it sooner.
 
 ## 7. Optional: failure pushes
 
