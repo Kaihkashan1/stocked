@@ -15,6 +15,7 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.auth import require_secret
 from app.config import ROOT, settings
+from app.errors import GEMINI_QUOTA_MESSAGE
 from app.extract import extract_recipe
 from app.match import STAPLES, grouped_pantry
 from app.models import FetchedPost, PantryUpdate, RecipeCreate, RecipeUpdate
@@ -131,10 +132,7 @@ async def api_extract_photo(photo: UploadFile = File(...)):
             recipe = extract_recipe(post)
         except GeminiAPIError as exc:
             if exc.code == 429:
-                raise HTTPException(
-                    status_code=429,
-                    detail="Gemini's free daily quota (20 requests/day) is used up. Try again after it resets — usually around midnight Pacific time.",
-                ) from exc
+                raise HTTPException(status_code=429, detail=GEMINI_QUOTA_MESSAGE) from exc
             raise HTTPException(status_code=502, detail=f"Gemini error: {exc.message or exc}") from exc
     finally:
         tmp_path.unlink(missing_ok=True)

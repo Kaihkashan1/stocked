@@ -142,12 +142,35 @@ def _is_instagram_url(url: str) -> bool:
     return host == "instagram.com" or host.endswith(".instagram.com")
 
 
+class ApifyLimitError(RuntimeError):
+    """Apify's usage limit was hit — either the account's monthly platform
+    credit or this specific actor's own free-tier run cap. Raised (not
+    swallowed) so it surfaces as a real error instead of silently falling
+    back to Instagram cookies, which would quietly reintroduce the exact
+    account risk this integration exists to avoid."""
+
+
+# Substrings seen in real Apify limit responses (e.g. "Monthly usage hard
+# limit exceeded" — github.com/apify/apify-mcp-server#263) or documented as
+# the platform's own error type ("monthly-usage-hard-limit-exceeded"),
+# plus generic terms for an actor's own self-imposed free-tier cap, which
+# has no standardized wording since each actor author writes its own.
+_APIFY_LIMIT_MARKERS = ("usage hard limit", "usage limit", "monthly usage", "insufficient", "free plan", "free tier")
+
+
+def _looks_like_apify_limit(text: str) -> bool:
+    lowered = text.lower()
+    return any(marker in lowered for marker in _APIFY_LIMIT_MARKERS)
+
+
 def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
     """Caption + media for a single Instagram post/reel via a paid Apify
     actor instead of yt-dlp + personal cookies — no Instagram login involved
-    at all, so it carries no risk to any Instagram account. Returns None
-    (never raises) on anything unexpected so fetch_post() falls back to the
-    yt-dlp+cookies path rather than hard-failing the whole save.
+    at all, so it carries no risk to any Instagram account. Returns None on
+    an ordinary/transient failure so fetch_post() falls back to the
+    yt-dlp+cookies path; raises ApifyLimitError instead when the failure
+    looks like a usage-limit block, so that one surfaces as a real error
+    rather than a silent, risk-reintroducing fallback.
 
     Schema is per apidojo/instagram-scraper-api's documented output (not
     guaranteed by any contract — it's an unofficial community actor, same
@@ -158,12 +181,23 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
     try:
         response = httpx.post(
             f"{APIFY_API_BASE}/acts/{settings.apify_instagram_actor}/run-sync-get-dataset-items",
-            params={"token": token},
+            headers={"Authorization": f"Bearer {token}"},
             json={"startUrls": [url], "maxItems": 1},
             timeout=60,
         )
         response.raise_for_status()
         items = response.json()
+    except httpx.HTTPStatusError as exc:
+        body = exc.response.text or ""
+        if _looks_like_apify_limit(body):
+            raise ApifyLimitError(
+                "Apify's usage limit has been reached (monthly platform credit, or this "
+                "actor's own free-tier run cap). The recipe wasn't fetched. Wait for next "
+                "month's reset, upgrade your Apify plan, or fall back to Instagram cookies "
+                "(see README)."
+            ) from exc
+        logger.warning("Apify Instagram fetch failed for %s: %s", url, body[:300])
+        return None
     except (httpx.HTTPError, ValueError) as exc:
         logger.warning("Apify Instagram fetch failed for %s: %s", url, exc)
         return None
