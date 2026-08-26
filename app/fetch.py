@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 ARTICLE_MAX_CHARS = 6000
+APIFY_API_BASE = "https://api.apify.com/v2"
 
 
 def extract_url(text: str) -> str:
@@ -94,6 +95,12 @@ def fetch_post(url: str, out_dir: Path) -> FetchedPost:
     out_dir.mkdir(parents=True, exist_ok=True)
     url = normalize_url(url)
 
+    if _is_instagram_url(url) and settings.apify_api_token.strip():
+        apify_post = _fetch_instagram_via_apify(url, out_dir)
+        if apify_post is not None:
+            return apify_post
+        logger.info("Apify fetch didn't pan out for %s; falling back to yt-dlp", url)
+
     if not _has_dedicated_extractor(url):
         logger.info("No yt-dlp extractor for %s; treating as an article", url)
         return fetch_article(url)
@@ -128,6 +135,94 @@ def fetch_post(url: str, out_dir: Path) -> FetchedPost:
         thumbnail_url=_thumbnail_url(info),
         media_id=str(info.get("id") or ""),
     )
+
+
+def _is_instagram_url(url: str) -> bool:
+    host = urlparse(url).netloc.lower()
+    return host == "instagram.com" or host.endswith(".instagram.com")
+
+
+def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
+    """Caption + media for a single Instagram post/reel via a paid Apify
+    actor instead of yt-dlp + personal cookies — no Instagram login involved
+    at all, so it carries no risk to any Instagram account. Returns None
+    (never raises) on anything unexpected so fetch_post() falls back to the
+    yt-dlp+cookies path rather than hard-failing the whole save.
+
+    Schema is per apidojo/instagram-scraper-api's documented output (not
+    guaranteed by any contract — it's an unofficial community actor, same
+    caveat as yt-dlp itself): {"caption": str, "isVideo": bool,
+    "video": {"url": str}, "image"/"displayUrl": str, "id"/"code": str}.
+    """
+    token = settings.apify_api_token.strip()
+    try:
+        response = httpx.post(
+            f"{APIFY_API_BASE}/acts/{settings.apify_instagram_actor}/run-sync-get-dataset-items",
+            params={"token": token},
+            json={"startUrls": [url], "maxItems": 1},
+            timeout=60,
+        )
+        response.raise_for_status()
+        items = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("Apify Instagram fetch failed for %s: %s", url, exc)
+        return None
+
+    if not items or not isinstance(items, list):
+        logger.warning("Apify returned no results for %s", url)
+        return None
+
+    item = items[0]
+    if item.get("noResults") or item.get("error"):
+        logger.warning("Apify returned an error item for %s: %s", url, item)
+        return None
+
+    caption = (item.get("caption") or "").strip()
+    media_id = str(item.get("id") or item.get("code") or "")
+
+    video_url = None
+    video = item.get("video")
+    if item.get("isVideo") and isinstance(video, dict):
+        video_url = video.get("url")
+
+    image_url = None
+    if not video_url:
+        image = item.get("image")
+        if isinstance(image, dict):
+            image_url = image.get("url")
+        elif isinstance(image, str):
+            image_url = image
+        image_url = image_url or item.get("displayUrl") or item.get("thumbnailUrl")
+
+    video_path = _download_apify_media(video_url, out_dir, media_id, video=True) if video_url else None
+    thumbnail_path = _download_apify_media(image_url, out_dir, media_id, video=False) if image_url else None
+
+    if video_path is None and thumbnail_path is None and not caption:
+        logger.warning("Apify result for %s had no caption or media", url)
+        return None
+
+    return FetchedPost(
+        url=url,
+        caption=caption,
+        video_path=str(video_path) if video_path else None,
+        thumbnail_path=str(thumbnail_path) if thumbnail_path else None,
+        thumbnail_url=image_url,
+        media_id=media_id,
+    )
+
+
+def _download_apify_media(url: str, out_dir: Path, media_id: str, video: bool) -> Path | None:
+    dest = out_dir / f"{media_id or 'apify'}{'.mp4' if video else '.jpg'}"
+    try:
+        with httpx.stream("GET", url, timeout=60, follow_redirects=True) as response:
+            response.raise_for_status()
+            with dest.open("wb") as f:
+                for chunk in response.iter_bytes():
+                    f.write(chunk)
+        return dest
+    except httpx.HTTPError as exc:
+        logger.warning("Could not download Apify media (%s): %s", url, exc)
+        return None
 
 
 def fetch_article(url: str) -> FetchedPost:

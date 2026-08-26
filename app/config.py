@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     ytdlp_cookies_from_browser: str = ""
     ytdlp_cookies_file: str = ""
     ytdlp_cookies: str = ""
+    # Instagram fetches go through this actor (no login, no personal cookies,
+    # no risk to any Instagram account) when a token is set. Falls back to
+    # yt-dlp + cookies below when unset or when the actor call fails, so this
+    # is an opt-in swap, not a hard requirement. See README for setup.
+    apify_api_token: str = ""
+    apify_instagram_actor: str = "apidojo~instagram-scraper-api"
 
     def has_service_account(self) -> bool:
         return bool(self.google_service_account_json.strip()) or self.google_service_account_file.exists()
