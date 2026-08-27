@@ -721,11 +721,11 @@ function editFormHtml(recipe) {
         <span>Notes</span>
         <textarea id="edit-notes" rows="3">${escapeHtml(recipe.notes || "")}</textarea>
       </label>
-      <label class="field">
-        <span>Tags — comma separated</span>
-        <input id="edit-tags" placeholder="quick, mom's recipes" value="${escapeAttr((recipe.tags || []).join(", "))}">
-      </label>
-      <div id="edit-tag-chips" class="chips" style="margin:-0.6rem 0 1.1rem;">${existingTagChips("pick-edit-tag", recipe.tags || [])}</div>
+      <div class="field">
+        <span>Tags</span>
+        <input type="hidden" id="edit-tags" value="${escapeAttr((recipe.tags || []).join(", "))}">
+        <div id="edit-tag-chips" class="chips">${existingTagChips("pick-edit-tag", recipe.tags || [])}</div>
+      </div>
       <p id="edit-error" class="edit-error" hidden></p>
       <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">Save</button>
     </div>`;
@@ -793,11 +793,11 @@ function addRecipeFormHtml(prefill) {
         <span>Time</span>
         <input id="add-time" placeholder="e.g. 20 min" value="${escapeAttr(prefill?.time || "")}">
       </label>
-      <label class="field">
-        <span>Tags — comma separated</span>
-        <input id="add-tags" placeholder="quick, mom's recipes" value="${escapeAttr(prefillTags.join(", "))}">
-      </label>
-      <div id="add-tag-chips" class="chips" style="margin:-0.6rem 0 1.1rem;">${existingTagChips("pick-add-tag", prefillTags)}</div>
+      <div class="field">
+        <span>Tags</span>
+        <input type="hidden" id="add-tags" value="${escapeAttr(prefillTags.join(", "))}">
+        <div id="add-tag-chips" class="chips">${existingTagChips("pick-add-tag", prefillTags)}</div>
+      </div>
       <label class="field">
         <span>Notes</span>
         <textarea id="add-notes" rows="3"></textarea>
