@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from html.parser import HTMLParser
 from pathlib import Path
@@ -168,31 +169,73 @@ def _looks_like_apify_limit(text: str) -> bool:
     return any(marker in lowered for marker in _APIFY_LIMIT_MARKERS)
 
 
-def _pick_comment_text(item: dict, owner_username: str) -> str:
+def _fetch_more_comments(url: str, token: str, max_items: int = 15) -> list[dict]:
+    """Fallback used only when the primary actor's own handful of comments
+    (`firstComment`/`latestComments`) doesn't include the post owner's: a
+    second Apify actor with a dedicated comments-search mode, returning up
+    to 15 comments (free tier) sorted newest first — confirmed via a real
+    case where the owner's actual recipe comment existed on the post but
+    wasn't among the primary actor's own small sample.
+
+    Best-effort — never raises, returns [] on any problem, since this is
+    strictly extra reach for _pick_comment_text, not a requirement.
+
+    Skipped entirely on Vercel: this is a second sequential network call on
+    top of the primary post fetch, and /ingest has a hard 60s function
+    budget there with no safe room left for it (see README).
+    """
+    if os.environ.get("VERCEL"):
+        return []
+    try:
+        response = httpx.post(
+            f"{APIFY_API_BASE}/acts/{settings.apify_comments_actor}/run-sync-get-dataset-items",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"resultsType": "comments", "directUrls": [url], "resultsLimit": max_items},
+            timeout=30,
+        )
+        response.raise_for_status()
+        items = response.json()
+        return [c for c in items if isinstance(c, dict) and c.get("text")] if isinstance(items, list) else []
+    except Exception as exc:
+        logger.info("Extra comments search skipped for %s: %s", url, exc)
+        return []
+
+
+def _pick_comment_text(item: dict, owner_username: str, url: str, token: str) -> str:
     """Some recipe accounts post the actual ingredients/steps as a
-    follow-up comment rather than in the caption. This actor returns
-    `firstComment` (the literal first comment on the post, author unknown)
-    and `latestComments` (a handful of recent ones, each with an owner
-    username) as part of the same post fetch — no separate call needed.
+    follow-up comment rather than in the caption. The primary actor
+    returns `firstComment` (the literal first comment on the post, author
+    unknown) and `latestComments` (a handful of recent ones, each with an
+    owner username) as part of the same post fetch — no separate call
+    needed for the common case.
 
-    Prefers the post owner's own comment among latestComments — the far
-    more reliable "this is the actual recipe continuation" signal than an
-    early fan's "😍" — falling back to firstComment plus a couple of the
-    most recent comments if the owner isn't among them.
-
-    Heuristic, not a guarantee: latestComments is only "a few" recent
-    comments per the actor's own docs, so on an old, very popular post the
-    owner's original comment may no longer be among the "latest", and
-    firstComment's author is unknown so it might not be the owner either.
+    Prefers the post owner's own comment — the far more reliable "this is
+    the actual recipe continuation" signal than an early fan's "😍" —
+    falling back to firstComment plus a couple of the most recent comments
+    if the owner isn't among them. If the owner isn't in that first handful
+    either, searches further via _fetch_more_comments before giving up —
+    the primary actor's "a few" comments genuinely missed a real recipe
+    comment that existed on the post (confirmed manually), so this isn't
+    just theoretical.
     """
     latest = item.get("latestComments")
     latest = latest if isinstance(latest, list) else []
 
     owner_lower = (owner_username or "").lower()
-    from_owner = [
-        c for c in latest
-        if isinstance(c, dict) and c.get("text") and (c.get("ownerUsername") or "").lower() == owner_lower
-    ]
+
+    def owner_comments(pool: list[dict]) -> list[dict]:
+        return [
+            c for c in pool
+            if isinstance(c, dict) and c.get("text") and (c.get("ownerUsername") or "").lower() == owner_lower
+        ]
+
+    from_owner = owner_comments(latest)
+    if not from_owner:
+        extra = _fetch_more_comments(url, token)
+        if extra:
+            latest = extra  # richer pool feeds both the owner search and the chronological fallback below
+            from_owner = owner_comments(latest)
+
     if from_owner:
         from_owner.sort(key=lambda c: c.get("timestamp") or "")
         return "\n\n".join(f"Comment by @{c.get('ownerUsername')}: {c['text']}" for c in from_owner[:3])
@@ -267,7 +310,7 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
     media_id = str(item.get("id") or item.get("shortCode") or "")
     owner_username = item.get("ownerUsername") or ""
 
-    comments_text = _pick_comment_text(item, owner_username)
+    comments_text = _pick_comment_text(item, owner_username, url, token)
     if comments_text:
         caption = f"{caption}\n\n{comments_text}".strip()
 
