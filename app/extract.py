@@ -9,11 +9,19 @@ from google import genai
 from google.genai import types
 
 from app.config import settings
-from app.models import FetchedPost, Recipe, RecipeCategory
+from app.models import RECIPE_TAGS, FetchedPost, Recipe, RecipeCategory
 
 logger = logging.getLogger(__name__)
 
-PROMPT = """Extract exactly one recipe from this saved recipe content.
+# Comma-joined once, reused in both prompts below — kept as a single source
+# (RECIPE_TAGS in app/models.py) rather than duplicated text, since the
+# model layer already enforces this same list regardless of what Gemini
+# picks. Telling Gemini the real list up front means it usually picks
+# something that actually survives that filter, instead of inventing tags
+# that just get silently dropped.
+_TAGS_LIST = ", ".join(f'"{tag}"' for tag in RECIPE_TAGS)
+
+PROMPT = f"""Extract exactly one recipe from this saved recipe content.
 
 If a video and/or image is attached, watch/look at it alongside the text below —
 prefer spoken instructions and on-screen text over the text if they disagree.
@@ -26,29 +34,29 @@ Rules:
 - cuisine: a short regional label such as Indian, Italian, Mexican, East Asian, Middle Eastern, or American. Use Other only if it truly has no regional identity.
 - meal: breakfast, lunch, dinner, snack, dessert, drink, or other.
 - time: total time if mentioned (for example "30 min"), otherwise null.
-- tags: up to 5 short lowercase tags such as vegetarian, vegan, spicy, weeknight, rice, one-pot.
+- tags: choose only from this fixed list, whichever genuinely apply — {_TAGS_LIST}. Do not invent any other tag. Leave it empty if none clearly apply.
 - If this is not a recipe, still return JSON with a short title, empty lists, confidence "low", and meal "other".
 - Return JSON only, matching the schema. No markdown.
 
 TEXT:
-{caption}
+{{caption}}
 """
 
-CATEGORY_PROMPT = """Categorize this saved recipe.
+CATEGORY_PROMPT = f"""Categorize this saved recipe.
 
 cuisine: a short label such as Indian, Italian, Mexican, East Asian, Middle Eastern, American, or Other.
 meal: breakfast, lunch, dinner, snack, dessert, drink, or other.
 time: total time if mentioned, otherwise null.
-tags: up to 5 short lowercase tags (vegetarian, vegan, spicy, weeknight, rice, one-pot, ...).
+tags: choose only from this fixed list, whichever genuinely apply — {_TAGS_LIST}. Do not invent any other tag. Leave it empty if none clearly apply.
 
-TITLE: {title}
-SERVINGS: {servings}
+TITLE: {{title}}
+SERVINGS: {{servings}}
 INGREDIENTS:
-{ingredients}
+{{ingredients}}
 STEPS:
-{steps}
+{{steps}}
 CAPTION:
-{caption}
+{{caption}}
 """
 
 

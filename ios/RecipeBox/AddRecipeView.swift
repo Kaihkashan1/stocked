@@ -18,7 +18,6 @@ struct AddRecipeView: View {
     @State private var meal: String
     @State private var time: String
     @State private var selectedTags: Set<String>
-    @State private var newTag = ""
     @State private var notes = ""
     @State private var saving = false
     @State private var errorMessage: String?
@@ -88,23 +87,10 @@ struct AddRecipeView: View {
                     FilterWrap(items: recipeTags, selected: selectedTags) { tag in
                         toggleTag(tag)
                     }
-                    let custom = selectedTags.subtracting(recipeTags).sorted()
-                    if !custom.isEmpty {
-                        FilterWrap(items: custom, selected: selectedTags) { tag in
-                            toggleTag(tag)
-                        }
-                    }
-                    HStack {
-                        TextField("Add a custom tag", text: $newTag)
-                            .textInputAutocapitalization(.never)
-                            .onSubmit(addCustomTag)
-                        Button("Add", action: addCustomTag)
-                            .disabled(newTag.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
                 } header: {
                     Text("Tags")
                 } footer: {
-                    Text("Tap a preset above, or type your own.")
+                    Text("A fixed set, on purpose — no way to add a new one, here or automatically.")
                 }
                 Section("Notes") {
                     TextEditor(text: $notes)
@@ -174,12 +160,5 @@ struct AddRecipeView: View {
         } else {
             selectedTags.insert(tag)
         }
-    }
-
-    private func addCustomTag() {
-        let trimmed = newTag.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        selectedTags.insert(trimmed)
-        newTag = ""
     }
 }
