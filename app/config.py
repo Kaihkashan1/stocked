@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     # links; there is no cookie-based fallback. See README for setup.
     apify_api_token: str = ""
     apify_instagram_actor: str = "apify~instagram-post-scraper"
+    # Fallback used only when the primary actor's own handful of comments
+    # doesn't include the post owner's — a dedicated comments-mode search
+    # over more (up to 15 free) comments, sorted newest first. See
+    # fetch.py's _pick_comment_text / _fetch_more_comments for why this
+    # exists (a real gap this actor's own limited comment sample missed).
+    apify_comments_actor: str = "apify~instagram-scraper"
 
     def has_service_account(self) -> bool:
         return bool(self.google_service_account_json.strip()) or self.google_service_account_file.exists()
