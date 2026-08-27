@@ -18,7 +18,6 @@
 		A10000000000000000000018 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* SettingsView.swift */; };
 		A10000000000000000000019 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000039 /* Assets.xcassets */; };
 		A1000000000000000000001B /* EditRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003C /* EditRecipeView.swift */; };
-		A1000000000000000000001C /* PantryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003D /* PantryView.swift */; };
 		A1000000000000000000001D /* CookModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* CookModeView.swift */; };
 		A1000000000000000000001E /* AddRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003F /* AddRecipeView.swift */; };
 		A1000000000000000000001A /* CameraPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003B /* CameraPicker.swift */; };
@@ -38,7 +37,6 @@
 		A10000000000000000000039 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000000000000000000003A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000000000000000000003C /* EditRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecipeView.swift; sourceTree = "<group>"; };
-		A1000000000000000000003D /* PantryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003E /* CookModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookModeView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003F /* AddRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRecipeView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003B /* CameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPicker.swift; sourceTree = "<group>"; };
@@ -67,7 +65,6 @@
 				A10000000000000000000036 /* RecipeListView.swift */,
 				A10000000000000000000037 /* RecipeDetailView.swift */,
 				A1000000000000000000003C /* EditRecipeView.swift */,
-				A1000000000000000000003D /* PantryView.swift */,
 				A1000000000000000000003E /* CookModeView.swift */,
 				A1000000000000000000003F /* AddRecipeView.swift */,
 				A1000000000000000000003B /* CameraPicker.swift */,
@@ -173,7 +170,6 @@
 				A10000000000000000000017 /* RecipeDetailView.swift in Sources */,
 				A10000000000000000000018 /* SettingsView.swift in Sources */,
 				A1000000000000000000001B /* EditRecipeView.swift in Sources */,
-				A1000000000000000000001C /* PantryView.swift in Sources */,
 				A1000000000000000000001D /* CookModeView.swift in Sources */,
 				A1000000000000000000001E /* AddRecipeView.swift in Sources */,
 				A1000000000000000000001A /* CameraPicker.swift in Sources */,

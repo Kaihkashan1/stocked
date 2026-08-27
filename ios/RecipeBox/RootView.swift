@@ -12,28 +12,14 @@ struct RootView: View {
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var extracting = false
     @State private var extractError: String?
-    @State private var selectedTab = 0
     @State private var recipesPath = NavigationPath()
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack(path: $recipesPath) {
-                RecipeListView()
-                    .navigationTitle("Recipe Box")
-                    .toolbar { addButton }
-                    .toolbar { settingsButton }
-            }
-            .tabItem { Label("Recipes", systemImage: "book.closed") }
-            .tag(0)
-
-            NavigationStack {
-                PantryView()
-                    .navigationTitle("Pantry")
-                    .toolbar { settingsButton }
-            }
-            .tabItem { Label("Pantry", systemImage: "basket") }
-            .badge(store.have.isEmpty ? nil : "\(store.have.count)")
-            .tag(1)
+        NavigationStack(path: $recipesPath) {
+            RecipeListView()
+                .navigationTitle("Recipe Box")
+                .toolbar { addButton }
+                .toolbar { settingsButton }
         }
         .tint(Theme.accent)
         .sheet(isPresented: $showSettings) {
@@ -153,13 +139,14 @@ struct RootView: View {
         guard let route else { return }
         switch route {
         case .pantry:
-            selectedTab = 1
+            // No separate Pantry screen anymore — "What I have" lives in
+            // the Recipes screen's search box and Filters sheet, so this
+            // just makes sure that's what's on screen.
+            recipesPath = NavigationPath()
         case .have(let items):
-            selectedTab = 0
             recipesPath = NavigationPath()
             store.setHave(items)
         case .surprise:
-            selectedTab = 0
             if let recipe = store.recipes.randomElement() {
                 recipesPath = NavigationPath()
                 recipesPath.append(recipe.id)

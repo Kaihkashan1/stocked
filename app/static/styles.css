@@ -70,43 +70,6 @@ button { font-family: inherit; }
 
 .brand h1 { font-size: 1.6rem; font-weight: 700; }
 
-.tabs {
-  display: flex;
-  gap: 0.3rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px;
-}
-
-.tab {
-  border: none;
-  background: none;
-  color: var(--ink-soft);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.5rem 1.1rem;
-  border-radius: 999px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.tab.active { background: var(--accent); color: #fff; }
-
-.tab-badge {
-  background: var(--danger);
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: 700;
-  border-radius: 999px;
-  padding: 0.05rem 0.4rem;
-}
-
-.tab.active .tab-badge { background: rgba(255, 255, 255, 0.3); }
-
 .icon-round {
   margin-left: auto;
   width: 38px;
@@ -143,6 +106,25 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 0.6rem;
+}
+
+.search-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.search-suggest[hidden] { display: none; }
+
+.search-suggest-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-right: 0.2rem;
 }
 
 .filters-anchor { position: relative; }
@@ -202,8 +184,6 @@ button { font-family: inherit; }
    since author styles always win over UA styles. */
 .shell[hidden] { display: none; }
 
-.pantry-shell { max-width: 920px; }
-
 .favorites-toggle {
   display: flex;
   align-items: center;
@@ -222,31 +202,10 @@ button { font-family: inherit; }
 .favorites-toggle svg { opacity: 0.55; }
 .favorites-toggle.active svg { opacity: 1; }
 
-.pantry-search {
-  width: 100%;
-  margin-bottom: 0.55rem;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink);
-  border-radius: 8px;
-  padding: 0.45rem 0.65rem;
-  font: inherit;
-  font-size: 0.85rem;
-}
-
-.pantry-options {
-  max-height: 22rem;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-
-#pantry-selected {
+#have-chips {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  margin-bottom: 0.7rem;
 }
 
 .pantry-heading {
@@ -649,9 +608,6 @@ ol.steps li {
   font-size: 0.85rem;
   margin-top: -0.4rem;
 }
-
-/* Pantry view */
-.pantry-content { display: flex; flex-direction: column; gap: 2.2rem; }
 
 .link-btn {
   background: none;

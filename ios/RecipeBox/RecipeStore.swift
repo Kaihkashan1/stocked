@@ -27,11 +27,6 @@ final class RecipeStore: ObservableObject {
             }
         }
     }
-    /// Search box on the Pantry tab, separate from the recipe list's
-    /// `query` — filters the browsable catalog, not the recipe list.
-    @Published var pantryQuery = "" {
-        didSet { if oldValue != pantryQuery { updatePantry() } }
-    }
     @Published var favoritesOnly = false {
         didSet { if oldValue != favoritesOnly { updateVisible() } }
     }
@@ -125,9 +120,6 @@ final class RecipeStore: ObservableObject {
         } else {
             have.append(item)
             ensurePantryGroupContains(item)
-            if !pantryQuery.isEmpty {
-                pantryQuery = ""
-            }
         }
         let updated = have
         Task {
@@ -155,7 +147,7 @@ final class RecipeStore: ObservableObject {
         toggleIngredient(item)
     }
 
-    /// True once the Pantry search box holds something that doesn't already
+    /// True once the search box holds something that doesn't already
     /// exactly match a catalog ingredient or an existing "have" item —
     /// that's when "+ Add" is a real option rather than a no-op duplicate
     /// of just selecting an existing chip.
@@ -404,10 +396,14 @@ final class RecipeStore: ObservableObject {
             return items.isEmpty ? nil : PantryGroup(category: group.category, items: items)
         }
 
+        // Driven by the same search box as the recipe list (`query`), not a
+        // separate one — typing something that matches a known ingredient
+        // surfaces it as a suggestion right alongside the filtered recipe
+        // results, rather than needing a whole separate Pantry search.
         // Gated behind actually typing something — as the recipe box grows,
-        // the full catalog is too long to skim, so this is a search box,
-        // not a browsable list.
-        let needle = pantryQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // the full catalog is too long to skim, so this is a search, not a
+        // browsable list.
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !needle.isEmpty else {
             visiblePantryGroups = []
             return

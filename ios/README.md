@@ -18,10 +18,9 @@ With a free Personal Team, the install lasts about 7 days. Run it again from Xco
 ## Using it
 
 - Pull down to refresh after you save a new recipe.
-- Filter by tag (select as many as you like — diet, course, source, appliance, anything), or tap **Favorites only**. Search by title, tag, or ingredient. Tag chips also show up when adding or editing a recipe, so picking "vegetarian" or "mom's recipes" is a tap instead of retyping it.
-- Open a recipe for ingredients and steps. Tap the star to favorite it, or **Edit** to fix a bad extraction — both write straight back to the Sheet.
-- The **Pantry** tab (second tab) is where "what I have" lives: tap ingredients from the browsable catalog, or type in your own (a leftover, a specific brand — anything, whether or not it's in any recipe). Once you've marked pantry items, the Recipes tab sorts by closest fit and shows a "% fit" badge; turn on **Only what I can make** in Filters to hide anything you can't fully cook right now. Opening a recipe you're missing ingredients for shows what's missing with a one-tap **Add to shopping list**.
-- The Pantry tab also holds a **Shopping list** — ingredients you plan to buy, independent of what you currently have.
+- One search box does two jobs: it filters the recipe list as you type, and if what you typed matches (or could become) something you have, a row right below lets you mark it — tap an ingredient suggestion, or **+ Add "…"** for anything new (a leftover, a specific brand, whether or not it's in any recipe). No separate pantry screen to visit.
+- Once you've marked anything, the list sorts by closest fit automatically. **Filters** (top right) holds **What I have** (everything you've marked, tap to remove), **Tag** (select as many as apply — diet, course, source, appliance — fixed set, no new ones to invent), **Favorites only**, and **Sort**.
+- Open a recipe for ingredients and steps. Tap the star to favorite it, or **Edit** to fix a bad extraction — both write straight back to the Sheet. Tags on the Edit/Add screens are the same fixed set as Filters — tap to toggle, nothing free-typed.
 
 The phone only needs internet. Leave Settings on the Vercel URL unless you are testing a local backend.
 
@@ -40,7 +39,7 @@ Two things use the Shortcuts app:
 | Link | What it does |
 | --- | --- |
 | `recipebox://surprise` | Opens a random saved recipe |
-| `recipebox://pantry` | Jumps straight to the Pantry tab |
+| `recipebox://pantry` | Returns to the main recipe list (kept for shortcuts saved before "what I have" moved off its own tab) |
 | `recipebox://have?items=chicken,rice` | Replaces "what I have" with that ingredient list |
 
 For "what can I make with ___", make the ingredients dynamic instead of hardcoding them:
