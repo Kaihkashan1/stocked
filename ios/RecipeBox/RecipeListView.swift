@@ -6,14 +6,14 @@ struct RecipeListView: View {
     @State private var showFilters = false
 
     private var activeFilterCount: Int {
-        [!store.tagFilters.isEmpty, store.favoritesOnly].filter { $0 }.count
+        [!store.tagFilters.isEmpty, store.favoritesOnly, !store.have.isEmpty].filter { $0 }.count
     }
 
     var body: some View {
         List {
             Section {
                 HStack(spacing: 10) {
-                    DebouncedTextField(placeholder: "Search title, ingredient, tag…", text: $store.query)
+                    DebouncedTextField(placeholder: "Search, or type something you have…", text: $store.query)
                     Button {
                         showFilters = true
                     } label: {
@@ -23,9 +23,54 @@ struct RecipeListView: View {
                     .foregroundStyle(activeFilterCount > 0 ? Theme.accent : Theme.inkSoft)
                     .accessibilityLabel("Filters")
                 }
+
+                // Same box, two jobs: it already filters the recipe list
+                // above; if the typed text also matches (or could become) a
+                // pantry ingredient, this row lets you mark it as something
+                // you have too — no separate Pantry search elsewhere.
+                let trimmed = store.query.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty, !store.visiblePantryGroups.isEmpty || store.canAddTypedPantryItem(trimmed) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Mark as something you have")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        FlowLayout(spacing: 8) {
+                            ForEach(store.visiblePantryGroups.flatMap(\.items), id: \.self) { item in
+                                Button {
+                                    store.toggleIngredient(item)
+                                } label: {
+                                    Text("+ \(item)")
+                                        .font(Theme.mono(12, weight: .semibold))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .background(Theme.surface)
+                                        .foregroundStyle(Theme.inkSoft)
+                                        .overlay(Capsule().strokeBorder(Theme.line))
+                                        .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            if store.canAddTypedPantryItem(trimmed) {
+                                Button {
+                                    store.addHaveItem(trimmed)
+                                } label: {
+                                    Text("+ Add “\(trimmed)”")
+                                        .font(Theme.mono(12, weight: .semibold))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .background(Theme.accentSoft)
+                                        .foregroundStyle(Theme.accent)
+                                        .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
             } footer: {
                 if !store.have.isEmpty {
-                    Text("Sorted by closest fit to your pantry — manage \"What I have\" on the Pantry tab.")
+                    Text("Sorted by closest fit to what you have — manage the full list from Filters.")
                 }
             }
 
@@ -109,6 +154,42 @@ struct FiltersSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    if store.selectedPantryGroups.isEmpty {
+                        Text("Nothing marked yet")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(store.selectedPantryGroups) { group in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(group.category)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .textCase(.uppercase)
+                                FlowLayout(spacing: 8) {
+                                    ForEach(group.items, id: \.self) { item in
+                                        Button {
+                                            store.toggleIngredient(item)
+                                        } label: {
+                                            Text("\(item) ×")
+                                                .font(Theme.mono(12, weight: .semibold))
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 7)
+                                                .background(Theme.accentSoft)
+                                                .foregroundStyle(Theme.accent)
+                                                .clipShape(Capsule())
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("What I have")
+                } footer: {
+                    Text("Sorts recipes by closest fit. Type an ingredient in the search box on Recipes to add one.")
+                }
+
                 Section {
                     Button {
                         store.favoritesOnly.toggle()

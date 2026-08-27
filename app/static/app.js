@@ -32,11 +32,9 @@ const HAVE_KEY = "recipeBox.have";
 const state = {
   recipes: [],
   pantryGroups: [],
-  tab: "recipes",
   tags: new Set(),
   query: "",
   have: loadHave(),
-  pantryQuery: "",
   favoritesOnly: false,
   sort: "recent",
   openRecipeId: null,
@@ -46,7 +44,9 @@ const state = {
 
 const els = {
   search: document.getElementById("search"),
+  searchSuggest: document.getElementById("search-suggest"),
   tagFilters: document.getElementById("tag-filters"),
+  haveChips: document.getElementById("have-chips"),
   favoritesToggle: document.getElementById("favorites-toggle"),
   filtersBtn: document.getElementById("filters-btn"),
   filtersPanel: document.getElementById("filters-panel"),
@@ -55,17 +55,10 @@ const els = {
   status: document.getElementById("status"),
   drawer: document.getElementById("drawer"),
   detail: document.getElementById("recipe-detail"),
-  recipesView: document.getElementById("recipes-view"),
-  pantryView: document.getElementById("pantry-view"),
-  pantryBadge: document.getElementById("pantry-badge"),
-  pantrySelected: document.getElementById("pantry-selected"),
-  pantrySearch: document.getElementById("pantry-search"),
-  pantryOptions: document.getElementById("pantry-options"),
   settingsBtn: document.getElementById("settings-btn"),
   addRecipeBtn: document.getElementById("add-recipe-btn"),
   addRecipeMenu: document.getElementById("add-recipe-menu"),
   photoInput: document.getElementById("photo-input"),
-  tabs: document.querySelectorAll(".tab"),
 };
 
 async function load() {
@@ -83,12 +76,10 @@ async function load() {
   state.pantryGroups = Array.isArray(data.pantry) ? data.pantry : [];
   renderFilters();
   renderGrid();
-  renderPantryBadge();
   maybeOpenFromHash();
   await fetchHave();
-  renderPantryBadge();
+  renderFilters();
   renderGrid();
-  if (state.tab === "pantry") renderPantryTab();
 }
 
 // ---------- auth / API ----------
@@ -218,15 +209,15 @@ async function putHave(items) {
 }
 
 // Optimistic, like toggleFavorite: flips locally first, pushes the whole
-// set, reverts on failure. Used for both catalog chips and selected chips
-// on the Pantry tab.
+// set, reverts on failure. Used for both the search-box suggestion chips
+// and the "What I have" chips in the Filters panel.
 async function togglePantry(item) {
   const previous = [...state.have];
   state.have = state.have.includes(item) ? state.have.filter((value) => value !== item) : [...state.have, item];
   cacheHave();
-  renderPantryBadge();
+  renderHaveChips();
+  renderSearchSuggest();
   renderGrid();
-  if (state.tab === "pantry") renderPantryTab();
   refreshOpenRecipe();
 
   try {
@@ -237,9 +228,9 @@ async function togglePantry(item) {
     window.alert(`Couldn't save your pantry: ${err.message}`);
   }
   cacheHave();
-  renderPantryBadge();
+  renderHaveChips();
+  renderSearchSuggest();
   renderGrid();
-  if (state.tab === "pantry") renderPantryTab();
   refreshOpenRecipe();
 }
 
@@ -268,16 +259,6 @@ function ensurePantryGroupContains(item) {
   other.items.sort((a, b) => a.localeCompare(b));
 }
 
-function renderPantryBadge() {
-  const count = state.have.length;
-  els.pantryBadge.hidden = count === 0;
-  els.pantryBadge.textContent = String(count);
-}
-
-// Renders the two dynamic pieces of the Pantry tab (selected chips and the
-// browsable/searchable catalog) without touching the two static text
-// inputs — replacing those on every keystroke would wipe whatever the user
-// is mid-typing.
 // True once you've typed something that doesn't already exactly match a
 // catalog ingredient or an existing "have" item — that's when "+ Add" is a
 // real option rather than a no-op duplicate of selecting an existing chip.
@@ -287,47 +268,58 @@ function canAddTypedPantryItem(trimmedNeedle) {
   return !pantryCatalog().concat(state.have).some((item) => item.toLowerCase() === lower);
 }
 
-function renderPantryTab() {
+// The "What I have" section of the Filters panel — just the currently
+// marked chips (removable), no search of its own. Finding/adding lives in
+// the main search box now (see renderSearchSuggest) — no reason for a
+// second, separate ingredient search elsewhere in the app.
+function renderHaveChips() {
   const selected = groupPantry(state.have);
-  els.pantrySelected.innerHTML = selected.length
+  els.haveChips.innerHTML = selected.length
     ? pantryGroupsHtml(selected, true)
     : `<span class="status">Nothing marked yet</span>`;
+}
 
-  // One box does both jobs: type to filter the catalog down to matching
-  // chips to select, and/or add whatever you typed as a new item if it
-  // isn't already one of them. Gated behind typing at all — as the recipe
-  // box grows, the full catalog is too long to skim as a browsable list.
-  const trimmed = state.pantryQuery.trim();
-  const needle = trimmed.toLowerCase();
+// The same box you search recipes with also lets you mark something as
+// "what I have" — shown as a small suggestion row right under it rather
+// than a separate Pantry search, since it's the same underlying question
+// ("does this text match an ingredient?") the recipe search is already
+// asking. Gated behind actually typing something, same reasoning as the
+// old Pantry-tab search: skimming the whole catalog doesn't scale as the
+// box grows.
+function renderSearchSuggest() {
+  const trimmed = state.query.trim();
   if (!trimmed) {
-    els.pantryOptions.innerHTML = "";
+    els.searchSuggest.innerHTML = "";
+    els.searchSuggest.hidden = true;
     return;
   }
 
-  const matches = pantryCatalog().filter((item) => !state.have.includes(item) && pantryQueryMatch(item, needle));
-  const options = groupPantry(matches);
+  const needle = trimmed.toLowerCase();
+  const matches = pantryCatalog()
+    .filter((item) => !state.have.includes(item) && pantryQueryMatch(item, needle))
+    .slice(0, 8);
   const canAdd = canAddTypedPantryItem(trimmed);
-  const addButton = canAdd
-    ? `<div class="chips" style="margin-top:0.6rem;"><button class="chip active" type="button" data-action="add-pantry-item" data-item="${escapeAttr(trimmed)}">+ Add "${escapeHtml(trimmed)}"</button></div>`
+  if (!matches.length && !canAdd) {
+    els.searchSuggest.innerHTML = "";
+    els.searchSuggest.hidden = true;
+    return;
+  }
+
+  const matchChips = matches
+    .map((item) => `<button class="chip toggle" type="button" data-pantry="${escapeAttr(item)}">+ ${escapeHtml(item)}</button>`)
+    .join("");
+  const addChip = canAdd
+    ? `<button class="chip active" type="button" data-action="add-pantry-item" data-item="${escapeAttr(trimmed)}">+ Add "${escapeHtml(trimmed)}"</button>`
     : "";
-  const optionsHtml = options.length ? pantryGroupsHtml(options, false) : "";
-  const emptyHtml = !options.length && !canAdd ? `<span class="status">No matching ingredients</span>` : "";
-  els.pantryOptions.innerHTML = optionsHtml + emptyHtml + addButton;
-}
-
-// ---------- tabs ----------
-
-function setTab(tab) {
-  state.tab = tab;
-  els.recipesView.hidden = tab !== "recipes";
-  els.pantryView.hidden = tab !== "pantry";
-  els.tabs.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === tab));
-  if (tab === "pantry") renderPantryTab();
+  els.searchSuggest.innerHTML = `<span class="search-suggest-label">Mark as something you have:</span>${matchChips}${addChip}`;
+  els.searchSuggest.hidden = false;
 }
 
 // ---------- filters / recipe grid (existing browse behavior) ----------
 
 function renderFilters() {
+  renderHaveChips();
+
   // The fixed six are always offered, even before any recipe carries one,
   // plus whatever else recipes actually carry — tag entry is free text, so
   // that "whatever else" can grow. Multi-select (AND): a recipe must carry
@@ -346,7 +338,7 @@ function renderFilters() {
     .querySelectorAll("#sort-options .chip")
     .forEach((chip) => chip.classList.toggle("active", chip.dataset.sort === state.sort));
 
-  const activeCount = [state.tags.size > 0, state.favoritesOnly].filter(Boolean).length;
+  const activeCount = [state.tags.size > 0, state.favoritesOnly, state.have.length > 0].filter(Boolean).length;
   els.filtersBtn.classList.toggle("active", activeCount > 0);
   els.filtersBtn.textContent = "";
   els.filtersBtn.append(filtersIcon(), document.createTextNode(activeCount > 0 ? `Filters (${activeCount})` : "Filters"));
@@ -989,7 +981,13 @@ function escapeAttr(value) {
 
 // Debounced like iOS's DebouncedTextField — filtering the full list (plus
 // pantry matching against "what I have") on every single keystroke is
-// wasted work while the user is still typing.
+// wasted work while the user is still typing. Drives both the recipe grid
+// and the "mark as something you have" suggestion row below the box — one
+// input, two jobs, rather than a separate search elsewhere for the second
+// one. (No Enter-to-add here, unlike the old dedicated pantry search: this
+// box's main job is finding a recipe by name, and a bare Enter shouldn't
+// silently file whatever you typed as a pantry item — tapping the "+ Add"
+// suggestion is an explicit, deliberate action instead.)
 let searchDebounceTimer = null;
 els.search.addEventListener("input", () => {
   const value = els.search.value;
@@ -997,24 +995,8 @@ els.search.addEventListener("input", () => {
   searchDebounceTimer = setTimeout(() => {
     state.query = value;
     renderGrid();
+    renderSearchSuggest();
   }, 160);
-});
-
-els.pantrySearch.addEventListener("input", () => {
-  state.pantryQuery = els.pantrySearch.value;
-  renderPantryTab();
-});
-
-// Enter submits the typed text as a new item, same as tapping "+ Add" —
-// but only when it isn't just re-adding something already selectable.
-els.pantrySearch.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter") return;
-  const trimmed = els.pantrySearch.value.trim();
-  if (!canAddTypedPantryItem(trimmed)) return;
-  addHaveItem(trimmed);
-  state.pantryQuery = "";
-  els.pantrySearch.value = "";
-  renderPantryTab();
 });
 
 els.favoritesToggle.addEventListener("click", () => {
@@ -1078,10 +1060,6 @@ document.addEventListener("click", (event) => {
 
 els.photoInput.addEventListener("change", handlePhotoSelected);
 
-els.tabs.forEach((btn) => {
-  btn.addEventListener("click", () => setTab(btn.dataset.tab));
-});
-
 document.addEventListener("click", (event) => {
   const pantry = event.target.closest("[data-pantry]");
   if (pantry) {
@@ -1128,9 +1106,6 @@ document.addEventListener("click", (event) => {
     }
     case "add-pantry-item":
       addHaveItem(actionEl.dataset.item);
-      state.pantryQuery = "";
-      els.pantrySearch.value = "";
-      renderPantryTab();
       break;
     case "start-edit":
       startEdit(id);
