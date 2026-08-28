@@ -293,6 +293,114 @@ struct APIClient {
         return try Self.decoder.decode(PantryResponse.self, from: data).items
     }
 
+    func fetchPantryInventory() async throws -> [PantryItem] {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/pantry-inventory", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(PantryInventoryResponse.self, from: data).items
+    }
+
+    func updatePantryInventory(items: [PantryItem], secret: String) async throws -> [PantryItem] {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/pantry-inventory", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.httpMethod = "PUT"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+        request.httpBody = try JSONEncoder().encode(PantryInventoryResponse(items: items))
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(PantryInventoryResponse.self, from: data).items
+    }
+
+    func fetchToBuy() async throws -> [ToBuyItem] {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/to-buy", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(ToBuyResponse.self, from: data).items
+    }
+
+    func updateToBuy(items: [ToBuyItem], secret: String) async throws -> [ToBuyItem] {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/to-buy", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.httpMethod = "PUT"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+        request.httpBody = try JSONEncoder().encode(ToBuyResponse(items: items))
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(ToBuyResponse.self, from: data).items
+    }
+
     /// Backs the Settings screen's "API usage" card.
     func fetchUsage(secret: String) async throws -> UsageStats {
         guard let base = URL(string: trimmedBase),

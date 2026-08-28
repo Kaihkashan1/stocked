@@ -19,16 +19,20 @@ from app.errors import GEMINI_DAILY_QUOTA, GEMINI_QUOTA_MESSAGE
 from app.extract import extract_recipe
 from app.fetch import get_apify_usage
 from app.match import STAPLES, grouped_pantry
-from app.models import FetchedPost, PantryUpdate, RecipeCreate, RecipeUpdate
+from app.models import FetchedPost, PantryInventoryUpdate, PantryUpdate, RecipeCreate, RecipeUpdate, ToBuyUpdate
 from app.pipeline import jobs, process_recipe
 from app.store import (
     create_recipe,
     delete_recipe,
     get_gemini_reads_today,
     get_have_items,
+    get_pantry_inventory,
     get_recipe,
+    get_to_buy_items,
     list_recipes,
     save_have_items,
+    save_pantry_inventory,
+    save_to_buy_items,
     update_recipe,
 )
 
@@ -178,6 +182,28 @@ async def api_get_pantry():
 @app.put("/api/pantry", dependencies=[Depends(require_secret)])
 async def api_put_pantry(body: PantryUpdate):
     return {"items": save_have_items(body.items)}
+
+
+@app.get("/api/pantry-inventory")
+async def api_get_pantry_inventory():
+    """Full Pantry-tab inventory (amount, unit, expiry, …). Separate from
+    /api/pantry, which remains the flat "What I have" fit-filter list."""
+    return {"items": get_pantry_inventory()}
+
+
+@app.put("/api/pantry-inventory", dependencies=[Depends(require_secret)])
+async def api_put_pantry_inventory(body: PantryInventoryUpdate):
+    return {"items": save_pantry_inventory(body.items)}
+
+
+@app.get("/api/to-buy")
+async def api_get_to_buy():
+    return {"items": get_to_buy_items()}
+
+
+@app.put("/api/to-buy", dependencies=[Depends(require_secret)])
+async def api_put_to_buy(body: ToBuyUpdate):
+    return {"items": save_to_buy_items(body.items)}
 
 
 @app.get("/api/usage", dependencies=[Depends(require_secret)])

@@ -1,0 +1,250 @@
+import SwiftUI
+
+/// Bottom sheet for adding or editing a pantry inventory row.
+struct PantryItemSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let item: PantryItem?
+    var onSave: (PantryItem) -> Void
+
+    @State private var name: String
+    @State private var category: PantryCategory
+    @State private var amountText: String
+    @State private var unit: PantryUnit
+    @State private var status: PantryItemStatus
+    @State private var hasExpiry: Bool
+    @State private var expiryDate: Date
+    @State private var notes: String
+
+    init(item: PantryItem?, onSave: @escaping (PantryItem) -> Void) {
+        self.item = item
+        self.onSave = onSave
+        _name = State(initialValue: item?.name ?? "")
+        _category = State(initialValue: item?.pantryCategory ?? .other)
+        if let amount = item?.amount {
+            _amountText = State(initialValue: amount.rounded() == amount
+                ? String(Int(amount.rounded()))
+                : String(format: "%g", amount))
+        } else {
+            _amountText = State(initialValue: "1")
+        }
+        _unit = State(initialValue: item?.unit ?? .pcs)
+        _status = State(initialValue: item?.status ?? .unopened)
+        if let expiry = item?.expiry, let date = PantryItem.parseExpiry(expiry) {
+            _hasExpiry = State(initialValue: true)
+            _expiryDate = State(initialValue: date)
+        } else {
+            _hasExpiry = State(initialValue: false)
+            _expiryDate = State(initialValue: Calendar.current.startOfDay(for: Date()))
+        }
+        _notes = State(initialValue: item?.notes ?? "")
+    }
+
+    private var isEditing: Bool { item != nil }
+    private var title: String { isEditing ? "Edit pantry item" : "Add pantry item" }
+    private var saveLabel: String { isEditing ? "Save changes" : "Add to pantry" }
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(Theme.neutral300)
+                .frame(width: 44, height: 5)
+                .padding(.top, 10)
+                .padding(.bottom, 14)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(title)
+                        .font(Theme.display(22))
+                        .foregroundStyle(Theme.ink)
+
+                    TextField("What is it?", text: $name)
+                        .font(Theme.body(14.5))
+                        .padding(.horizontal, 18)
+                        .frame(height: 48)
+                        .background(Theme.surface)
+                        .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                        .clipShape(Capsule())
+
+                    field(kicker: "Category") {
+                        FlowLayout(spacing: 7) {
+                            ForEach(PantryCategory.allCases) { option in
+                                compactChip(option.rawValue, selected: category == option) {
+                                    category = option
+                                }
+                            }
+                        }
+                    }
+
+                    HStack(alignment: .top, spacing: 10) {
+                        field(kicker: "Amount") {
+                            TextField("e.g. 200", text: $amountText)
+                                .keyboardType(.decimalPad)
+                                .font(Theme.body(14))
+                                .padding(.horizontal, 16)
+                                .frame(height: 46)
+                                .background(Theme.surface)
+                                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                                .clipShape(Capsule())
+                        }
+
+                        field(kicker: "Unit") {
+                            HStack(spacing: 6) {
+                                ForEach(PantryUnit.allCases) { option in
+                                    Button {
+                                        unit = option
+                                    } label: {
+                                        Text(option.rawValue)
+                                            .font(Theme.body(12.5, weight: .semibold))
+                                            .foregroundStyle(unit == option ? .white : Theme.neutral800)
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: 46)
+                                            .background(unit == option ? Theme.accent : Theme.surface)
+                                            .overlay {
+                                                if unit != option {
+                                                    Capsule().strokeBorder(Theme.divider, lineWidth: 1)
+                                                }
+                                            }
+                                            .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    field(kicker: "Status") {
+                        HStack(spacing: 7) {
+                            ForEach(PantryItemStatus.allCases) { option in
+                                Button {
+                                    status = option
+                                } label: {
+                                    Text(option.label)
+                                        .font(Theme.body(13, weight: .semibold))
+                                        .foregroundStyle(status == option ? .white : Theme.neutral800)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(status == option ? Theme.accent : Theme.surface)
+                                        .overlay {
+                                            if status != option {
+                                                Capsule().strokeBorder(Theme.divider, lineWidth: 1)
+                                            }
+                                        }
+                                        .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    field(kicker: "Expiry date (optional)") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Toggle(isOn: $hasExpiry) {
+                                Text(hasExpiry ? "Date set" : "No expiry")
+                                    .font(Theme.body(13))
+                                    .foregroundStyle(Theme.neutral700)
+                            }
+                            .tint(Theme.accent)
+
+                            if hasExpiry {
+                                DatePicker(
+                                    "Expiry",
+                                    selection: $expiryDate,
+                                    displayedComponents: .date
+                                )
+                                .datePickerStyle(.compact)
+                                .labelsHidden()
+                                .padding(.horizontal, 14)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 46)
+                                .background(Theme.surface)
+                                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
+
+                    field(kicker: "Notes") {
+                        TextField("Optional", text: $notes, axis: .vertical)
+                            .font(Theme.body(14))
+                            .lineLimit(3...6)
+                            .padding(12)
+                            .frame(minHeight: 70, alignment: .topLeading)
+                            .background(Theme.surface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                    .strokeBorder(Theme.divider, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    }
+
+                    Button(action: save) {
+                        Text(saveLabel)
+                            .font(Theme.display(15))
+                            .foregroundStyle(Theme.bg)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(canSave ? Theme.accent : Theme.neutral400)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSave)
+                    .padding(.top, 4)
+                    .padding(.bottom, 20)
+                }
+                .padding(.horizontal, 22)
+            }
+        }
+        .background(Theme.bg.ignoresSafeArea())
+    }
+
+    private func field<Content: View>(kicker: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(kicker.uppercased())
+                .font(Theme.body(10.5, weight: .semibold))
+                .tracking(1.26)
+                .foregroundStyle(Theme.neutral600)
+            content()
+        }
+    }
+
+    private func compactChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(Theme.body(12.5, weight: .semibold))
+                .foregroundStyle(selected ? .white : Theme.neutral800)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(selected ? Theme.accent : Theme.surface)
+                .overlay {
+                    if !selected {
+                        Capsule().strokeBorder(Theme.divider, lineWidth: 1)
+                    }
+                }
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func save() {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let amount = Double(amountText.replacingOccurrences(of: ",", with: ".")) ?? 1
+        let saved = PantryItem(
+            id: item?.id ?? UUID().uuidString,
+            name: trimmed,
+            category: category,
+            amount: amount > 0 ? amount : 1,
+            unit: unit,
+            status: status,
+            expiry: hasExpiry ? PantryItem.formatExpiry(expiryDate) : nil,
+            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        onSave(saved)
+        dismiss()
+    }
+}

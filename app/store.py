@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import uuid
 from datetime import datetime, timezone
 from functools import lru_cache
 from zoneinfo import ZoneInfo
@@ -12,7 +13,7 @@ import gspread
 from app.config import settings
 from app.fetch import normalize_url
 from app.match import pantry_items
-from app.models import FetchedPost, Recipe
+from app.models import PANTRY_CATEGORIES, FetchedPost, Recipe
 
 logger = logging.getLogger(__name__)
 
@@ -115,9 +116,8 @@ def _write_app_state(**updates) -> None:
 
 
 def get_have_items() -> list[str]:
-    """The pantry — ingredients you currently have on hand. Synced across
-    devices (web + iOS), so it's a real inventory rather than a per-session
-    browsing filter."""
+    """List-screen "What I have" — a flat string list used for fit %. Synced
+    across devices. Distinct from pantry inventory (see get_pantry_inventory)."""
     items = _read_app_state().get("have") or []
     return sorted({str(item).strip().lower() for item in items if str(item).strip()})
 
@@ -126,6 +126,119 @@ def save_have_items(items: list[str]) -> list[str]:
     clean = sorted({str(item).strip().lower() for item in items if str(item).strip()})
     _write_app_state(have=clean)
     return clean
+
+
+def _normalize_expiry(value) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    # Accept full ISO timestamps from clients; store date-only.
+    return text[:10]
+
+
+def _normalize_pantry_item(raw: dict) -> dict | None:
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        return None
+    item_id = str(raw.get("id") or "").strip() or str(uuid.uuid4())
+    category = str(raw.get("category") or "Other").strip()
+    if category not in PANTRY_CATEGORIES:
+        category = "Other"
+    unit = str(raw.get("unit") or "pcs").strip().lower()
+    if unit not in ("pcs", "g", "kg"):
+        unit = "pcs"
+    status = str(raw.get("status") or "unopened").strip().lower()
+    if status not in ("open", "unopened"):
+        status = "unopened"
+    try:
+        amount = float(raw.get("amount", 1))
+    except (TypeError, ValueError):
+        amount = 1.0
+    if amount <= 0:
+        amount = 1.0
+    notes = str(raw.get("notes") or "").strip()
+    return {
+        "id": item_id,
+        "name": name,
+        "category": category,
+        "amount": amount,
+        "unit": unit,
+        "status": status,
+        "expiry": _normalize_expiry(raw.get("expiry")),
+        "notes": notes,
+    }
+
+
+def get_pantry_inventory() -> list[dict]:
+    raw_items = _read_app_state().get("pantry_inventory") or []
+    cleaned: list[dict] = []
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            continue
+        item = _normalize_pantry_item(raw)
+        if item:
+            cleaned.append(item)
+    return cleaned
+
+
+def save_pantry_inventory(items: list) -> list[dict]:
+    cleaned: list[dict] = []
+    seen_ids: set[str] = set()
+    for raw in items:
+        if hasattr(raw, "model_dump"):
+            raw = raw.model_dump()
+        if not isinstance(raw, dict):
+            continue
+        item = _normalize_pantry_item(raw)
+        if not item or item["id"] in seen_ids:
+            continue
+        seen_ids.add(item["id"])
+        cleaned.append(item)
+    _write_app_state(pantry_inventory=cleaned)
+    return cleaned
+
+
+def _normalize_to_buy_item(raw: dict) -> dict | None:
+    text = str(raw.get("text") or "").strip()
+    if not text:
+        return None
+    item_id = str(raw.get("id") or "").strip() or str(uuid.uuid4())
+    return {
+        "id": item_id,
+        "text": text,
+        "checked": bool(raw.get("checked", False)),
+    }
+
+
+def get_to_buy_items() -> list[dict]:
+    raw_items = _read_app_state().get("to_buy") or []
+    cleaned: list[dict] = []
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            continue
+        item = _normalize_to_buy_item(raw)
+        if item:
+            cleaned.append(item)
+    return cleaned
+
+
+def save_to_buy_items(items: list) -> list[dict]:
+    cleaned: list[dict] = []
+    seen_ids: set[str] = set()
+    for raw in items:
+        if hasattr(raw, "model_dump"):
+            raw = raw.model_dump()
+        if not isinstance(raw, dict):
+            continue
+        item = _normalize_to_buy_item(raw)
+        if not item or item["id"] in seen_ids:
+            continue
+        seen_ids.add(item["id"])
+        cleaned.append(item)
+    _write_app_state(to_buy=cleaned)
+    return cleaned
 
 
 # Gemini's free-tier quota resets on its own clock (~midnight Pacific, per

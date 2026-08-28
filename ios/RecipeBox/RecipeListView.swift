@@ -28,9 +28,6 @@ struct RecipeListView: View {
         }
         .background(Theme.bg.ignoresSafeArea())
         .scrollIndicators(.hidden)
-        .navigationDestination(for: Int.self) { id in
-            RecipeDetailView(id: id)
-        }
         .refreshable { await store.refresh() }
         .sheet(isPresented: $showFilters) {
             FiltersSheet()

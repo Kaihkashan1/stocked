@@ -30,8 +30,15 @@ private enum PendingAddAction {
     case photo, library
 }
 
+private enum AppTab: Hashable {
+    case recipes
+    case pantry
+}
+
 struct RootView: View {
     @Environment(RecipeStore.self) private var store
+    @Environment(PantryStore.self) private var pantryStore
+    @State private var selectedTab: AppTab = .recipes
     @State private var activeSheet: ActiveSheet?
     @State private var addRecipePrefill: RecipeExtraction?
     /// What to do once `activeSheet` has actually finished dismissing —
@@ -47,14 +54,30 @@ struct RootView: View {
     @State private var recipesPath = NavigationPath()
 
     var body: some View {
-        NavigationStack(path: $recipesPath) {
-            RecipeListView(
-                onAdd: { activeSheet = .addOptions },
-                onSettings: { activeSheet = .settings }
-            )
-            .toolbar(.hidden, for: .navigationBar)
+        TabView(selection: $selectedTab) {
+            recipesTab
+                .tabItem {
+                    Label("Recipes", systemImage: "book.closed")
+                }
+                .tag(AppTab.recipes)
+
+            pantryTab
+                .tabItem {
+                    Label("Pantry", systemImage: "basket")
+                }
+                .tag(AppTab.pantry)
         }
         .tint(Theme.accent)
+        .toolbarBackground(Theme.surface, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .onAppear {
+            let appearance = UITabBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = UIColor(Theme.surface)
+            UITabBar.appearance().standardAppearance = appearance
+            UITabBar.appearance().scrollEdgeAppearance = appearance
+            UITabBar.appearance().unselectedItemTintColor = UIColor(Theme.neutral500)
+        }
         .sheet(item: $activeSheet, onDismiss: performPendingAddAction) { sheet in
             // Presentation modifiers (detents etc.) are applied ONCE, here,
             // uniformly on the composed content — not per-branch inside the
@@ -112,9 +135,37 @@ struct RootView: View {
         } message: { message in
             Text(message)
         }
-        .task { await store.refresh() }
+        .task {
+            async let recipes = store.refresh()
+            async let pantry = pantryStore.refresh()
+            _ = await (recipes, pantry)
+        }
+        .onAppear { handle(store.pendingRoute) }
         .onChange(of: store.pendingRoute) { _, route in
             handle(route)
+        }
+    }
+
+    private var recipesTab: some View {
+        NavigationStack(path: $recipesPath) {
+            RecipeListView(
+                onAdd: { activeSheet = .addOptions },
+                onSettings: { activeSheet = .settings }
+            )
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: Int.self) { id in
+                RecipeDetailView(id: id)
+            }
+        }
+    }
+
+    private var pantryTab: some View {
+        NavigationStack {
+            PantryView(onOpenRecipe: { id in
+                selectedTab = .recipes
+                recipesPath = NavigationPath()
+                recipesPath.append(id)
+            })
         }
     }
 
@@ -134,12 +185,14 @@ struct RootView: View {
         case .settings:
             SettingsView()
                 .environment(store)
+                .environment(pantryStore)
         case .addRecipe:
             AddRecipeView(prefill: addRecipePrefill)
                 .environment(store)
         case .pasteLink:
             PasteALinkView(onOpenRecipe: { id in
                 activeSheet = nil
+                selectedTab = .recipes
                 recipesPath = NavigationPath()
                 recipesPath.append(id)
             })
@@ -196,14 +249,14 @@ struct RootView: View {
         guard let route else { return }
         switch route {
         case .pantry:
-            // No separate Pantry screen anymore — "What I have" lives in
-            // the Recipes screen's search box and Filters sheet, so this
-            // just makes sure that's what's on screen.
+            selectedTab = .pantry
             recipesPath = NavigationPath()
         case .have(let items):
+            selectedTab = .recipes
             recipesPath = NavigationPath()
             store.setHave(items)
         case .surprise:
+            selectedTab = .recipes
             if let recipe = store.recipes.randomElement() {
                 recipesPath = NavigationPath()
                 recipesPath.append(recipe.id)

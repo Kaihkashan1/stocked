@@ -319,6 +319,7 @@ struct RecipeDetailView: View {
 /// every ingredient line on every tap, even though only this section's
 /// output depends on scale.
 private struct IngredientsCard: View {
+    @Environment(PantryStore.self) private var pantry
     let recipe: Recipe
     @State private var scale: Double = 1.0
 
@@ -357,14 +358,13 @@ private struct IngredientsCard: View {
                                 .padding(.vertical, 5)
                                 .background(scale == 1.0 ? Theme.accent200 : Theme.accent)
                                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            Text(parsed.text)
-                                .font(Theme.body(14.5))
-                                .foregroundStyle(Theme.ink)
-                        } else {
-                            Text(parsed.text)
-                                .font(Theme.body(14.5))
-                                .foregroundStyle(Theme.ink)
                         }
+                        Text(parsed.text)
+                            .font(Theme.body(14.5))
+                            .foregroundStyle(Theme.ink)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        toBuyButton(for: parsed.text)
                     }
                     .padding(.vertical, 13)
 
@@ -376,6 +376,24 @@ private struct IngredientsCard: View {
             .padding(.horizontal, 16)
             .cardBackground(radius: Theme.radiusRow)
         }
+    }
+
+    /// Round + / ✓ control — the only link from a recipe into the Pantry
+    /// to-buy list. Toggles by ingredient text (case-insensitive).
+    private func toBuyButton(for text: String) -> some View {
+        let inList = pantry.isInToBuy(text)
+        return Button {
+            pantry.toggleToBuy(text: text)
+        } label: {
+            Image(systemName: inList ? "checkmark" : "plus")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(inList ? Theme.bg : Theme.neutral700)
+                .frame(width: 30, height: 30)
+                .background(inList ? Theme.sage500 : Theme.neutral100)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(inList ? "Remove \(text) from to-buy list" : "Add \(text) to to-buy list")
     }
 
     private var scaleControl: some View {

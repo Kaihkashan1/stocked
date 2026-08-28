@@ -22,6 +22,96 @@ struct PantryGroup: Codable, Hashable, Identifiable {
     let items: [String]
 }
 
+/// Fixed category order for the Pantry tab inventory (handoff §11).
+enum PantryCategory: String, CaseIterable, Identifiable, Codable {
+    case produce = "Produce"
+    case dairyEggs = "Dairy & eggs"
+    case meatSeafood = "Meat & seafood"
+    case grainsPantry = "Grains & pantry"
+    case condimentsSpices = "Condiments & spices"
+    case other = "Other"
+
+    var id: String { rawValue }
+
+    static func resolve(_ raw: String) -> PantryCategory {
+        Self(rawValue: raw) ?? .other
+    }
+}
+
+enum PantryUnit: String, CaseIterable, Identifiable, Codable {
+    case pcs, g, kg
+    var id: String { rawValue }
+}
+
+enum PantryItemStatus: String, CaseIterable, Identifiable, Codable {
+    case unopened
+    case open
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .unopened: "Unopened"
+        case .open: "Open"
+        }
+    }
+}
+
+/// One row on the Pantry tab's Items list — independent of recipe `have`
+/// fit filtering and of `PantryGroup` (the catalog of ingredient names).
+struct PantryItem: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var category: String
+    var amount: Double
+    var unit: PantryUnit
+    var status: PantryItemStatus
+    /// ISO date-only string `YYYY-MM-DD`, when set.
+    var expiry: String?
+    var notes: String
+
+    var pantryCategory: PantryCategory { PantryCategory.resolve(category) }
+
+    init(
+        id: String = UUID().uuidString,
+        name: String,
+        category: PantryCategory = .other,
+        amount: Double = 1,
+        unit: PantryUnit = .pcs,
+        status: PantryItemStatus = .unopened,
+        expiry: String? = nil,
+        notes: String = ""
+    ) {
+        self.id = id
+        self.name = name
+        self.category = category.rawValue
+        self.amount = amount
+        self.unit = unit
+        self.status = status
+        self.expiry = expiry
+        self.notes = notes
+    }
+}
+
+struct ToBuyItem: Codable, Hashable, Identifiable {
+    var id: String
+    var text: String
+    var checked: Bool
+
+    init(id: String = UUID().uuidString, text: String, checked: Bool = false) {
+        self.id = id
+        self.text = text
+        self.checked = checked
+    }
+}
+
+struct PantryInventoryResponse: Codable {
+    let items: [PantryItem]
+}
+
+struct ToBuyResponse: Codable {
+    let items: [ToBuyItem]
+}
+
 struct Recipe: Codable, Identifiable, Hashable {
     let id: Int
     let title: String

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(RecipeStore.self) private var store
+    @Environment(PantryStore.self) private var pantryStore
     @Environment(\.dismiss) private var dismiss
     @State private var draftURL = ""
     @State private var saving = false
@@ -139,7 +140,10 @@ struct SettingsView: View {
         saveError = nil
         defer { saving = false }
         store.serverURL = draftURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let ok = await store.refresh()
+        async let recipesOK = store.refresh()
+        async let pantryOK = pantryStore.refresh()
+        let ok = await recipesOK
+        _ = await pantryOK
         if ok {
             dismiss()
         } else {

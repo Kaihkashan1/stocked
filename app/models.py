@@ -88,6 +88,45 @@ class PantryUpdate(BaseModel):
     items: list[str] = Field(default_factory=list)
 
 
+# Inventory on the Pantry tab — distinct from PantryUpdate/`have`, which is
+# still the list-screen "What I have" fit filter (a flat string list).
+PANTRY_CATEGORIES = (
+    "Produce",
+    "Dairy & eggs",
+    "Meat & seafood",
+    "Grains & pantry",
+    "Condiments & spices",
+    "Other",
+)
+PantryUnit = Literal["pcs", "g", "kg"]
+PantryStatus = Literal["open", "unopened"]
+
+
+class PantryItem(BaseModel):
+    id: str
+    name: str
+    category: str = "Other"
+    amount: float = 1
+    unit: PantryUnit = "pcs"
+    status: PantryStatus = "unopened"
+    expiry: str | None = None  # YYYY-MM-DD, optional
+    notes: str = ""
+
+
+class PantryInventoryUpdate(BaseModel):
+    items: list[PantryItem] = Field(default_factory=list)
+
+
+class ToBuyItem(BaseModel):
+    id: str
+    text: str
+    checked: bool = False
+
+
+class ToBuyUpdate(BaseModel):
+    items: list[ToBuyItem] = Field(default_factory=list)
+
+
 class RecipeCategory(BaseModel):
     cuisine: str = "Uncategorized"
     meal: Meal = "other"

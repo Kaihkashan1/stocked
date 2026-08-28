@@ -27,6 +27,9 @@
 		A20000000000000000000014 /* Figtree-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* Figtree-Bold.ttf */; };
 		A20000000000000000000015 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* Components.swift */; };
 		A20000000000000000000017 /* PasteALinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* PasteALinkView.swift */; };
+		A20000000000000000000018 /* PantryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* PantryView.swift */; };
+		A20000000000000000000019 /* PantryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PantryStore.swift */; };
+		A2000000000000000000001A /* PantryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* PantryItemSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -52,6 +55,9 @@
 		A20000000000000000000004 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Bold.ttf"; sourceTree = "<group>"; };
 		A20000000000000000000006 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* PasteALinkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteALinkView.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* PantryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryView.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* PantryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryStore.swift; sourceTree = "<group>"; };
+		A2000000000000000000000A /* PantryItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryItemSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +78,7 @@
 				A10000000000000000000031 /* Models.swift */,
 				A10000000000000000000032 /* APIClient.swift */,
 				A10000000000000000000033 /* RecipeStore.swift */,
+				A20000000000000000000009 /* PantryStore.swift */,
 				A10000000000000000000034 /* Theme.swift */,
 				A20000000000000000000006 /* Components.swift */,
 				A10000000000000000000035 /* RootView.swift */,
@@ -83,6 +90,8 @@
 				A1000000000000000000003B /* CameraPicker.swift */,
 				A10000000000000000000038 /* SettingsView.swift */,
 				A20000000000000000000007 /* PasteALinkView.swift */,
+				A20000000000000000000008 /* PantryView.swift */,
+				A2000000000000000000000A /* PantryItemSheet.swift */,
 				A10000000000000000000039 /* Assets.xcassets */,
 				A1000000000000000000003A /* Info.plist */,
 				A20000000000000000000005 /* Fonts */,
@@ -205,6 +214,9 @@
 				A1000000000000000000001A /* CameraPicker.swift in Sources */,
 				A20000000000000000000015 /* Components.swift in Sources */,
 				A20000000000000000000017 /* PasteALinkView.swift in Sources */,
+				A20000000000000000000018 /* PantryView.swift in Sources */,
+				A20000000000000000000019 /* PantryStore.swift in Sources */,
+				A2000000000000000000001A /* PantryItemSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

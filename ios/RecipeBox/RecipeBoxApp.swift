@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct RecipeBoxApp: App {
     @State private var store = RecipeStore()
+    @State private var pantryStore = PantryStore()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(store)
+                .environment(pantryStore)
                 .onOpenURL { url in
                     store.pendingRoute = Self.route(for: url)
                 }
@@ -15,7 +17,8 @@ struct RecipeBoxApp: App {
     }
 
     /// Parses a recipebox:// deep link, e.g. from a Shortcuts action:
-    /// recipebox://pantry, recipebox://surprise, recipebox://have?items=chicken,rice
+    /// recipebox://pantry (Pantry tab), recipebox://surprise,
+    /// recipebox://have?items=chicken,rice
     static func route(for url: URL) -> DeepLinkRoute? {
         guard url.scheme?.lowercased() == "recipebox" else { return nil }
         switch url.host?.lowercased() {

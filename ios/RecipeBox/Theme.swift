@@ -34,13 +34,21 @@ enum Theme {
     /// dashed border on a pantry-suggestion chip.
     static let sage400 = Color(hex: 0xaebe93)
 
+    /// From the Organic ramp (`_ds/.../styles.css`); not listed in the
+    /// handoff table but used for amount chips, Add-to-buy buttons, and
+    /// inactive tab glyphs.
+    static let neutral100 = Color(hex: 0xf9f4ed)
     static let neutral200 = Color(hex: 0xeee7db)
     static let neutral300 = Color(hex: 0xdcd3c4)
     static let neutral400 = Color(hex: 0xc0b6a5)
+    static let neutral500 = Color(hex: 0xa19786)
     static let neutral600 = Color(hex: 0x82796a)
     static let neutral700 = Color(hex: 0x645c50)
     static let neutral800 = Color(hex: 0x474238)
     static let neutral900 = Color(hex: 0x2e2b25)
+
+    /// Expiry badge fill when an item expires within 3 days (Organic accent-500).
+    static let accent500 = Color(hex: 0xd67f48)
 
     /// Hairline borders/dividers everywhere: ink at 16% opacity.
     static let divider = ink.opacity(0.16)
