@@ -22,7 +22,6 @@ struct RecipeListView: View {
                 SearchBlock(showFilters: $showFilters)
                 CourseFilterRow()
                 PantryBanner()
-                ClearFiltersRow()
                 ResultsSection(onAdd: onAdd)
             }
         }
@@ -113,7 +112,7 @@ private struct ListHeader: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 Kicker(text: "\(store.recipes.count) RECIPE\(store.recipes.count == 1 ? "" : "S") · \(favoriteCount) FAVORITE\(favoriteCount == 1 ? "" : "S")")
-                Text("Recipe Box")
+                Text("Stocked")
                     .font(Theme.display(36))
                     .foregroundStyle(Theme.ink)
             }
@@ -172,7 +171,7 @@ private struct SearchBlock: View {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(Theme.neutral600)
-                    DebouncedTextField(placeholder: "Search, or type what you have…", text: $store.query)
+                    DebouncedTextField(placeholder: "Search recipes", text: $store.query)
                         .font(Theme.body(14.5))
                 }
                 .padding(.horizontal, 16)
@@ -228,7 +227,7 @@ private struct SearchBlock: View {
 
     private func pantrySuggestionRow(_ trimmed: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Kicker(text: "Mark as something you have", size: 10, color: Theme.neutral600)
+            Kicker(text: "Filter by ingredient", size: 10, color: Theme.neutral600)
             FlowLayout(spacing: 8) {
                 ForEach(store.visiblePantryGroups.flatMap(\.items), id: \.self) { item in
                     Button {
@@ -300,76 +299,24 @@ private struct PantryBanner: View {
         }
     }
 
-    /// Each ingredient is its own removable chip rather than one joined line
-    /// with a single Clear, so a wrong pick costs one tap instead of losing
-    /// the whole selection. Wraps too, so nothing gets truncated out of reach.
+    /// Handoff-style sage pill: active ingredient filters + Clear.
     private var banner: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Circle().fill(Theme.sage500).frame(width: 8, height: 8)
-                Text("Sorted by closest fit to")
-                    .font(Theme.body(12.5, weight: .semibold))
-                    .foregroundStyle(Theme.sage800)
-            }
-            FlowLayout(spacing: 8) {
-                ForEach(store.have, id: \.self) { item in
-                    Button {
-                        store.toggleIngredient(item)
-                    } label: {
-                        Text("\(item) ×")
-                            .font(Theme.body(12.5, weight: .semibold))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(Theme.sage500)
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Remove \(item)")
-                }
-            }
+        HStack(spacing: 8) {
+            Circle().fill(Theme.sage500).frame(width: 8, height: 8)
+            Text("Filtered by \(store.have.joined(separator: ", "))")
+                .font(Theme.body(12.5, weight: .semibold))
+                .foregroundStyle(Theme.sage800)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Button("Clear") { store.setHave([]) }
+                .font(Theme.body(12.5, weight: .semibold))
+                .foregroundStyle(Theme.sage800)
+                .buttonStyle(.plain)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(Theme.sage100)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusCard, style: .continuous))
-        .padding(.horizontal, Theme.screenPadding)
-        .padding(.top, 14)
-    }
-}
-
-// MARK: - Clear filters
-
-/// One tap back to the full list, from search, course, tags, favorites and
-/// ingredients at once. Sits on the list screen rather than only in the
-/// Filters sheet because search and course are applied from out here.
-private struct ClearFiltersRow: View {
-    @Environment(RecipeStore.self) private var store
-
-    var body: some View {
-        if store.hasActiveFilters {
-            row
-        }
-    }
-
-    private var row: some View {
-        Button {
-            store.clearFilters()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-                Text("Clear all filters")
-                    .font(Theme.body(12.5, weight: .semibold))
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .background(Theme.accent100)
-            .foregroundStyle(Theme.accent700)
-            .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .clipShape(Capsule())
         .padding(.horizontal, Theme.screenPadding)
         .padding(.top, 14)
     }
@@ -580,7 +527,7 @@ struct FiltersSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button("Clear all") { store.clearFilters() }
+                Button("Reset") { store.clearFilters() }
                     .font(Theme.body(14, weight: .semibold))
                     .foregroundStyle(Theme.accent700)
                     .disabled(!store.hasActiveFilters)
@@ -588,7 +535,7 @@ struct FiltersSheet: View {
 
                 Spacer()
                 Text("Filters")
-                    .font(Theme.display(20))
+                    .font(Theme.display(30))
                     .foregroundStyle(Theme.ink)
                 Spacer()
 
@@ -664,7 +611,7 @@ struct FiltersSheet: View {
                             }
                         }
                         if !store.have.isEmpty {
-                            Text("Ignored while \u{201c}what I have\u{201d} is active — closest fit always comes first then.")
+                            Text("Ignored while ingredient filters are active — closest fit comes first then.")
                                 .font(Theme.body(11.5))
                                 .foregroundStyle(Theme.neutral600)
                         }
@@ -679,8 +626,9 @@ struct FiltersSheet: View {
 
     private var whatIHaveCard: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Kicker(text: "Ingredients", color: Theme.sage800)
             if store.selectedPantryGroups.isEmpty {
-                Text("Nothing marked yet.")
+                Text("No ingredients selected.")
                     .font(Theme.body(13))
                     .foregroundStyle(Theme.sage800)
             } else {
@@ -701,7 +649,7 @@ struct FiltersSheet: View {
                     }
                 }
             }
-            Text("Sorts recipes by closest fit. Type an ingredient in search to add one.")
+            Text("Shows recipes that use all of these, ranked by fit. Type an ingredient in search to add one.")
                 .font(Theme.body(11.5))
                 .foregroundStyle(Theme.sage800.opacity(0.8))
         }

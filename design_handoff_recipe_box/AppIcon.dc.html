@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stocked - App Icon Design Spec</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #EDE4D8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+      color: #3C2A21;
+    }
+    .container {
+      background: #FFFFFF;
+      padding: 48px;
+      border-radius: 36px;
+      box-shadow: 0 24px 48px rgba(90, 56, 37, 0.12), 0 4px 12px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 580px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 34px;
+      font-weight: 800;
+      color: #B35223;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 15px;
+      color: #7A6F64;
+      margin-bottom: 32px;
+      font-weight: 500;
+    }
+    .icon-preview {
+      width: 280px;
+      height: 280px;
+      border-radius: 64px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(179, 82, 35, 0.22), 0 6px 16px rgba(0,0,0,0.08);
+      margin-bottom: 36px;
+      border: 1px solid rgba(255,255,255,0.8);
+    }
+    .icon-preview svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .specs-card {
+      width: 100%;
+      background: #FAF6EF;
+      border: 1px solid #EAE0D2;
+      border-radius: 20px;
+      padding: 22px 24px;
+      font-size: 14px;
+    }
+    .spec-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #EFE5D8;
+    }
+    .spec-item:last-child {
+      border-bottom: none;
+    }
+    .spec-key {
+      color: #706255;
+      font-weight: 600;
+    }
+    .spec-val {
+      color: #B35223;
+      font-weight: 700;
+    }
+    .swatches {
+      display: flex;
+      gap: 8px;
+    }
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: inline-block;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Stocked</h1>
+    <p class="subtitle">App Icon Asset &amp; Design Specification</p>
+    
+    <div class="icon-preview">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Solid App Icon Background (App Store requirements) -->
+  <rect width="1024" height="1024" fill="#F6EFE6" />
+
+  <!-- Master Center Group scaled to fill standard icon bounds -->
+  <g transform="translate(512, 512) scale(1.36) translate(-512, -475)">
+    
+    <!-- ==================== 1. OPEN COOKBOOK ==================== -->
+    <g id="cookbook">
+      <!-- Book Green Base Outer Contour -->
+      <path d="M 374 180 C 428 198, 474 208, 512 222 C 550 208, 596 198, 650 180 C 660 177, 670 184, 670 195 L 670 358 C 670 367, 662 374, 652 377 C 596 395, 552 406, 512 418 C 472 406, 428 395, 372 377 C 362 374, 354 367, 354 358 L 354 195 C 354 184, 364 177, 374 180 Z" 
+            fill="#8FA88B" />
+
+      <!-- White/Cream Inner Pages -->
+      <path d="M 382 194 C 432 210, 474 220, 512 232 C 550 220, 592 210, 642 194 C 648 192, 656 197, 656 205 L 656 345 C 656 352, 650 358, 643 360 C 592 378, 550 388, 512 400 C 474 388, 432 378, 381 360 C 374 358, 368 352, 368 345 L 368 205 C 368 197, 376 192, 382 194 Z" 
+            fill="#FAF7F2" />
+
+      <!-- Page Inset Outlines -->
+      <path d="M 400 222 C 440 234, 474 242, 498 250 L 498 372 C 474 364, 440 356, 400 344 Z" 
+            fill="none" stroke="#8FA88B" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" />
+
+      <path d="M 624 222 C 584 234, 550 242, 526 250 L 526 372 C 550 364, 584 356, 624 344 Z" 
+            fill="none" stroke="#8FA88B" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" />
+
+      <!-- Spine Line -->
+      <line x1="512" y1="226" x2="512" y2="406" stroke="#789374" stroke-width="8" stroke-linecap="round" />
+
+      <!-- Bookmark Ribbon -->
+      <path d="M 546 186 L 576 178 L 576 280 L 561 264 L 546 280 Z" 
+            fill="#C25E2E" />
+    </g>
+
+
+    <!-- ==================== 2. SHELF STRUCTURE ==================== -->
+    <g id="shelf_structure">
+      <!-- Left Vertical Ladder Post -->
+      <rect x="320" y="390" width="30" height="350" rx="15" fill="#B35223" />
+
+      <!-- Right Vertical Ladder Post -->
+      <rect x="674" y="390" width="30" height="350" rx="15" fill="#B35223" />
+
+      <!-- Top Shelf Plank -->
+      <rect x="276" y="452" width="472" height="28" rx="14" fill="#B35223" />
+
+      <!-- Bottom Shelf Plank -->
+      <rect x="276" y="660" width="472" height="30" rx="15" fill="#B35223" />
+    </g>
+
+
+    <!-- ==================== 3. PANTRY & CUPBOARD ITEMS ==================== -->
+    <g id="items">
+      <!-- Left Box Item -->
+      <rect x="364" y="508" width="82" height="152" rx="8" fill="#B35223" />
+      <path d="M 446 516 L 472 486 L 472 636 L 446 660 Z" fill="#CB6837" />
+      <path d="M 372 508 L 398 478 L 472 486 L 446 516 Z" fill="#DD7C49" />
+
+      <!-- Center Jar Item -->
+      <rect x="495" y="522" width="60" height="18" rx="8" fill="#B35223" />
+      <path d="M 488 544 C 482 544, 478 552, 478 562 L 478 646 C 478 654, 484 660, 492 660 L 558 660 C 566 660, 572 654, 572 646 L 572 562 C 572 552, 566 544, 558 544 Z" 
+            fill="#B35223" />
+      <rect x="494" y="572" width="62" height="52" rx="10" fill="#C46030" />
+
+      <!-- Right Sack Item -->
+      <path d="M 602 534 C 592 538, 584 552, 586 574 C 588 596, 580 638, 582 652 C 584 658, 590 660, 598 660 L 652 660 C 660 660, 666 658, 668 652 C 670 638, 662 596, 664 574 C 666 552, 658 538, 648 534 C 642 531, 634 535, 630 540 C 624 535, 614 535, 608 540 C 604 535, 598 531, 592 534 Z" 
+            fill="#B35223" />
+      <path d="M 596 534 Q 625 542, 654 534 Q 646 518, 656 506 Q 625 514, 594 506 Q 604 518, 596 534 Z" 
+            fill="#CB6837" />
+      <path d="M 627 582 C 641 584, 649 600, 643 614 C 635 619, 621 616, 617 604 C 615 594, 620 585, 627 582 Z" 
+            fill="#8FA88B" />
+      <path d="M 619 610 Q 629 600, 639 590" stroke="#FAF7F2" stroke-width="3" stroke-linecap="round" fill="none" />
+    </g>
+
+  </g>
+</svg>
+    </div>
+
+    <div class="specs-card">
+      <div class="spec-item">
+        <span class="spec-key">App Name</span>
+        <span class="spec-val">Stocked</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-key">Navigation Structure</span>
+        <span class="spec-val">Cookbook &amp; Cupboard</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-key">Canvas Dimensions</span>
+        <span class="spec-val">1024 × 1024 px</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-key">Visual Concept</span>
+        <span class="spec-val">Cookbook (Top) + Cupboard Shelf (Bottom)</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-key">Color Palette</span>
+        <div class="swatches">
+          <span class="swatch" style="background:#B35223;" title="Terracotta / Rust (#B35223)"></span>
+          <span class="swatch" style="background:#8FA88B;" title="Sage Green (#8FA88B)"></span>
+          <span class="swatch" style="background:#FAF7F2;" title="Warm Cream (#FAF7F2)"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

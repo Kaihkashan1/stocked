@@ -32,7 +32,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: Theme.sectionGap) {
                     field(
                         kicker: "Server",
-                        footnote: "Recipes load from the hosted Recipe Box server. You do not need your Mac running. Only change this if you are testing a local backend."
+                        footnote: "Recipes load from the hosted Stocked server. You do not need your Mac running. Only change this if you are testing a local backend."
                     ) {
                         TextField(RecipeStore.hostedURL, text: $draftURL)
                             .textInputAutocapitalization(.never)

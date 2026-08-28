@@ -27,7 +27,7 @@ a:hover{color:var(--color-accent-800)}
 
   <div style="width:300px;flex:none;display:flex;flex-direction:column;gap:26px;position:sticky;top:52px">
     <div>
-      <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:8px">Recipe Box · iOS</div>
+      <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:8px">Stocked · iOS</div>
       <h1 style="font-size:40px;margin:0 0 12px;line-height:1.05">A warmer recipe box</h1>
       <p style="font-size:14px;line-height:1.6;margin:0;color:var(--color-neutral-700)">Text-first cards on a cream ground, terracotta for actions, sage for what you have. Source badges stay quiet. Every screen below is live — tap through the phone.</p>
     </div>
@@ -53,7 +53,7 @@ a:hover{color:var(--color-accent-800)}
           <div style="position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
             <div>
               <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:4px">{{ collectionLine }}</div>
-              <h1 style="font-size:36px;margin:0;line-height:1">Recipe Box</h1>
+              <h1 style="font-size:36px;margin:0;line-height:1">Stocked</h1>
             </div>
             <div style="display:flex;gap:8px">
               <button onClick="{{ openSettings }}" style="width:42px;height:42px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);color:var(--color-neutral-800);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--color-accent)" aria-label="Settings">
@@ -67,7 +67,7 @@ a:hover{color:var(--color-accent-800)}
           <div style="position:relative;display:flex;gap:9px;margin-top:18px">
             <div style="flex:1;display:flex;align-items:center;gap:9px;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:0 16px;height:46px">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" style="color:var(--color-neutral-600);flex:none"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.8-3.8"></path></svg>
-              <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search, or type what you have…" style="flex:1;min-width:0;border:none;background:transparent;outline:none;font:inherit;font-size:14.5px;color:var(--color-text)">
+              <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search recipes" style="flex:1;min-width:0;border:none;background:transparent;outline:none;font:inherit;font-size:14.5px;color:var(--color-text)">
             </div>
             <button onClick="{{ openFilters }}" style="width:46px;height:46px;flex:none;border-radius:999px;border:1px solid {{ filterBd }};background:{{ filterBg }};color:{{ filterFg }};display:flex;align-items:center;justify-content:center;cursor:pointer" aria-label="Filters">
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M4 7h16M7 12h10M10 17h4"></path></svg>
@@ -130,6 +130,17 @@ a:hover{color:var(--color-accent-800)}
           </sc-if>
         </div>
 
+        <div style="flex:none;display:flex;padding:10px 18px 26px;background:var(--color-surface);border-top:1px solid var(--color-divider)">
+          <button onClick="{{ goList }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:none;background:transparent;cursor:pointer;color:{{ tabRecipeColor }}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5a2 2 0 0 1 2-2h5a3 3 0 0 1 3 3v13.5a2.5 2.5 0 0 0-2.5-2.5H4z"></path><path d="M20 5.5a2 2 0 0 0-2-2h-5a3 3 0 0 0-3 3v13.5a2.5 2.5 0 0 1 2.5-2.5H20z"></path></svg>
+            <span style="font-size:10.5px;font-family:var(--font-body)">Cookbook</span>
+          </button>
+          <button onClick="{{ goPantry }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:none;background:transparent;cursor:pointer;color:{{ tabPantryColor }}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3" width="15" height="18" rx="2"></rect><path d="M12 3v18"></path><circle cx="10.2" cy="12" r="0.9" fill="currentColor" stroke="none"></circle><circle cx="13.8" cy="12" r="0.9" fill="currentColor" stroke="none"></circle></svg>
+            <span style="font-size:10.5px;font-family:var(--font-body)">Cupboard</span>
+          </button>
+        </div>
+
         <sc-if value="{{ addSheet }}" hint-placeholder-val="{{ false }}">
           <div onClick="{{ closeAddSheet }}" style="position:absolute;inset:0;z-index:40;background:color-mix(in srgb,var(--color-neutral-900) 42%,transparent);display:flex;flex-direction:column;justify-content:flex-end">
             <div style="background:var(--color-bg);border-radius:34px 34px 0 0;padding:26px 22px 40px;display:flex;flex-direction:column;gap:10px;animation:rbfade .22s ease both">
@@ -150,6 +161,173 @@ a:hover{color:var(--color-accent-800)}
       </div>
     </sc-if>
 
+    <!-- ══ PANTRY ══ -->
+    <sc-if value="{{ isPantry }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);position:relative">
+        <div style="flex:none;padding:66px 22px 14px">
+          <h1 style="font-size:36px;margin:0 0 4px;line-height:1">Cupboard</h1>
+          <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:16px">{{ pantryLine }}</div>
+          <div style="display:flex;gap:7px">
+            <sc-for list="{{ pantryTabChips }}" as="c" hint-placeholder-count="2">
+              <button onClick="{{ c.on }}" style="flex:1;cursor:pointer;font:inherit;font-size:13px;padding:10px 0;border-radius:999px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ isPantryItems }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:none;padding:2px 22px 10px">
+            <div style="display:flex;align-items:center;gap:9px;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:0 16px;height:46px">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" style="color:var(--color-neutral-600);flex:none"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+              <input value="{{ stockQuery }}" onChange="{{ onStockQuery }}" placeholder="Search what's in stock" style="flex:1;min-width:0;border:none;background:transparent;outline:none;font:inherit;font-size:14.5px;color:var(--color-text)">
+            </div>
+          </div>
+          <div style="flex:none;display:flex;gap:8px;padding:2px 22px 12px">
+            <button onClick="{{ toggleMatchMode }}" style="flex:1;cursor:pointer;font:inherit;font-size:13px;padding:11px 0;border-radius:999px;border:1px solid {{ matchBd }};background:{{ matchBg }};color:{{ matchFg }}">{{ matchModeLabel }}</button>
+            <button onClick="{{ openPantryAdd }}" style="width:44px;height:44px;flex:none;border-radius:999px;border:none;background:var(--color-accent);color:var(--color-bg);display:flex;align-items:center;justify-content:center;cursor:pointer" aria-label="Add pantry item">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            </button>
+          </div>
+
+          <div class="rb-scroll" style="flex:1;padding:6px 22px 16px">
+            <sc-if value="{{ hasMatchResults }}" hint-placeholder-val="{{ false }}">
+              <div style="border-radius:26px;background:var(--color-accent-2-100);padding:16px 18px;margin-bottom:16px">
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-2-800);margin-bottom:10px">{{ matchSelectedCount }} selected · matching recipes</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ matchResults }}" as="m" hint-placeholder-count="2">
+                    <button onClick="{{ m.open }}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer;font:inherit;border:none;background:var(--color-bg);border-radius:18px;padding:12px 16px">
+                      <span style="font-family:var(--font-heading);font-size:14.5px">{{ m.title }}</span>
+                      <span style="flex:none;font-size:11.5px;color:var(--color-accent-2-800)">{{ m.line }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-for list="{{ pantryGroups }}" as="g" hint-placeholder-count="3">
+              <div style="margin-bottom:18px">
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:9px">{{ g.label }}</div>
+                <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+                  <div onClick="{{ it.rowClick }}" style="cursor:pointer;background:var(--color-surface);border-radius:22px;padding:13px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm);margin-bottom:9px">
+                    <sc-if value="{{ it.matchMode }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:22px;height:22px;flex:none;border-radius:50%;border:2px solid {{ it.checkBd }};background:{{ it.checkBg }}"></span>
+                    </sc-if>
+                    <span style="flex:1;min-width:0">
+                      <span style="display:block;font-size:14.5px;font-weight:600;color:var(--color-neutral-900);margin-bottom:5px">{{ it.name }}</span>
+                      <span style="display:flex;gap:6px;flex-wrap:wrap">
+                        <span style="font-size:10.5px;padding:3px 9px;border-radius:999px;background:var(--color-neutral-100);color:var(--color-neutral-700)">{{ it.amountLabel }}</span>
+                        <span style="font-size:10.5px;padding:3px 9px;border-radius:999px;background:{{ it.statusBg }};color:{{ it.statusFg }}">{{ it.statusLabel }}</span>
+                        <sc-if value="{{ it.hasExpiry }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-size:10.5px;padding:3px 9px;border-radius:999px;background:{{ it.expiryBg }};color:{{ it.expiryFg }};border:1px solid {{ it.expiryBd }}">{{ it.expiryLabel }}</span>
+                        </sc-if>
+                      </span>
+                    </span>
+                    <sc-if value="{{ it.showRemove }}" hint-placeholder-val="{{ true }}">
+                      <button onClick="{{ it.removeIt }}" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:transparent;color:var(--color-neutral-500);display:flex;align-items:center;justify-content:center;cursor:pointer" aria-label="Remove">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 6h14M9 6V4.5A1.5 1.5 0 0110.5 3h3A1.5 1.5 0 0115 4.5V6m2 0-.8 13a2 2 0 01-2 1.9H9.8a2 2 0 01-2-1.9L7 6"></path></svg>
+                      </button>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noPantryItems }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:44px 8px;text-align:center;color:var(--color-neutral-600);font-size:14px">Nothing in your cupboard yet.</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isPantryToBuy }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:none;padding:2px 22px 10px">
+            <div style="display:flex;align-items:center;gap:9px;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:0 16px;height:46px">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" style="color:var(--color-neutral-600);flex:none"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+              <input value="{{ buyQuery }}" onChange="{{ onBuyQuery }}" placeholder="Search items to buy" style="flex:1;min-width:0;border:none;background:transparent;outline:none;font:inherit;font-size:14.5px;color:var(--color-text)">
+            </div>
+          </div>
+          <div style="flex:none;display:flex;gap:9px;padding:2px 22px 12px">
+            <input value="{{ newToBuy }}" onChange="{{ onNewToBuy }}" onKeyDown="{{ onToBuyKey }}" placeholder="Add something to buy…" style="flex:1;min-width:0;height:46px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 18px;font:inherit;font-size:14px;color:var(--color-text);outline:none">
+            <button onClick="{{ addToBuy }}" style="width:46px;height:46px;flex:none;border-radius:999px;border:none;background:var(--color-accent);color:var(--color-bg);display:flex;align-items:center;justify-content:center;cursor:pointer" aria-label="Add to buy">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            </button>
+          </div>
+          <div class="rb-scroll" style="flex:1;padding:6px 22px 16px">
+            <sc-for list="{{ toBuyList }}" as="b" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:12px;background:var(--color-surface);border-radius:20px;padding:13px 16px;margin-bottom:9px">
+                <button onClick="{{ b.toggle }}" style="flex:none;width:24px;height:24px;border-radius:50%;border:2px solid {{ b.checkBd }};background:{{ b.checkBg }};cursor:pointer"></button>
+                <span style="flex:1;font-size:14.5px;text-decoration:{{ b.textDecoration }};color:{{ b.textColor }}">{{ b.text }}</span>
+                <input value="{{ b.qty }}" onChange="{{ b.onQty }}" placeholder="qty" style="flex:none;width:64px;height:34px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-bg);padding:0 12px;font:inherit;font-size:12.5px;color:var(--color-neutral-800);outline:none;text-align:center">
+                <button onClick="{{ b.remove }}" style="flex:none;width:28px;height:28px;border-radius:50%;border:none;background:transparent;color:var(--color-neutral-500);display:flex;align-items:center;justify-content:center;cursor:pointer" aria-label="Remove">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+                </button>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noToBuy }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:44px 8px;text-align:center;color:var(--color-neutral-600);font-size:14px">Your to-buy list is empty.</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <div style="flex:none;display:flex;padding:10px 18px 26px;background:var(--color-surface);border-top:1px solid var(--color-divider)">
+          <button onClick="{{ goList }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:none;background:transparent;cursor:pointer;color:{{ tabRecipeColor }}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5a2 2 0 0 1 2-2h5a3 3 0 0 1 3 3v13.5a2.5 2.5 0 0 0-2.5-2.5H4z"></path><path d="M20 5.5a2 2 0 0 0-2-2h-5a3 3 0 0 0-3 3v13.5a2.5 2.5 0 0 1 2.5-2.5H20z"></path></svg>
+            <span style="font-size:10.5px;font-family:var(--font-body)">Cookbook</span>
+          </button>
+          <button onClick="{{ goPantry }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:none;background:transparent;cursor:pointer;color:{{ tabPantryColor }}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3" width="15" height="18" rx="2"></rect><path d="M12 3v18"></path><circle cx="10.2" cy="12" r="0.9" fill="currentColor" stroke="none"></circle><circle cx="13.8" cy="12" r="0.9" fill="currentColor" stroke="none"></circle></svg>
+            <span style="font-size:10.5px;font-family:var(--font-body)">Cupboard</span>
+          </button>
+        </div>
+
+        <sc-if value="{{ pantryAddSheet }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closePantryAdd }}" style="position:absolute;inset:0;z-index:40;background:color-mix(in srgb,var(--color-neutral-900) 42%,transparent);display:flex;flex-direction:column;justify-content:flex-end">
+            <div onClick="{{ stopClick }}" style="background:var(--color-bg);border-radius:34px 34px 0 0;padding:22px 22px 36px;display:flex;flex-direction:column;gap:14px;max-height:82%;overflow:auto;animation:rbfade .22s ease both">
+              <div style="width:44px;height:5px;border-radius:999px;background:var(--color-neutral-300);align-self:center"></div>
+              <h3 style="font-size:22px;margin:0">{{ pantrySheetTitle }}</h3>
+              <input value="{{ newPantryName }}" onChange="{{ onNewPantryName }}" placeholder="What is it?" style="width:100%;height:48px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 18px;font:inherit;font-size:14.5px;outline:none;color:var(--color-text);box-sizing:border-box">
+              <div>
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Category</div>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <sc-for list="{{ pantryCategoryChips }}" as="c" hint-placeholder-count="5">
+                    <button onClick="{{ c.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1">
+                  <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Amount</div>
+                  <input value="{{ newPantryAmount }}" onChange="{{ onNewPantryAmount }}" placeholder="e.g. 200" style="width:100%;height:46px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 16px;font:inherit;font-size:14px;outline:none;color:var(--color-text);box-sizing:border-box">
+                </div>
+                <div style="flex:1">
+                  <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Unit</div>
+                  <div style="display:flex;gap:6px">
+                    <sc-for list="{{ pantryUnitChips }}" as="u" hint-placeholder-count="3">
+                      <button onClick="{{ u.on }}" style="flex:1;cursor:pointer;font:inherit;font-size:12.5px;padding:0;height:46px;border-radius:999px;border:1px solid {{ u.bd }};background:{{ u.bg }};color:{{ u.fg }}">{{ u.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Status</div>
+                <div style="display:flex;gap:7px">
+                  <sc-for list="{{ pantryStatusChips }}" as="st" hint-placeholder-count="2">
+                    <button onClick="{{ st.on }}" style="flex:1;cursor:pointer;font:inherit;font-size:13px;padding:10px 0;border-radius:999px;border:1px solid {{ st.bd }};background:{{ st.bg }};color:{{ st.fg }}">{{ st.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Expiry date (optional)</div>
+                <input type="date" value="{{ newPantryExpiry }}" onChange="{{ onNewPantryExpiry }}" style="width:100%;height:46px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 16px;font:inherit;font-size:14px;outline:none;color:var(--color-text);box-sizing:border-box">
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Notes</div>
+                <textarea value="{{ newPantryNotes }}" onChange="{{ onNewPantryNotes }}" placeholder="Optional" style="width:100%;height:70px;border-radius:22px;border:1px solid var(--color-divider);background:var(--color-surface);padding:12px 16px;font:inherit;font-size:14px;outline:none;resize:none;color:var(--color-text);box-sizing:border-box"></textarea>
+              </div>
+              <button onClick="{{ savePantryItem }}" style="width:100%;border:none;border-radius:999px;padding:15px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:15px;background:var(--color-accent);color:var(--color-bg)" style-hover="background:var(--color-accent-600)">{{ pantrySaveLabel }}</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
     <!-- ══ DETAIL ══ -->
     <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
       <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
@@ -161,10 +339,94 @@ a:hover{color:var(--color-accent-800)}
           <button onClick="{{ favCurrent }}" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:{{ detailStarColor }}" aria-label="Favorite">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="{{ detailStarFill }}" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M12 3.2l2.7 5.5 6 .9-4.35 4.24 1.03 6-5.38-2.83L6.62 19.84l1.03-6L3.3 9.6l6-.9z"></path></svg>
           </button>
-          <button style="width:40px;height:40px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);color:var(--color-neutral-800);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--color-accent)" aria-label="More">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.9"></circle><circle cx="12" cy="12" r="1.9"></circle><circle cx="19" cy="12" r="1.9"></circle></svg>
-          </button>
+          <div style="position:relative">
+            <button onClick="{{ toggleMoreMenu }}" style="width:40px;height:40px;border-radius:999px;border:1px solid {{ moreMenuBd }};background:var(--color-surface);color:var(--color-neutral-800);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--color-accent)" aria-label="More">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.9"></circle><circle cx="12" cy="12" r="1.9"></circle><circle cx="19" cy="12" r="1.9"></circle></svg>
+            </button>
+            <sc-if value="{{ moreMenuOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;top:46px;right:0;z-index:30;min-width:190px;background:var(--color-surface);border-radius:20px;box-shadow:var(--shadow-lg);padding:6px;display:flex;flex-direction:column;animation:rbfade .16s ease both">
+                <sc-if value="{{ hasSourceLink }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ openOriginalPost }}" style="display:flex;align-items:center;gap:11px;padding:11px 12px;border:none;background:transparent;border-radius:14px;cursor:pointer;font:inherit;font-size:14px;color:var(--color-neutral-900);text-align:left" style-hover="background:var(--color-accent-100)">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5h5v5M19 5l-8 8"></path><path d="M18 13v5a2 2 0 01-2 2H7a2 2 0 01-2-2V8a2 2 0 012-2h5"></path></svg>
+                    Original post
+                  </button>
+                </sc-if>
+                <button onClick="{{ openEditRecipe }}" style="display:flex;align-items:center;gap:11px;padding:11px 12px;border:none;background:transparent;border-radius:14px;cursor:pointer;font:inherit;font-size:14px;color:var(--color-neutral-900);text-align:left" style-hover="background:var(--color-accent-100)">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"></path></svg>
+                  Edit recipe
+                </button>
+                <div style="height:1px;background:var(--color-divider);margin:5px 8px"></div>
+                <button onClick="{{ openDeleteConfirm }}" style="display:flex;align-items:center;gap:11px;padding:11px 12px;border:none;background:transparent;border-radius:14px;cursor:pointer;font:inherit;font-size:14px;color:var(--color-accent-800);text-align:left" style-hover="background:var(--color-accent-100)">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 6h14M9 6V4.5A1.5 1.5 0 0110.5 3h3A1.5 1.5 0 0115 4.5V6m2 0-.8 13a2 2 0 01-2 1.9H9.8a2 2 0 01-2-1.9L7 6"></path></svg>
+                  Delete recipe
+                </button>
+              </div>
+            </sc-if>
+          </div>
         </div>
+
+        <sc-if value="{{ moreMenuOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeMoreMenu }}" style="position:fixed;inset:0;z-index:25"></div>
+        </sc-if>
+
+        <sc-if value="{{ editSheetOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeEditRecipe }}" style="position:absolute;inset:0;z-index:40;background:color-mix(in srgb,var(--color-neutral-900) 42%,transparent);display:flex;flex-direction:column;justify-content:flex-end">
+            <div onClick="{{ stopClick }}" style="background:var(--color-bg);border-radius:34px 34px 0 0;padding:22px 22px 36px;display:flex;flex-direction:column;gap:14px;max-height:82%;overflow:auto;animation:rbfade .22s ease both">
+              <div style="width:44px;height:5px;border-radius:999px;background:var(--color-neutral-300);align-self:center"></div>
+              <h3 style="font-size:22px;margin:0">Edit recipe</h3>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Title</div>
+                <input value="{{ editTitle }}" onChange="{{ onEditTitle }}" style="width:100%;height:48px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 18px;font:inherit;font-size:14.5px;outline:none;color:var(--color-text);box-sizing:border-box">
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Course</div>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <sc-for list="{{ editCourseChips }}" as="c" hint-placeholder-count="4">
+                    <button onClick="{{ c.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Tags (comma separated)</div>
+                <input value="{{ editTags }}" onChange="{{ onEditTags }}" style="width:100%;height:46px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 16px;font:inherit;font-size:14px;outline:none;color:var(--color-text);box-sizing:border-box">
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+                  <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600)">Ingredients</span>
+                  <span style="font-size:11.5px;color:var(--color-neutral-600)">one per line, "qty | item"</span>
+                </div>
+                <textarea value="{{ editIngredients }}" onChange="{{ onEditIngredients }}" style="width:100%;height:130px;border-radius:22px;border:1px solid var(--color-divider);background:var(--color-surface);padding:12px 16px;font:inherit;font-size:13.5px;line-height:1.7;outline:none;resize:none;color:var(--color-text);box-sizing:border-box"></textarea>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+                  <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600)">Steps</span>
+                  <span style="font-size:11.5px;color:var(--color-neutral-600)">blank line between steps</span>
+                </div>
+                <textarea value="{{ editSteps }}" onChange="{{ onEditSteps }}" style="width:100%;height:160px;border-radius:22px;border:1px solid var(--color-divider);background:var(--color-surface);padding:12px 16px;font:inherit;font-size:13.5px;line-height:1.7;outline:none;resize:none;color:var(--color-text);box-sizing:border-box"></textarea>
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Notes</div>
+                <textarea value="{{ editNotes }}" onChange="{{ onEditNotes }}" style="width:100%;height:80px;border-radius:22px;border:1px solid var(--color-divider);background:var(--color-surface);padding:12px 16px;font:inherit;font-size:14px;outline:none;resize:none;color:var(--color-text);box-sizing:border-box"></textarea>
+              </div>
+              <button onClick="{{ saveEditRecipe }}" style="width:100%;border:none;border-radius:999px;padding:15px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:15px;background:var(--color-accent);color:var(--color-bg)" style-hover="background:var(--color-accent-600)">Save changes</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ deleteConfirmOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeDeleteConfirm }}" style="position:absolute;inset:0;z-index:40;background:color-mix(in srgb,var(--color-neutral-900) 42%,transparent);display:flex;align-items:center;justify-content:center;padding:0 30px">
+            <div onClick="{{ stopClick }}" style="width:100%;max-width:320px;background:var(--color-bg);border-radius:28px;padding:26px 24px;display:flex;flex-direction:column;gap:18px;animation:rbfade .18s ease both">
+              <div>
+                <h3 style="font-size:20px;margin:0 0 8px">Delete this recipe?</h3>
+                <p style="font-size:14px;color:var(--color-neutral-700);margin:0;line-height:1.5">This removes it from your box. This can't be undone.</p>
+              </div>
+              <div style="display:flex;gap:10px">
+                <button onClick="{{ closeDeleteConfirm }}" style="flex:1;border:1px solid var(--color-divider);border-radius:999px;padding:13px 0;cursor:pointer;font:inherit;font-size:14px;background:var(--color-surface);color:var(--color-neutral-800)">Cancel</button>
+                <button onClick="{{ confirmDeleteRecipe }}" style="flex:1;border:none;border-radius:999px;padding:13px 0;cursor:pointer;font:inherit;font-size:14px;background:var(--color-accent-800);color:#fff8ec">Delete</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
 
         <div class="rb-scroll" style="flex:1;padding:14px 22px 120px">
           <div style="position:relative;overflow:hidden;border-radius:32px;background:var(--color-surface);padding:24px 22px 22px;margin-bottom:18px">
@@ -195,11 +457,19 @@ a:hover{color:var(--color-accent-800)}
           </div>
           <div style="background:var(--color-surface);border-radius:28px;padding:6px 20px;margin-bottom:28px">
             <sc-for list="{{ detailIngredients }}" as="i" hint-placeholder-count="6">
-              <div style="display:flex;align-items:baseline;gap:12px;padding:13px 0;border-bottom:1px solid var(--color-divider)">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--color-divider)">
                 <sc-if value="{{ i.hasQty }}" hint-placeholder-val="{{ true }}">
                   <span style="flex:none;min-width:62px;text-align:center;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;background:{{ i.qtyBg }};color:{{ i.qtyFg }}">{{ i.qty }}</span>
                 </sc-if>
-                <span style="font-size:14.5px;line-height:1.45;color:var(--color-neutral-900)">{{ i.text }}</span>
+                <span style="flex:1;font-size:14.5px;line-height:1.45;color:var(--color-neutral-900)">{{ i.text }}</span>
+                <button onClick="{{ i.toggleBuy }}" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:{{ i.buyBg }};color:{{ i.buyFg }};display:flex;align-items:center;justify-content:center;cursor:pointer" aria-label="Add to buy list">
+                  <sc-if value="{{ i.inBuyList }}" hint-placeholder-val="{{ false }}">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"></path></svg>
+                  </sc-if>
+                  <sc-if value="{{ i.notInBuyList }}" hint-placeholder-val="{{ true }}">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+                  </sc-if>
+                </button>
               </div>
             </sc-for>
           </div>
@@ -326,6 +596,17 @@ a:hover{color:var(--color-accent-800)}
             <div>
               <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Ingredients</div>
               <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:26px;padding:16px 18px;font-size:14px;line-height:1.9;color:var(--color-neutral-900)">1 cup grated coconut<br>2 tbsp roasted chana dal<br>2 green chillies<br>1 tsp tamarind paste<br>Salt, to taste</div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Steps</div>
+              <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:26px;padding:6px 18px">
+                <sc-for list="{{ photoSteps }}" as="st" hint-placeholder-count="6">
+                  <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--color-divider)">
+                    <span style="flex:none;width:22px;height:22px;border-radius:50%;background:var(--color-accent-200);color:var(--color-accent-800);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ st.n }}</span>
+                    <span style="font-size:14px;line-height:1.5;color:var(--color-neutral-900)">{{ st.text }}</span>
+                  </div>
+                </sc-for>
+              </div>
             </div>
             <div>
               <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Course</div>
@@ -511,10 +792,10 @@ Melt butter with chili crisp" style="width:100%;height:130px;border-radius:26px;
     <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
       <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
         <div style="flex:none;padding:66px 22px 14px">
-          <h1 style="font-size:36px;margin:0;line-height:1">Recipe Box</h1>
+          <h1 style="font-size:36px;margin:0;line-height:1">Stocked</h1>
           <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
             <span style="width:18px;height:18px;flex:none;border-radius:50%;border:2.5px solid var(--color-accent-200);border-top-color:var(--color-accent);animation:rbspin .9s linear infinite"></span>
-            <span style="font-size:13px;color:var(--color-neutral-700)">Loading your recipes…</span>
+            <span style="font-size:13px;color:var(--color-neutral-700)">Loading your cookbook and cupboard…</span>
           </div>
           <div style="height:46px;border-radius:999px;background:var(--color-surface);margin-top:16px;animation:rbpulse 1.4s ease-in-out infinite"></div>
         </div>
@@ -775,10 +1056,31 @@ Melt butter with chili crisp" style="width:100%;height:130px;border-radius:26px;
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000,&quot;height&quot;:1000}}">
 class Component extends DCLogic {
+  addDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+  PANTRY_SEED = [
+    { id: 1, name: 'Salted butter', category: 'Dairy & eggs', amount: 150, unit: 'g', status: 'open', expiry: this.addDays(2), notes: '' },
+    { id: 2, name: 'Paneer', category: 'Dairy & eggs', amount: 200, unit: 'g', status: 'unopened', expiry: this.addDays(6), notes: '' },
+    { id: 3, name: 'Yellow onions', category: 'Produce', amount: 5, unit: 'pcs', status: 'unopened', expiry: null, notes: '' },
+    { id: 4, name: 'Lemon', category: 'Produce', amount: 3, unit: 'pcs', status: 'unopened', expiry: this.addDays(9), notes: '' },
+    { id: 5, name: 'Spring onions', category: 'Produce', amount: 1, unit: 'pcs', status: 'open', expiry: this.addDays(-1), notes: 'One bunch, from Tuesday' },
+    { id: 6, name: 'Chicken thighs', category: 'Meat & seafood', amount: 6, unit: 'pcs', status: 'unopened', expiry: this.addDays(3), notes: '' },
+    { id: 7, name: 'Salmon fillets', category: 'Meat & seafood', amount: 2, unit: 'pcs', status: 'unopened', expiry: this.addDays(2), notes: '' },
+    { id: 8, name: 'Wheat noodles', category: 'Grains & pantry', amount: 500, unit: 'g', status: 'unopened', expiry: null, notes: '' },
+    { id: 9, name: 'Dried chickpeas', category: 'Grains & pantry', amount: 1, unit: 'kg', status: 'unopened', expiry: null, notes: '' },
+    { id: 10, name: 'Soy sauce', category: 'Condiments & spices', amount: 1, unit: 'pcs', status: 'open', expiry: null, notes: 'About half left' },
+    { id: 11, name: 'Tahini', category: 'Condiments & spices', amount: 1, unit: 'pcs', status: 'unopened', expiry: this.addDays(90), notes: '' },
+    { id: 12, name: 'Harissa paste', category: 'Condiments & spices', amount: 1, unit: 'pcs', status: 'open', expiry: null, notes: '' },
+  ];
+  TOBUY_SEED = [
+    { id: 1, text: 'Chili crisp', checked: false },
+    { id: 2, text: 'Black vinegar', checked: false },
+    { id: 3, text: 'Parchment paper', checked: true },
+  ];
   state = {
     screen: 'list', query: '', have: [], favs: {2:true}, tags: [], favOnly: false, viewMode: 'list',
     sort: 'Recent', currentId: 1, step: 0, scale: 1, addSheet: false, sources: [], course: null, formCourse: 'Main course',
     link: '', linkPhase: 'idle', fetchIndex: 0, meal: 'Dinner',
+    pantry: this.PANTRY_SEED, toBuy: this.TOBUY_SEED, pantryTab: 'items', pantryMatchMode: false, pantryMatchSelected: [], pantryAddSheet: false,
   };
 
   RECIPES = [
@@ -870,7 +1172,7 @@ class Component extends DCLogic {
     const activeFilters = s.tags.length || s.favOnly || s.have.length || s.sources.length;
 
     const rail = [
-      ['Recipe list','list','6'], ['Recipe detail','detail',''], ['Cook mode','cook',''],
+      ['Recipe list','list','6'], ['Cupboard','pantry',''], ['Recipe detail','detail',''], ['Cook mode','cook',''],
       ['Paste a link','link','new'], ['From a photo','photo',''], ['Type it in','type',''],
       ['Filters','filters',''], ['Settings','settings',''], ['Empty state','empty',''], ['Loading','loading',''],
     ].map(([label, key, hint]) => ({
@@ -881,6 +1183,61 @@ class Component extends DCLogic {
     }));
 
     const cook = { bg: 'var(--color-accent-900)', fg: '#f7ecd9', chip: 'rgba(247,236,217,0.14)', blob: 'rgba(198,113,57,0.18)', accent: 'var(--color-accent-400)' };
+
+    const CATEGORY_ORDER = ['Produce','Dairy & eggs','Meat & seafood','Grains & pantry','Condiments & spices','Other'];
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+    const expiryInfo = (exp) => {
+      if (!exp) return null;
+      const d = new Date(exp + 'T00:00:00');
+      const diff = Math.round((d - today0) / 86400000);
+      if (diff < 0) return { label: 'Expired', bg: 'var(--color-accent-800)', fg: '#fff8ec', bd: 'transparent' };
+      if (diff <= 3) return { label: diff === 0 ? 'Expires today' : 'Expires in ' + diff + 'd', bg: 'var(--color-accent-500)', fg: '#fff8ec', bd: 'transparent' };
+      return { label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), bg: 'transparent', fg: 'var(--color-neutral-600)', bd: 'var(--color-divider)' };
+    };
+    const pantrySel = s.pantryMatchSelected || [];
+    const openEdit = (it) => this.setState({ pantryAddSheet: true, editingPantryId: it.id,
+      newPantryName: it.name, newPantryCategory: it.category, newPantryAmount: String(it.amount),
+      newPantryUnit: it.unit, newPantryStatus: it.status, newPantryExpiry: it.expiry || '', newPantryNotes: it.notes || '' });
+    const pantryRow = (it) => {
+      const exp = expiryInfo(it.expiry);
+      const selected = pantrySel.includes(it.id);
+      return {
+        id: it.id, name: it.name,
+        amountLabel: it.amount + ' ' + it.unit,
+        statusLabel: it.status === 'open' ? 'Open' : 'Unopened',
+        statusBg: it.status === 'open' ? 'var(--color-accent-2-100)' : 'var(--color-neutral-100)',
+        statusFg: it.status === 'open' ? 'var(--color-accent-2-800)' : 'var(--color-neutral-700)',
+        hasExpiry: !!exp, expiryLabel: exp ? exp.label : '', expiryBg: exp ? exp.bg : '', expiryFg: exp ? exp.fg : '', expiryBd: exp ? exp.bd : '',
+        matchMode: !!s.pantryMatchMode, selected, showRemove: !s.pantryMatchMode,
+        checkBg: selected ? 'var(--color-accent)' : 'transparent',
+        checkBd: selected ? 'var(--color-accent)' : 'var(--color-neutral-400)',
+        rowClick: () => {
+          if (s.pantryMatchMode) this.setState({ pantryMatchSelected: selected ? pantrySel.filter(x => x !== it.id) : pantrySel.concat(it.id) });
+          else openEdit(it);
+        },
+        removeIt: (e) => { e.stopPropagation(); this.setState({ pantry: s.pantry.filter(p => p.id !== it.id) }); },
+      };
+    };
+    const stockQ = (s.stockQuery || '').trim().toLowerCase();
+    const pantryFiltered = stockQ ? s.pantry.filter(p => p.name.toLowerCase().includes(stockQ) || p.category.toLowerCase().includes(stockQ)) : s.pantry;
+    const pantryGroups = CATEGORY_ORDER
+      .map(cat => ({ label: cat, items: pantryFiltered.filter(p => p.category === cat).map(pantryRow) }))
+      .filter(g => g.items.length > 0);
+    const stem = (w) => w.length > 4 && w.endsWith('es') ? w.slice(0, -2) : w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w;
+    const wordsOf = (text) => text.toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 4).map(stem);
+    const matchNames = pantrySel.map(id => (s.pantry.find(p => p.id === id) || {}).name).filter(Boolean);
+    const matchWordSets = matchNames.map(wordsOf);
+    const matchResults = matchNames.length ? this.RECIPES.map(r => {
+      const total = r.ingredients.length;
+      const hits = r.ingredients.filter(i => {
+        const iw = wordsOf(i[1]);
+        return matchWordSets.some(nw => nw.some(w => iw.includes(w)));
+      }).length;
+      return { r, hits, total };
+    }).filter(x => x.hits > 0).sort((a, b) => b.hits - a.hits).slice(0, 4).map(({ r, hits, total }) => ({
+      title: r.title, line: hits + ' of ' + total + ' ingredients',
+      open: () => this.setState({ screen: 'detail', currentId: r.id, step: 0, scale: 1 }),
+    })) : [];
 
     return {
       frameW: 402, frameH: 874,
@@ -951,13 +1308,68 @@ class Component extends DCLogic {
       detailStarColor: s.favs[current.id] ? 'var(--color-accent)' : 'var(--color-neutral-500)',
       detailStarFill: s.favs[current.id] ? 'currentColor' : 'none',
       favCurrent: () => this.setState({ favs: Object.assign({}, s.favs, { [current.id]: !s.favs[current.id] }) }),
+      moreMenuOpen: !!s.moreMenuOpen, moreMenuBd: s.moreMenuOpen ? 'var(--color-accent)' : 'var(--color-divider)',
+      toggleMoreMenu: () => this.setState({ moreMenuOpen: !s.moreMenuOpen }),
+      closeMoreMenu: () => this.setState({ moreMenuOpen: false }),
+      stopClick: (e) => e.stopPropagation(),
+      hasSourceLink: ['Instagram', 'YouTube', 'TikTok', 'Link'].includes(current.source),
+      openOriginalPost: () => { this.setState({ moreMenuOpen: false }); window.open('https://example.com', '_blank'); },
+      openEditRecipe: () => this.setState({ moreMenuOpen: false, editSheetOpen: true,
+        editTitle: current.title, editCourse: current.course, editTags: current.tags.join(', '),
+        editIngredients: current.ingredients.map(([qty, text]) => (qty ? qty + ' | ' + text : text)).join('\n'),
+        editSteps: current.steps.join('\n\n'), editNotes: current.notes || '' }),
+      closeEditRecipe: () => this.setState({ editSheetOpen: false }),
+      editSheetOpen: !!s.editSheetOpen,
+      editTitle: s.editTitle || '', onEditTitle: (e) => this.setState({ editTitle: e.target.value }),
+      editCourseChips: ['Appetizers', 'Main course', 'Desserts', 'Drinks'].map(c => Object.assign(
+        { label: c, on: () => this.setState({ editCourse: c }) }, chip((s.editCourse || current.course) === c)
+      )),
+      editTags: s.editTags || '', onEditTags: (e) => this.setState({ editTags: e.target.value }),
+      editIngredients: s.editIngredients || '', onEditIngredients: (e) => this.setState({ editIngredients: e.target.value }),
+      editSteps: s.editSteps || '', onEditSteps: (e) => this.setState({ editSteps: e.target.value }),
+      editNotes: s.editNotes || '', onEditNotes: (e) => this.setState({ editNotes: e.target.value }),
+      saveEditRecipe: () => {
+        const title = (s.editTitle || '').trim(); if (!title) return;
+        const ingredients = (s.editIngredients || '').split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+          const parts = line.split('|');
+          return parts.length > 1 ? [parts[0].trim(), parts.slice(1).join('|').trim()] : [null, line];
+        });
+        const steps = (s.editSteps || '').split(/\n\s*\n/).map(t => t.trim()).filter(Boolean);
+        const tags = (s.editTags || '').split(',').map(t => t.trim()).filter(Boolean);
+        Object.assign(current, { title, course: s.editCourse || current.course, tags,
+          ingredients: ingredients.length ? ingredients : current.ingredients,
+          steps: steps.length ? steps : current.steps, notes: s.editNotes || '' });
+        this.setState({ editSheetOpen: false, step: 0 });
+      },
+      openDeleteConfirm: () => this.setState({ moreMenuOpen: false, deleteConfirmOpen: true }),
+      closeDeleteConfirm: () => this.setState({ deleteConfirmOpen: false }),
+      deleteConfirmOpen: !!s.deleteConfirmOpen,
+      confirmDeleteRecipe: () => {
+        this.RECIPES = this.RECIPES.filter(r => r.id !== current.id);
+        this.setState({ deleteConfirmOpen: false, screen: 'list' });
+      },
       detailPantryLine: missing.length === 0 ? 'You have everything for this.' : 'Missing ' + missing.length + ': ' + missing.slice(0, 3).join(', '),
-      detailIngredients: current.ingredients.map(([qty, text]) => ({
-        hasQty: !!qty, qty: scaleQty(qty), text,
-        qtyBg: s.scale === 1 ? 'var(--color-accent-200)' : 'var(--color-accent)',
-        qtyFg: s.scale === 1 ? 'var(--color-accent-800)' : 'var(--color-bg)',
-      })),
+      detailIngredients: current.ingredients.map(([qty, text]) => {
+        const inList = (s.toBuy || []).some(b => b.text.toLowerCase() === text.toLowerCase());
+        return {
+          hasQty: !!qty, qty: scaleQty(qty), text,
+          qtyBg: s.scale === 1 ? 'var(--color-accent-200)' : 'var(--color-accent)',
+          qtyFg: s.scale === 1 ? 'var(--color-accent-800)' : 'var(--color-bg)',
+          inBuyList: inList, notInBuyList: !inList,
+          buyBg: inList ? 'var(--color-accent-2-500)' : 'var(--color-neutral-100)',
+          buyFg: inList ? 'var(--color-bg)' : 'var(--color-neutral-700)',
+          toggleBuy: () => this.setState(inList
+            ? { toBuy: s.toBuy.filter(b => b.text.toLowerCase() !== text.toLowerCase()) }
+            : { toBuy: (s.toBuy || []).concat({ id: Date.now() + Math.random(), text, qty: qty || '', checked: false }) }),
+        };
+      }),
       detailSteps: current.steps.map((text, i) => ({ n: i + 1, text })),
+      photoSteps: ['Dry roast the chana dal until it turns a shade darker and smells nutty, then let it cool.',
+        'Blend the coconut, roasted dal, green chillies, tamarind and salt with a splash of water to a coarse paste.',
+        'Adjust water until it loosens to a spoonable consistency — not runny.',
+        'Heat oil in a small pan and add mustard seeds; let them pop.',
+        'Add curry leaves and a pinch of asafoetida to the popped mustard seeds.',
+        'Pour the tempering over the chutney just before serving.'].map((text, i) => ({ n: i + 1, text })),
       scales: [0.5, 1, 2, 3].map(f => Object.assign(
         { label: (f === 0.5 ? '½' : f) + '×', on: () => this.setState({ scale: f }) },
         s.scale === f ? { bg: 'var(--color-accent)', fg: 'var(--color-bg)' } : { bg: 'var(--color-surface)', fg: 'var(--color-neutral-700)' }
@@ -1024,6 +1436,67 @@ class Component extends DCLogic {
       favOnlyFill: s.favOnly ? 'currentColor' : 'none',
       toggleFavOnly: () => this.setState({ favOnly: !s.favOnly }),
       resetFilters: () => this.setState({ tags: [], favOnly: false, sort: 'Recent', have: [], sources: [] }),
+
+      goPantry: this.go('pantry'),
+      isPantry: s.screen === 'pantry',
+      tabRecipeColor: s.screen === 'list' ? 'var(--color-accent)' : 'var(--color-neutral-500)',
+      tabPantryColor: s.screen === 'pantry' ? 'var(--color-accent)' : 'var(--color-neutral-500)',
+      isPantryItems: (s.pantryTab || 'items') !== 'toBuy',
+      isPantryToBuy: (s.pantryTab || 'items') === 'toBuy',
+      pantryTabChips: [['items','Items'],['toBuy','To buy']].map(([key,label]) => Object.assign(
+        { label, on: () => this.setState({ pantryTab: key }) }, chip((s.pantryTab || 'items') === key)
+      )),
+      pantryLine: s.pantry.length + ' items' + ((s.toBuy || []).filter(b => !b.checked).length ? ' · ' + (s.toBuy || []).filter(b => !b.checked).length + ' to buy' : ''),
+      matchModeLabel: s.pantryMatchMode ? 'Done selecting' : 'Select items to match',
+      toggleMatchMode: () => this.setState({ pantryMatchMode: !s.pantryMatchMode, pantryMatchSelected: [] }),
+      matchBg: chip(s.pantryMatchMode).bg, matchFg: chip(s.pantryMatchMode).fg, matchBd: chip(s.pantryMatchMode).bd,
+      pantryGroups, noPantryItems: pantryFiltered.length === 0,
+      stockQuery: s.stockQuery || '', onStockQuery: (e) => this.setState({ stockQuery: e.target.value }),
+      hasMatchResults: matchResults.length > 0, matchSelectedCount: pantrySel.length, matchResults,
+      openPantryAdd: () => this.setState({ pantryAddSheet: true, editingPantryId: null, newPantryName: '', newPantryCategory: CATEGORY_ORDER[0], newPantryAmount: '', newPantryUnit: 'g', newPantryStatus: 'unopened', newPantryExpiry: '', newPantryNotes: '' }),
+      closePantryAdd: () => this.setState({ pantryAddSheet: false, editingPantryId: null }),
+      pantryAddSheet: !!s.pantryAddSheet,
+      pantrySheetTitle: s.editingPantryId ? 'Edit pantry item' : 'Add pantry item',
+      pantrySaveLabel: s.editingPantryId ? 'Save changes' : 'Add to pantry',
+      stopClick: (e) => e.stopPropagation(),
+      newPantryName: s.newPantryName || '', onNewPantryName: (e) => this.setState({ newPantryName: e.target.value }),
+      pantryCategoryChips: CATEGORY_ORDER.filter(c => c !== 'Other').map(c => Object.assign(
+        { label: c, on: () => this.setState({ newPantryCategory: c }) }, chip((s.newPantryCategory || CATEGORY_ORDER[0]) === c)
+      )),
+      newPantryAmount: s.newPantryAmount || '', onNewPantryAmount: (e) => this.setState({ newPantryAmount: e.target.value }),
+      pantryUnitChips: ['pcs','g','kg'].map(u => Object.assign({ label: u, on: () => this.setState({ newPantryUnit: u }) }, chip((s.newPantryUnit || 'g') === u))),
+      pantryStatusChips: [['unopened','Unopened'],['open','Open']].map(([k,label]) => Object.assign({ label, on: () => this.setState({ newPantryStatus: k }) }, chip((s.newPantryStatus || 'unopened') === k))),
+      newPantryExpiry: s.newPantryExpiry || '', onNewPantryExpiry: (e) => this.setState({ newPantryExpiry: e.target.value }),
+      newPantryNotes: s.newPantryNotes || '', onNewPantryNotes: (e) => this.setState({ newPantryNotes: e.target.value }),
+      savePantryItem: () => {
+        const name = (s.newPantryName || '').trim();
+        if (!name) return;
+        const fields = { name, category: s.newPantryCategory || CATEGORY_ORDER[0],
+          amount: s.newPantryAmount || '1', unit: s.newPantryUnit || 'g', status: s.newPantryStatus || 'unopened',
+          expiry: s.newPantryExpiry || null, notes: s.newPantryNotes || '' };
+        if (s.editingPantryId) {
+          this.setState({ pantry: s.pantry.map(p => p.id === s.editingPantryId ? Object.assign({}, p, fields) : p), pantryAddSheet: false, editingPantryId: null });
+        } else {
+          this.setState({ pantry: s.pantry.concat(Object.assign({ id: Date.now() }, fields)), pantryAddSheet: false });
+        }
+      },
+      buyQuery: s.buyQuery || '', onBuyQuery: (e) => this.setState({ buyQuery: e.target.value }),
+      toBuyList: (s.toBuy || []).filter(b => !((s.buyQuery || '').trim()) || b.text.toLowerCase().includes((s.buyQuery || '').trim().toLowerCase())).map(b => ({
+        id: b.id, text: b.text, checked: b.checked, qty: b.qty || '',
+        textDecoration: b.checked ? 'line-through' : 'none',
+        textColor: b.checked ? 'var(--color-neutral-500)' : 'var(--color-text)',
+        checkBg: b.checked ? 'var(--color-accent-2-500)' : 'transparent',
+        checkBd: b.checked ? 'var(--color-accent-2-500)' : 'var(--color-neutral-400)',
+        toggle: () => this.setState({ toBuy: s.toBuy.map(x => x.id === b.id ? Object.assign({}, x, { checked: !x.checked }) : x) }),
+        remove: () => this.setState({ toBuy: s.toBuy.filter(x => x.id !== b.id) }),
+        onQty: (e) => this.setState({ toBuy: s.toBuy.map(x => x.id === b.id ? Object.assign({}, x, { qty: e.target.value }) : x) }),
+      })),
+      noToBuy: (s.toBuy || []).filter(b => !((s.buyQuery || '').trim()) || b.text.toLowerCase().includes((s.buyQuery || '').trim().toLowerCase())).length === 0,
+      newToBuy: s.newToBuy || '', onNewToBuy: (e) => this.setState({ newToBuy: e.target.value }),
+      addToBuy: () => { const text = (s.newToBuy || '').trim(); if (!text) return;
+        this.setState({ toBuy: (s.toBuy || []).concat({ id: Date.now(), text, qty: '', checked: false }), newToBuy: '' }); },
+      onToBuyKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); const text = (s.newToBuy || '').trim();
+        if (text) this.setState({ toBuy: (s.toBuy || []).concat({ id: Date.now(), text, qty: '', checked: false }), newToBuy: '' }); } },
 
       quotaRows: [
         { label: 'Gemini reads today', value: '6 of 20', pct: '30%' },

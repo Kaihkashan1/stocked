@@ -1,8 +1,8 @@
-# Recipe Box
+# Stocked
 
-Share a recipe reel, video, or blog link from your iPhone. The hosted backend fetches it, asks Gemini to extract the recipe, and appends a row to a Google Sheet. Browse the collection in the iPhone app, at the Vercel URL, or in the Sheets app.
+Share a recipe reel, video, or blog link from your iPhone. The hosted backend fetches it, asks Gemini to extract the recipe, and appends a row to a Google Sheet. Browse and cook in the personal iPhone app (**Stocked** — Cookbook + Cupboard tabs), at the Vercel URL, or in the Sheets app.
 
-This is the free-tier MVP: Google Sheets storage, Vercel in production (optional local Mac for development). Browse at `https://kaihkashan-recipe-box.vercel.app/`, locally at `http://127.0.0.1:8000/`, or in the personal iPhone app in `ios/`.
+This is the free-tier MVP: Google Sheets storage, Vercel in production (optional local Mac for development). Production: `https://stocked-cookbook-cupboard.vercel.app/`. Local: `http://127.0.0.1:8000/`. iPhone app: [`ios/`](ios/).
 
 ```
 iPhone Share → POST /ingest → Apify (Instagram) / yt-dlp (YouTube, TikTok, ...) / plain page fetch (everything else) → Gemini → Google Sheets
@@ -41,7 +41,7 @@ The backend writes as a bot, so it needs a Google Cloud *service account* that y
 
 ### Create the spreadsheet
 
-1. Open [Google Sheets](https://sheets.google.com) and create a blank spreadsheet. Name it **Recipe Box**.
+1. Open [Google Sheets](https://sheets.google.com) and create a blank spreadsheet. Name it **Stocked** (or keep an existing “Recipe Box” sheet — only the id matters).
 2. Copy the long id from the URL:
 
 ```
@@ -96,12 +96,12 @@ source .venv/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-On this Mac, open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) for the recipe box app. Health check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health).
+On this Mac, open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) for the web UI. Health check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health).
 
-For day-to-day use, point the iPhone Shortcut and app at the hosted URL instead of this Mac:
+For day-to-day use, point the iPhone Shortcut and Stocked app at the hosted URL instead of this Mac:
 
 ```
-https://kaihkashan-recipe-box.vercel.app
+https://stocked-cookbook-cupboard.vercel.app
 ```
 
 A local server is only needed when you are developing the backend. If you do use LAN ingest, find this Mac’s Wi-Fi address (iPhone and Mac on the same network):
@@ -119,7 +119,7 @@ On the iPhone:
 1. Open **Shortcuts → All Shortcuts → +**. Name it **Save Recipe**.
 2. Tap the **i** (or shortcut settings) and turn on **Show in Share Sheet**. Accept **URLs** and **Text**.
 3. Add action **Get Contents of URL**:
-   - URL: `https://kaihkashan-recipe-box.vercel.app/ingest`
+   - URL: `https://stocked-cookbook-cupboard.vercel.app/ingest`
    - Method: `POST`
    - Headers:
      - `Content-Type` = `application/json`
@@ -132,10 +132,10 @@ On the iPhone:
    - **Inside the If (has "status" — a real response came back):**
      - Add **Get Dictionary Value**. Key: `status`. Dictionary: **Contents of URL**.
      - Add a nested **If**. Input: **Dictionary Value**. Condition: **is** `error`.
-       - Inside: **Show Notification** — Title: `Recipe Box`, Body: **Get Dictionary Value**, key `error`, dictionary **Contents of URL**. This is where the Gemini-quota and Apify-limit messages actually show up — each has distinct wording (see section below), so the notification itself tells you which one it was.
+       - Inside: **Show Notification** — Title: `Stocked`, Body: **Get Dictionary Value**, key `error`, dictionary **Contents of URL**. This is where the Gemini-quota and Apify-limit messages actually show up — each has distinct wording (see section below), so the notification itself tells you which one it was.
        - Leave that inner **Otherwise** empty — a successful save or a duplicate stays silent.
    - **In the outer If's Otherwise (no "status" — the request never got a real response):**
-     - Add **Show Notification** — Title: `Recipe Box`, Body: `Request timed out or failed before the server could respond (Vercel's ingest limit is 60s). The recipe probably wasn't saved — try again in a bit.`
+     - Add **Show Notification** — Title: `Stocked`, Body: `Request timed out or failed before the server could respond (Vercel's ingest limit is 60s). The recipe probably wasn't saved — try again in a bit.`
 5. Tap **i** on the shortcut and turn **off Show When Run**.
 6. In Instagram: Reel → Share → **More** → enable **Save Recipe**.
 
@@ -175,18 +175,18 @@ Two specific messages worth knowing about, since both are common on a personal/f
 
 Create a unique topic name at [ntfy.sh](https://ntfy.sh), subscribe in the ntfy iOS app, and set `NTFY_TOPIC` in `.env`. You’ll get a ping when a save fails (or when a duplicate is skipped).
 
-## 8. iPhone app (personal, not App Store)
+## 8. iPhone app — Stocked (personal, not App Store)
 
-A SwiftUI app lives in `ios/`. Install it on your own iPhone from Xcode with a free Apple ID. Full steps: [`ios/README.md`](ios/README.md).
+A SwiftUI app lives in `ios/` (Xcode project still named RecipeBox; home-screen name is **Stocked**). Two tabs: **Cookbook** (recipes) and **Cupboard** (inventory + to-buy). Full steps: [`ios/README.md`](ios/README.md).
 
-Short version: open `ios/RecipeBox.xcodeproj` in **Xcode.app**, sign with your Personal Team, plug in the iPhone, press Run. The app defaults to `https://kaihkashan-recipe-box.vercel.app` — the Mac does not need to be running.
+Short version: open `ios/RecipeBox.xcodeproj` in **Xcode.app**, sign with your Personal Team, plug in the iPhone, press Run. The app defaults to `https://stocked-cookbook-cupboard.vercel.app` — the Mac does not need to be running. Older phones still pointing at `kaihkashan-recipe-box.vercel.app` are migrated to the new host on launch.
 
 ## 9. Deploy to Vercel
 
 The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in Vercel env vars — never commit `.env` or `service_account.json`.
 
 1. Install the [Vercel CLI](https://vercel.com/docs/cli) and log in: `vercel login`
-2. From this folder: `vercel --prod --yes --name recipe-box`
+2. From this folder: `vercel --prod --yes` (this project deploys as **stocked-cookbook-cupboard**)
 3. In the Vercel project → Settings → Environment Variables, add:
 
    | Name | Value |
@@ -199,32 +199,37 @@ The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in 
    | `APIFY_API_TOKEN` | same as `.env` — required for Instagram links |
    | `NTFY_TOPIC` | optional |
 
-4. Redeploy after saving env vars. Production is [https://kaihkashan-recipe-box.vercel.app/](https://kaihkashan-recipe-box.vercel.app/).
+4. Redeploy after saving env vars. Production is [https://stocked-cookbook-cupboard.vercel.app/](https://stocked-cookbook-cupboard.vercel.app/).
 
 Browsing the box works well on Vercel. Ingest has a **60 second** function limit, so long videos may time out in the cloud. If that happens, you can temporarily point the Shortcut at a local Mac ingest URL.
 
 ## Notes
 
-- **The app.** Production is `https://kaihkashan-recipe-box.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install the personal iOS app — see [`ios/README.md`](ios/README.md). Google Sheets remains the database.
+- **The app.** Production is `https://stocked-cookbook-cupboard.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install **Stocked** — see [`ios/README.md`](ios/README.md). Google Sheets remains the recipe database; Cupboard inventory and to-buy live in App State JSON on the server (not Sheet rows).
 - **Duplicates.** The same source URL is not written twice.
 - **Rate limits.** Gemini 429s are retried with backoff; a quota exhausted after retries surfaces the friendly message described above rather than a raw error.
 - **Sources.** Instagram goes through Apify — required, no fallback (see section 4). YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption directly — no login needed for those, since they don't require it the way Instagram does. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. Neither yt-dlp nor the Apify actor is an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If yt-dlp fetches start failing (YouTube/TikTok/blog links, not Instagram), update with `pip install -U yt-dlp`.
-- **Photos** (a card, cookbook page, or screenshot) are added via the app's "Add from a photo" flow — reviewed and saved manually, not auto-ingested like a link.
-- **Pantry / What I have.** No separate tab — the same search box you use to find a recipe also lets you mark ingredients you have (a small suggestion row appears below it once you type something matching, or new, an ingredient). Once you've marked anything, the recipe list automatically sorts by closest fit, with a "% fit" badge per recipe. The full "What I have" list, tag filters, favorites, and sort all live together in the Filters panel. Independent of the ingest pipeline described above.
-- **Tags.** A small fixed set (mom's recipes, veg, non-veg, dessert, high protein, airfryer) shown as quick-pick chips when adding/editing a recipe — enforced at the model layer, so nothing (not Gemini, not a stray API call) can add a tag outside this list. Multi-select filtering on the Recipes tab.
-- **Course.** Every recipe is Main course, Appetizers, or Desserts — its own column in the Sheet, shown as a filter row and a pill on the detail screen. A recipe captured through `/ingest` gets it derived from Gemini's meal classification; typing one in or reviewing a photo extraction lets you pick it directly. Not yet editable after creation via the app's Edit screen.
-- **API usage.** The app's Settings screen shows a small "API usage" card: today's Gemini read count against the free tier's 20/day cap (self-tracked — Gemini has no quota-remaining endpoint to query), and this month's Apify spend against your account's live credit limit (queried straight from Apify, so it can't drift from what you're actually billed), each with when it resets. The Apify half only appears when `APIFY_API_TOKEN` is set and reachable.
+- **Photos** (a card, cookbook page, or screenshot) are added via the app's photo add flow — reviewed and saved manually, not auto-ingested like a link.
+- **Cookbook ingredient filter** (`GET`/`PUT /api/pantry`). Flat string list used only on the Cookbook tab: type in search to mark ingredients, **AND**-filter recipes that use all of them, rank by **fit %**, sage banner **Filtered by …**. Synced across devices. This is **not** kitchen inventory.
+- **Cupboard** (`GET`/`PUT /api/pantry-inventory`, `GET`/`PUT /api/to-buy`). Separate stock rows (amount, unit, open/unopened, expiry, notes) plus a to-buy checklist with optional **qty**. Match mode on Items suggests recipes from selected stock. Recipe detail **+** toggles a line onto to-buy (qty prefilled from the ingredient chip). Independent of the Cookbook ingredient filter and of ingest.
+- **Tags.** A small fixed set (mom's recipes, veg, non-veg, dessert, high protein, airfryer) shown as quick-pick chips when adding/editing a recipe — enforced at the model layer. Multi-select filtering on Cookbook.
+- **Course.** Every recipe is Main course, Appetizers, or Desserts — Sheet column, Cookbook filter row, detail pill. `/ingest` derives it from Gemini's meal classification; add/edit flows (including Edit recipe) set it directly.
+- **API usage.** Settings shows today's Gemini read count against the free tier's 20/day cap (self-tracked), and this month's Apify spend against live credit (when `APIFY_API_TOKEN` is set), each with when it resets.
+- **Design handoff.** Visual/interaction reference for the iOS redesign: [`design_handoff_recipe_box/`](design_handoff_recipe_box/).
 
 ## Layout
 
 ```
 app/
-  main.py       FastAPI: app UI, GET /api/recipes, POST /ingest
-  static/       Recipe box web app
+  main.py       FastAPI: web UI, recipes CRUD, pantry / pantry-inventory / to-buy, usage, POST /ingest
+  static/       Web browse UI
   pipeline.py   Background job: fetch → extract → save
   fetch.py      Apify for Instagram, yt-dlp for other video sources, plain HTTP + text extraction otherwise
   errors.py     Shared friendly-error-message mapping (Gemini quota, Apify limit)
   extract.py    Gemini video/image/text → structured JSON
-  store.py      Google Sheets append, list, categories
+  store.py      Google Sheets + App State (inventory, to-buy, flat pantry filter)
+  models.py     Recipe, PantryItem, ToBuyItem, …
+ios/            Stocked (SwiftUI) — Cookbook + Cupboard
+design_handoff_recipe_box/   Interactive prototype + app icon
 vercel.json     Vercel function timeout
 ```

@@ -34,7 +34,8 @@ struct CircleIconButton: View {
 
 /// A selectable capsule chip — the course row, filter chips, scale control,
 /// tags, sort options. Selected = accent fill / cream text; unselected =
-/// surface fill / neutral text / divider border.
+/// surface fill / neutral text / divider border. Pressed selected chips
+/// ramp to accent-600.
 struct ChipButton: View {
     let title: String
     let selected: Bool
@@ -45,19 +46,53 @@ struct ChipButton: View {
         Button(action: action) {
             Text(title)
                 .font(font)
-                .foregroundStyle(selected ? .white : Theme.neutral800)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .frame(maxWidth: .infinity)
-                .background(selected ? Theme.accent : Theme.surface)
-                .overlay {
-                    if !selected {
-                        Capsule().strokeBorder(Theme.divider, lineWidth: 1)
-                    }
-                }
-                .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChipButtonStyle(selected: selected))
+    }
+}
+
+private struct ChipButtonStyle: ButtonStyle {
+    let selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(selected ? Color.white : Theme.neutral800)
+            .background(selected
+                ? (configuration.isPressed ? Theme.accent600 : Theme.accent)
+                : (configuration.isPressed ? Theme.neutral200 : Theme.surface))
+            .overlay {
+                if !selected {
+                    Capsule().strokeBorder(Theme.divider, lineWidth: 1)
+                }
+            }
+            .clipShape(Capsule())
+    }
+}
+
+/// Full-width (or capsule) accent CTA — pressed state uses accent-600.
+struct AccentFillButtonStyle: ButtonStyle {
+    var fill: Color = Theme.accent
+    var pressedFill: Color = Theme.accent600
+    var foreground: Color = .white
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(foreground)
+            .background(configuration.isPressed ? pressedFill : fill)
+            .clipShape(Capsule())
+    }
+}
+
+/// Destructive confirm fill (accent-800) with pressed darkening.
+struct DestructiveFillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color(hex: 0xfff8ec))
+            .background(configuration.isPressed ? Theme.accent900 : Theme.accent800)
+            .clipShape(Capsule())
     }
 }
 

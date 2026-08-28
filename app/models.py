@@ -120,6 +120,7 @@ class PantryInventoryUpdate(BaseModel):
 class ToBuyItem(BaseModel):
     id: str
     text: str
+    qty: str = ""
     checked: bool = False
 
 

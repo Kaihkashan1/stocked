@@ -39,9 +39,9 @@ final class RecipeStore {
     var query = "" {
         didSet { if oldValue != query { updateVisible() } }
     }
-    /// Ingredients to find recipes from. Synced across devices via
-    /// /api/pantry, but it behaves as a search input rather than a standing
-    /// inventory, so clearFilters() empties it along with everything else.
+    /// Ingredient filters for the Recipes list — not inventory. Synced via
+    /// /api/pantry as a flat string list. The Pantry tab's stock lives in
+    /// PantryStore (/api/pantry-inventory) and is a separate concept.
     var have: [String] = [] {
         didSet {
             if oldValue != have {
@@ -92,7 +92,7 @@ final class RecipeStore {
         didSet { UserDefaults.standard.set(serverSecret, forKey: Self.secretKey) }
     }
 
-    static let hostedURL = "https://kaihkashan-recipe-box.vercel.app"
+    static let hostedURL = "https://stocked-cookbook-cupboard.vercel.app"
 
     private static let urlKey = "recipeBox.serverURL"
     private static let secretKey = "recipeBox.serverSecret"
@@ -101,6 +101,7 @@ final class RecipeStore {
     private static let legacyLANDefault = "http://192.168.0.54:8000"
     private static let legacyHostedHosts: Set<String> = [
         "recipe-box-ashen-alpha.vercel.app",
+        "kaihkashan-recipe-box.vercel.app",
     ]
     // nonisolated: encode/decode need to run from persistCache()'s background
     // task (see below), not hop back to the main actor just to reach these.
@@ -182,8 +183,8 @@ final class RecipeStore {
     }
 
     /// Optimistic, like toggleFavorite: flips locally (so the UI is
-    /// instant) then pushes the whole pantry to the server so it matches on
-    /// every device. Reverts on failure.
+    /// instant) then pushes the ingredient filter list to the server so it
+    /// matches on every device. Reverts on failure.
     func toggleIngredient(_ item: String) {
         let previous = have
         if let index = have.firstIndex(of: item) {
@@ -208,10 +209,9 @@ final class RecipeStore {
         }
     }
 
-    /// A free-text addition — for something you have that isn't derived from
-    /// any recipe (a specific brand, a leftover, whatever). Normalized like
-    /// the server does (trimmed, lowercased) so it still matches recipe
-    /// ingredients via namesMatch just like a catalog pick would.
+    /// A free-text addition to the ingredient filter — for something that
+    /// isn't in the catalog yet. Normalized like the server does (trimmed,
+    /// lowercased) so it still matches recipe pantry stems via namesMatch.
     func addHaveItem(_ raw: String) {
         let item = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !item.isEmpty, !have.contains(where: { $0 == item || namesMatch($0, item) }) else { return }
@@ -492,12 +492,12 @@ final class RecipeStore {
             return recipe.searchBlob.contains(needle)
         }
 
-        // Unlike the old ingredient-search behavior, marking more pantry
-        // items never hides a recipe — matchRecipe always returns a
-        // score/missing count once `have` is non-empty, and that's all
-        // that's used here: closest fit first, nothing filtered out.
+        // Ingredient filters: keep recipes that use every selected name
+        // (AND), then rank by fit % (how much of that recipe the selection
+        // covers). Sort chips are ignored while filters are active.
         var matches: [Int: RecipeMatch] = [:]
         if !have.isEmpty {
+            rows = rows.filter { recipeMatchesIngredientFilter($0, ingredients: have) }
             for recipe in rows {
                 matches[recipe.id] = matchRecipe(recipe, have: have)
             }

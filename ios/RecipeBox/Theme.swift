@@ -110,6 +110,8 @@ enum Theme {
     static let shadowSM = ShadowStyle(color: neutral900.opacity(0.14), radius: 2, x: 0, y: 1)
     /// `0 3 10 rgba(46,43,37,0.16)` — heavier lift, e.g. the add-sheet.
     static let shadowMD = ShadowStyle(color: neutral900.opacity(0.16), radius: 10, x: 0, y: 3)
+    /// Anchored menus (detail ellipsis) — a touch larger than md.
+    static let shadowLG = ShadowStyle(color: neutral900.opacity(0.22), radius: 24, x: 0, y: 10)
 }
 
 extension View {

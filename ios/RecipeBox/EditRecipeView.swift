@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Full-screen edit form for a saved recipe. Ingredients/steps are edited as
-/// plain multi-line text (one item per line) — the server re-parses lines the
-/// same way it formats them on save, so the round trip is lossless.
+/// Full-screen edit form for a saved recipe. Field order and the
+/// `qty | item` ingredient lines match the handoff edit sheet.
 struct EditRecipeView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -21,7 +20,7 @@ struct EditRecipeView: View {
     init(recipe: Recipe) {
         self.recipe = recipe
         _title = State(initialValue: recipe.title)
-        _ingredientsText = State(initialValue: recipe.ingredients.joined(separator: "\n"))
+        _ingredientsText = State(initialValue: recipe.ingredients.map(formatIngredientForEdit).joined(separator: "\n"))
         _stepsText = State(initialValue: recipe.steps.joined(separator: "\n"))
         _notes = State(initialValue: recipe.notes)
         _selectedTags = State(initialValue: Set(recipe.tags))
@@ -43,7 +42,28 @@ struct EditRecipeView: View {
                             .clipShape(Capsule())
                     }
 
-                    field(kicker: "Ingredients", hint: "one per line") {
+                    field(kicker: "Course") {
+                        HStack(spacing: 7) {
+                            ForEach(Course.allCases) { option in
+                                ChipButton(title: option.rawValue, selected: course == option) {
+                                    course = option
+                                }
+                            }
+                        }
+                    }
+
+                    field(kicker: "Tags") {
+                        FlowLayout(spacing: 8) {
+                            ForEach(recipeTags, id: \.self) { tag in
+                                ChipButton(title: tag, selected: selectedTags.contains(tag)) {
+                                    toggleTag(tag)
+                                }
+                                .fixedSize()
+                            }
+                        }
+                    }
+
+                    field(kicker: "Ingredients", hint: "one per line as qty | item (blank qty allowed)") {
                         TextEditor(text: $ingredientsText)
                             .font(Theme.body(14.5))
                             .lineSpacing(14.5 * 0.9)
@@ -65,16 +85,6 @@ struct EditRecipeView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
 
-                    field(kicker: "Course") {
-                        HStack(spacing: 7) {
-                            ForEach(Course.allCases) { option in
-                                ChipButton(title: option.rawValue, selected: course == option) {
-                                    course = option
-                                }
-                            }
-                        }
-                    }
-
                     field(kicker: "Notes") {
                         TextEditor(text: $notes)
                             .font(Theme.body(14))
@@ -83,17 +93,6 @@ struct EditRecipeView: View {
                             .frame(minHeight: 80)
                             .background(Theme.surface)
                             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    }
-
-                    field(kicker: "Tags") {
-                        FlowLayout(spacing: 8) {
-                            ForEach(recipeTags, id: \.self) { tag in
-                                ChipButton(title: tag, selected: selectedTags.contains(tag)) {
-                                    toggleTag(tag)
-                                }
-                                .fixedSize()
-                            }
-                        }
                     }
 
                     if let errorMessage {
@@ -116,7 +115,7 @@ struct EditRecipeView: View {
                 .foregroundStyle(Theme.neutral700)
             Spacer()
             Text("Edit recipe")
-                .font(Theme.display(20))
+                .font(Theme.display(22))
                 .foregroundStyle(Theme.ink)
             Spacer()
             Button(saving ? "Saving…" : "Save") {
@@ -150,7 +149,7 @@ struct EditRecipeView: View {
         let failure = await store.saveEdits(
             id: recipe.id,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            ingredients: lines(from: ingredientsText),
+            ingredients: lines(from: ingredientsText).map(parseIngredientFromEdit),
             steps: lines(from: stepsText),
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
             tags: Array(selectedTags),
@@ -177,4 +176,25 @@ struct EditRecipeView: View {
             selectedTags.insert(tag)
         }
     }
+}
+
+/// Formats a stored ingredient line for the edit sheet's `qty | item` rows.
+func formatIngredientForEdit(_ line: String) -> String {
+    let parsed = splitIngredientQuantity(line)
+    if let quantity = parsed.quantity {
+        return "\(quantity) | \(parsed.text)"
+    }
+    return "| \(parsed.text)"
+}
+
+/// Turns an edit-sheet `qty | item` line back into a normal ingredient string.
+func parseIngredientFromEdit(_ line: String) -> String {
+    guard let bar = line.firstIndex(of: "|") else {
+        return line.trimmingCharacters(in: .whitespaces)
+    }
+    let qty = line[..<bar].trimmingCharacters(in: .whitespaces)
+    let item = line[line.index(after: bar)...].trimmingCharacters(in: .whitespaces)
+    if qty.isEmpty { return item }
+    if item.isEmpty { return qty }
+    return "\(qty) \(item)"
 }

@@ -57,13 +57,13 @@ struct RootView: View {
         TabView(selection: $selectedTab) {
             recipesTab
                 .tabItem {
-                    Label("Recipes", systemImage: "book.closed")
+                    Label("Cookbook", systemImage: "book")
                 }
                 .tag(AppTab.recipes)
 
             pantryTab
                 .tabItem {
-                    Label("Pantry", systemImage: "basket")
+                    Label("Cupboard", systemImage: "cabinet")
                 }
                 .tag(AppTab.pantry)
         }

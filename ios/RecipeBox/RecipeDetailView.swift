@@ -3,13 +3,15 @@ import SwiftUI
 struct RecipeDetailView: View {
     let id: Int
     @Environment(RecipeStore.self) private var store
+    @Environment(PantryStore.self) private var pantry
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var showEdit = false
     @State private var showDeleteConfirm = false
     @State private var deleting = false
     @State private var deleteError: String?
     @State private var showCookMode = false
-    @State private var showActionSheet = false
+    @State private var showMoreMenu = false
 
     private var recipe: Recipe? { store.recipe(id: id) }
 
@@ -37,8 +39,7 @@ struct RecipeDetailView: View {
             if let recipe {
                 // One toolbar item, not two — two adjacent ToolbarItems get
                 // an automatic pill-grouping background on newer iOS. A
-                // plain Button + confirmationDialog (rather than Menu, which
-                // brings its own glass chrome) keeps these flat circles.
+                // plain Button keeps these flat circles.
                 trailingToolbarButtons(for: recipe)
             }
         }
@@ -53,27 +54,13 @@ struct RecipeDetailView: View {
                 CookModeView(recipe: recipe)
             }
         }
-        .confirmationDialog("Recipe", isPresented: $showActionSheet, titleVisibility: .hidden) {
-            if let url = recipe?.sourceURL {
-                Link("Original post", destination: url)
+        .overlay {
+            if showMoreMenu {
+                moreMenuOverlay
             }
-            Button("Edit") { showEdit = true }
-            Button("Delete", role: .destructive) { showDeleteConfirm = true }
-            Button("Cancel", role: .cancel) {}
-        }
-        .confirmationDialog(
-            "Delete this recipe?",
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                if let recipe {
-                    Task { await delete(recipe) }
-                }
+            if showDeleteConfirm {
+                deleteConfirmOverlay
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes it from your Recipe Box. It stays out of Google Sheets too, but the row itself isn't removed.")
         }
         .alert(
             "Couldn't delete",
@@ -82,6 +69,18 @@ struct RecipeDetailView: View {
                 set: { shown in if !shown { deleteError = nil } }
             ),
             presenting: deleteError
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { message in
+            Text(message)
+        }
+        .alert(
+            "Couldn't save",
+            isPresented: Binding(
+                get: { pantry.actionError != nil },
+                set: { shown in if !shown { pantry.actionError = nil } }
+            ),
+            presenting: pantry.actionError
         ) { _ in
             Button("OK", role: .cancel) {}
         } message: { message in
@@ -122,10 +121,120 @@ struct RecipeDetailView: View {
 
     private var moreButton: some View {
         CircleIconButton(systemImage: "ellipsis", size: 40) {
-            showActionSheet = true
+            showMoreMenu = true
         }
         .disabled(deleting)
         .accessibilityLabel("More")
+    }
+
+    private var moreMenuOverlay: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.clear
+                .contentShape(Rectangle())
+                .ignoresSafeArea()
+                .onTapGesture { showMoreMenu = false }
+
+            VStack(alignment: .leading, spacing: 0) {
+                if let url = recipe?.sourceURL {
+                    menuRow(systemImage: "arrow.up.right.square", title: "Original post", destructive: false) {
+                        showMoreMenu = false
+                        openURL(url)
+                    }
+                }
+                menuRow(systemImage: "pencil", title: "Edit recipe", destructive: false) {
+                    showMoreMenu = false
+                    showEdit = true
+                }
+                Rectangle()
+                    .fill(Theme.divider)
+                    .frame(height: 1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                menuRow(systemImage: "trash", title: "Delete recipe", destructive: true) {
+                    showMoreMenu = false
+                    showDeleteConfirm = true
+                }
+            }
+            .padding(6)
+            .frame(minWidth: 190, alignment: .leading)
+            .background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .themeShadow(Theme.shadowLG)
+            .padding(.trailing, Theme.screenPadding)
+            .padding(.top, 52)
+        }
+    }
+
+    private func menuRow(
+        systemImage: String,
+        title: String,
+        destructive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 11) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 17)
+                Text(title)
+                    .font(Theme.body(14))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(destructive ? Theme.accent800 : Theme.neutral900)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(MenuRowButtonStyle())
+    }
+
+    private var deleteConfirmOverlay: some View {
+        ZStack {
+            Theme.neutral900.opacity(0.42)
+                .ignoresSafeArea()
+                .onTapGesture { showDeleteConfirm = false }
+
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Delete this recipe?")
+                        .font(Theme.display(20))
+                        .foregroundStyle(Theme.ink)
+                    Text("This removes it from your box. This can't be undone.")
+                        .font(Theme.body(14))
+                        .foregroundStyle(Theme.neutral700)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 10) {
+                    Button("Cancel") {
+                        showDeleteConfirm = false
+                    }
+                    .font(Theme.body(14, weight: .semibold))
+                    .foregroundStyle(Theme.neutral800)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(Theme.surface)
+                    .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                    .clipShape(Capsule())
+                    .buttonStyle(.plain)
+
+                    Button(deleting ? "Deleting…" : "Delete") {
+                        guard let recipe, !deleting else { return }
+                        Task { await delete(recipe) }
+                    }
+                    .font(Theme.body(14, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .buttonStyle(DestructiveFillButtonStyle())
+                    .disabled(deleting)
+                }
+            }
+            .padding(EdgeInsets(top: 26, leading: 24, bottom: 26, trailing: 24))
+            .frame(maxWidth: 320)
+            .background(Theme.bg)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .padding(.horizontal, 30)
+        }
     }
 
     private func delete(_ recipe: Recipe) async {
@@ -134,6 +243,7 @@ struct RecipeDetailView: View {
         if let error = await store.deleteRecipe(recipe) {
             deleteError = error
         } else {
+            showDeleteConfirm = false
             dismiss()
         }
     }
@@ -144,12 +254,6 @@ struct RecipeDetailView: View {
                 hero(for: recipe)
                     .padding(.horizontal, Theme.screenPadding)
                     .padding(.top, 8)
-
-                if !store.have.isEmpty {
-                    pantryLine(for: recipe)
-                        .padding(.horizontal, Theme.screenPadding)
-                        .padding(.top, 14)
-                }
 
                 VStack(alignment: .leading, spacing: Theme.sectionGap) {
                     if !recipe.steps.isEmpty {
@@ -202,21 +306,6 @@ struct RecipeDetailView: View {
         .cardBackground(radius: Theme.radiusContainer)
     }
 
-    private func pantryLine(for recipe: Recipe) -> some View {
-        let missing = missingIngredients(recipe, have: store.have)
-        return Text(
-            missing.isEmpty
-                ? "You have everything for this."
-                : "Missing \(missing.count): \(missing.joined(separator: ", "))"
-        )
-        .font(Theme.body(13))
-        .foregroundStyle(Theme.sage800)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Theme.sage100)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
     private var cookButton: some View {
         Button {
             showCookMode = true
@@ -226,14 +315,11 @@ struct RecipeDetailView: View {
                 Text("Start cooking")
             }
             .font(Theme.display(16))
-            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(Theme.accent)
-            .clipShape(Capsule())
             .themeShadow(Theme.shadowSM)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AccentFillButtonStyle())
     }
 
     private func tags(for recipe: Recipe) -> some View {
@@ -312,6 +398,16 @@ struct RecipeDetailView: View {
     }
 }
 
+private struct MenuRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(configuration.isPressed ? Theme.accent100 : Color.clear)
+            )
+    }
+}
+
 /// Its own view rather than a function on RecipeDetailView, so that tapping
 /// ½×/1×/2×/3× only re-renders this card. As a function, `scale` lived on
 /// RecipeDetailView itself, so every scale change invalidated the *entire*
@@ -364,7 +460,7 @@ private struct IngredientsCard: View {
                             .foregroundStyle(Theme.ink)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        toBuyButton(for: parsed.text)
+                        toBuyButton(for: parsed)
                     }
                     .padding(.vertical, 13)
 
@@ -379,11 +475,11 @@ private struct IngredientsCard: View {
     }
 
     /// Round + / ✓ control — the only link from a recipe into the Pantry
-    /// to-buy list. Toggles by ingredient text (case-insensitive).
-    private func toBuyButton(for text: String) -> some View {
-        let inList = pantry.isInToBuy(text)
+    /// to-buy list. Prefills qty from the ingredient's quantity chip.
+    private func toBuyButton(for line: IngredientLine) -> some View {
+        let inList = pantry.isInToBuy(line.text)
         return Button {
-            pantry.toggleToBuy(text: text)
+            pantry.toggleToBuy(text: line.text, qty: line.quantity ?? "")
         } label: {
             Image(systemName: inList ? "checkmark" : "plus")
                 .font(.system(size: 12, weight: .bold))
@@ -393,7 +489,7 @@ private struct IngredientsCard: View {
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(inList ? "Remove \(text) from to-buy list" : "Add \(text) to to-buy list")
+        .accessibilityLabel(inList ? "Remove \(line.text) from to-buy list" : "Add \(line.text) to to-buy list")
     }
 
     private var scaleControl: some View {

@@ -16,6 +16,7 @@ final class PantryStore {
     private static let urlKey = "recipeBox.serverURL"
     private static let secretKey = "recipeBox.serverSecret"
     private static let cacheName = "pantryInventoryCache.json"
+    @ObservationIgnored private var toBuySyncTask: Task<Void, Never>?
 
     init() {
         loadCache()
@@ -105,13 +106,14 @@ final class PantryStore {
         }
     }
 
-    func addToBuy(_ text: String) {
+    func addToBuy(_ text: String, qty: String = "") {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         if toBuy.contains(where: { $0.text.caseInsensitiveCompare(trimmed) == .orderedSame }) {
             return
         }
-        replaceToBuy(toBuy + [ToBuyItem(text: trimmed)])
+        let qtyTrimmed = qty.trimmingCharacters(in: .whitespacesAndNewlines)
+        replaceToBuy(toBuy + [ToBuyItem(text: trimmed, qty: qtyTrimmed)])
     }
 
     func removeToBuy(id: String) {
@@ -119,7 +121,8 @@ final class PantryStore {
     }
 
     /// Toggle by ingredient text (case-insensitive) — used from recipe detail.
-    func toggleToBuy(text: String) {
+    /// `qty` is applied when adding; ignored when removing.
+    func toggleToBuy(text: String, qty: String = "") {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         if let index = toBuy.firstIndex(where: { $0.text.caseInsensitiveCompare(trimmed) == .orderedSame }) {
@@ -127,7 +130,8 @@ final class PantryStore {
             next.remove(at: index)
             replaceToBuy(next)
         } else {
-            replaceToBuy(toBuy + [ToBuyItem(text: trimmed)])
+            let qtyTrimmed = qty.trimmingCharacters(in: .whitespacesAndNewlines)
+            replaceToBuy(toBuy + [ToBuyItem(text: trimmed, qty: qtyTrimmed)])
         }
     }
 
@@ -141,6 +145,16 @@ final class PantryStore {
         guard let index = next.firstIndex(where: { $0.id == id }) else { return }
         next[index].checked.toggle()
         replaceToBuy(next)
+    }
+
+    /// Updates quantity locally immediately; syncs to the server after a short
+    /// idle so typing "200 g" doesn't fire a PUT per keystroke.
+    func setToBuyQty(id: String, qty: String) {
+        guard let index = toBuy.firstIndex(where: { $0.id == id }) else { return }
+        if toBuy[index].qty == qty { return }
+        toBuy[index].qty = qty
+        persistCache()
+        scheduleToBuySync()
     }
 
     func replaceToBuy(_ next: [ToBuyItem]) {
@@ -160,6 +174,26 @@ final class PantryStore {
                     toBuy = previous
                     persistCache()
                 }
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    private func scheduleToBuySync() {
+        toBuySyncTask?.cancel()
+        let snapshot = toBuy
+        toBuySyncTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            guard !Task.isCancelled else { return }
+            do {
+                let confirmed = try await APIClient(baseURLString: serverURL)
+                    .updateToBuy(items: snapshot, secret: serverSecret)
+                // Only apply if the user hasn't typed further since this snapshot.
+                if toBuy == snapshot {
+                    toBuy = confirmed
+                    persistCache()
+                }
+            } catch {
                 actionError = error.localizedDescription
             }
         }

@@ -1,9 +1,12 @@
-# Handoff: Recipe Box iOS redesign
+# Handoff: Stocked (formerly Recipe Box) iOS redesign
 
 ## Overview
-A warm visual redesign of the personal Recipe Box iPhone app (`ios/RecipeBox/`, SwiftUI), plus two functional
-additions: a paste-a-link add flow and a course filter (Main course / Appetizers / Desserts). Backend is unchanged
-except where noted under "API / data".
+A warm visual redesign of the personal Recipe Box iPhone app (`ios/RecipeBox/`, SwiftUI), renamed **Stocked**,
+plus a paste-a-link add flow, a course filter (Main course / Appetizers / Desserts), and a new second tab —
+a personal pantry inventory called **Cupboard**, alongside the recipes tab now called **Cookbook**. Backend is
+unchanged except where noted under "API / data".
+
+**Implemented in-repo** against production `https://stocked-cookbook-cupboard.vercel.app`. See the root [`README.md`](../README.md) and [`ios/README.md`](../ios/README.md) for how the shipping app behaves (Cookbook ingredient filter vs Cupboard inventory are separate; Cupboard search filters; to-buy qty; etc.). This file remains the visual/interaction source of truth for the prototype.
 
 ## About the design files
 `Recipe Box.dc.html` and `AppIcon.dc.html` in this bundle are **design references written in HTML** — an
@@ -51,11 +54,11 @@ header is inline content.
 
 - **Header**, 66pt top padding, 22pt sides. Decorative accent-200 circle, 210pt, positioned top -70 / right -60,
   clipped by the screen. Kicker (Figtree 10.5pt, uppercase, tracking 0.14em, accent-700): "6 RECIPES · 1 FAVORITE".
-  Title "Recipe Box" — Caprasimo 36pt, ink.
+  Title "Stocked" — Caprasimo 36pt, ink.
 - **Header buttons**, top-right, 42×42 circles, 8pt apart: settings (gear, sage-neutral icon, surface fill,
   1pt divider border) and add (plus, cream glyph on accent fill, shadow-sm). Lucide icons, stroke width 2.75.
 - **Search row**, 18pt below the title: pill 46pt tall, surface fill, 1pt divider border, 16pt inner padding,
-  search icon then text field, placeholder "Search, or type what you have…" (Figtree 14.5pt). To its right a
+  search icon then text field, placeholder "Search recipes" (Figtree 14.5pt). To its right a
   46×46 pill filter button; when any filter is active it fills accent with a cream icon.
 - **Pantry suggestion row** (unchanged behavior from the current app): appears under search when the query
   matches a pantry ingredient. Label "MARK AS SOMETHING YOU HAVE" (10pt uppercase, neutral-600) over dashed
@@ -87,6 +90,20 @@ header is inline content.
 
 ### 2. Recipe detail (RecipeDetailView)
 - Toolbar: 40pt circular back, favorite (accent when on) and ellipsis buttons, surface fill, divider border.
+- **Ellipsis menu — NEW**: tapping it opens a dropdown anchored top-right, surface fill, 20pt radius,
+  shadow-lg, 6pt padding, below a fixed 46pt gap. Rows: "Original post" (external-link glyph, only when the
+  recipe has a source link — Instagram/YouTube/TikTok/Link), "Edit recipe" (pencil glyph), a 1pt divider, then
+  "Delete recipe" (trash glyph, accent-800 text). Each row: 11pt icon-to-label gap, 11/12 padding, 14pt radius,
+  accent-100 hover. A full-screen transparent tap-catcher behind the menu closes it on outside tap.
+- **Delete confirm — NEW**: a centered dialog over a 42% neutral-900 scrim — "Delete this recipe?" (Caprasimo
+  20pt) / "This removes it from your box. This can't be undone." (14pt neutral-700), then Cancel (surface,
+  divider border) and Delete (accent-800 fill, cream text) side by side. Confirming removes the recipe and
+  returns to the list.
+- **Edit sheet — NEW**: "Edit recipe" opens a bottom sheet (same shell as the pantry add sheet) prefilled from
+  the current recipe, covering Title (pill field), Course (chip row), Tags (comma-separated text field),
+  Ingredients (textarea, one per line as "qty | item", blank qty allowed), Steps (textarea, blank line between
+  steps), and Notes (textarea). No time or servings fields — this app doesn't track either. Saving parses the
+  textareas back into the ingredient/step arrays and updates the recipe in place.
 - **Hero card**: surface fill, 32pt radius, 24/22 padding, with an accent-200 circle 170pt at right -46 /
   bottom -58, clipped. Kicker "SAVED 2 DAYS AGO" (10.5pt uppercase, accent-700). Title Caprasimo 31pt, max
   ~16 characters per line. Below it, 14pt down, the **course pill — NEW**: accent fill, cream text, 11.5pt,
@@ -156,8 +173,10 @@ Reached from the add sheet. Cancel button top-left.
 Cancel / Save in the header. Title "From a photo" (Caprasimo 30pt) and the line "Check what we read off the page
 before it goes in the box." **The photo itself is not shown or stored** — go straight to the read-back: a sage-100
 confidence pill ("Read 9 ingredients and 6 steps. Confidence: high."), then Title (pill field, Caprasimo 17pt),
-Ingredients (26pt-radius surface field, one per line, line height 1.9), the Course pill row, the Tags chip row,
-and the line "Source is set automatically — this one files under **Photo** in Filters."
+Ingredients (26pt-radius surface field, one per line, line height 1.9), **Steps — NEW** (same 26pt-radius surface
+card, numbered rows: 22pt accent-200 circle with the step number in 12pt accent-800, then the step text at 14pt;
+this block was missing even though the confidence pill already claimed a step count), the Course pill row, the
+Tags chip row, and the line "Source is set automatically — this one files under **Photo** in Filters."
 
 ### 6. Type it in (AddRecipeView)
 Cancel / Save header, title "Type it in". Fields, 18pt apart, all labelled with 10.5pt uppercase neutral-600
@@ -207,10 +226,53 @@ alone were ambiguous — then four skeleton cards (surface, 30pt radius, three n
 - Every interactive element needs a hover/pressed state one ramp step past its base (accent → accent-600 on
   light grounds, accent → accent-400 on the dark cook screen), and a 2pt accent focus ring for keyboard/VoiceOver.
 
+### 11. Cupboard — NEW tab
+Reached via a bottom tab bar now present on both screens: **Cookbook** (an open-book glyph, the renamed recipe
+list/detail/cook flow) and **Cupboard** (a two-door cabinet glyph, the new pantry tab), accent when active,
+neutral-500 otherwise. This is the user's own inventory — it is not required to be in sync with any recipe.
+- **Header**: same style as the recipe list — Caprasimo 36pt "Cupboard", kicker line "12 items · 2 to buy".
+  Below it a 2-segment control (Items / To buy) — same chip styling as filter chips.
+- **Search bar — NEW**: above the Items list, a pill search field identical in style to the Cookbook search
+  ("Search what's in stock"), filtering the grouped list by item name or category. The To buy tab has its own
+  matching search field ("Search items to buy") filtering the checklist by item text. Independent queries —
+  switching sub-tabs does not clear the other's search.
+- **Items tab**: a "Select items to match" toggle pill (full width minus a 44×44 add-item circle button) —
+  entering match mode shows a checkbox circle on the left of every row instead of the trash icon.
+  Items are **grouped by category** (Produce, Dairy & eggs, Meat & seafood, Grains & pantry, Condiments &
+  spices, Other) under 10.5pt uppercase kickers. Each row: surface card, 22pt radius, shadow-sm — name (14.5pt
+  semibold) with a chip line below it: amount+unit (neutral-100 pill), Open/Unopened status (sage or neutral
+  tint), and an **expiry badge** when set — neutral outline showing the date normally, switching to a solid
+  accent-500 fill ("Expires in 2d" / "Expires today") inside 3 days, and accent-800 ("Expired") once past.
+  Tapping a row (outside match mode) opens it in the same add/edit sheet, prefilled, for editing; a trash
+  icon on the row deletes it directly.
+  **No photos or avatar icons on rows** — deliberately left out.
+- **Add/edit item sheet**: bottom sheet, same shell as the recipe edit sheet. Fields: Name (pill field),
+  Category (chip row), Amount + Unit (number field beside a 3-way pcs/g/kg chip row), Status (Unopened/Open
+  2-pill row), Expiry date (native date input, optional), Notes (textarea, optional). Title and button label
+  switch to "Edit pantry item" / "Save changes" when opened from an existing row, vs. "Add pantry item" /
+  "Add to pantry" for a new one.
+- **Match mode**: selecting items surfaces a sage-100 result card above the grouped list — "N selected ·
+  matching recipes" — listing up to 4 recipes ranked by how many selected items they use, each row showing the
+  recipe title and "2 of 6 ingredients". Matching does not require every pantry item to be used; it's a partial,
+  best-effort match on ingredient word stems (handles plurals), independent of the list screen's pantry "fit %".
+  Tapping a result opens that recipe.
+- **To buy tab**: the search bar above, then a text field + add button row, then a plain checklist — each row a circle checkbox (sage-500
+  when checked), the item text (strikethrough + muted when checked), a **quantity field — NEW** (64pt pill,
+  bg fill, divider border, 12.5pt centered text, placeholder "qty", freely editable), and a trash icon per row.
+  Manually populated; no auto-sync to pantry stock levels. Items added from a recipe (below) prefill this field
+  with that ingredient's quantity string (e.g. "200 g"); manually typed items start blank.
+- **Add to buy from a recipe — NEW**: every ingredient row on the recipe detail screen has a small round
+  button (plus glyph, neutral-100 fill) that adds that ingredient's text to the pantry's To-buy list; it fills
+  sage with a checkmark once added, and tapping again removes it. This is the only link between recipes and
+  the pantry's to-buy list — everything else in Pantry is independent of recipes.
+
 ## State
 `screen`, `query`, `have: [String]`, `favs: [Int: Bool]`, `tags: Set<String>`, `sources: Set<String>`,
 `course: String?`, `favOnly: Bool`, `sort`, `currentId`, `step`, `scale`, `addSheet: Bool`,
 `link`, `linkPhase: idle|fetching|done`. `course` and `sources` are new; everything else exists in RecipeStore.
+
+`pantry: [PantryItem]` (id, name, category, amount, unit, status: open|unopened, expiry: Date?, notes) and
+`toBuy: [{id, text, checked}]` are new, independent top-level stores — no foreign key to `RecipeStore`.
 
 ## Data model change
 Add a **course** value per recipe — "Main course", "Appetizers" or "Desserts" — shown as the pill on the detail
@@ -220,7 +282,9 @@ have Gemini fill it. Derivation needs no backend change and is the recommended f
 
 ## Assets
 - `AppIcon-1024.png` — the app icon, square 1024×1024, no transparency, no pre-rounded corners. Drop it on the
-  1024 slot of the AppIcon set in `ios/RecipeBox/Assets.xcassets`.
+  1024 slot of the AppIcon set in `ios/RecipeBox/Assets.xcassets`. Icon artwork is a stylized cooking pot with
+  sprouts, unrelated to the cupboard/cookbook tab icons used inside the app — kept intentionally simple as a
+  1024px mark rather than illustrating the two-tab structure.
 - `AppIcon.dc.html` — the icon's source, parametric by size, if any other size is needed.
 - Icons: Lucide (https://lucide.dev) at stroke width 2.75, or the closest SF Symbol at `.semibold`.
 - Fonts: Caprasimo and Figtree, both from Google Fonts, both OFL.

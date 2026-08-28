@@ -208,6 +208,7 @@ def _normalize_to_buy_item(raw: dict) -> dict | None:
     return {
         "id": item_id,
         "text": text,
+        "qty": str(raw.get("qty") or "").strip(),
         "checked": bool(raw.get("checked", False)),
     }
 

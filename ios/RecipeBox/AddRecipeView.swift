@@ -4,8 +4,7 @@ import SwiftUI
 /// extraction before it's saved. Servings, time and a free meal picker are
 /// gone on purpose — Course and Tags are the only classifications this form
 /// collects, so anything created here is reachable from every filter on the
-/// list screen. Cuisine isn't collected either: a photo extraction still
-/// produces one, but nothing downstream reads or stores it anymore.
+/// list screen.
 struct AddRecipeView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -15,6 +14,7 @@ struct AddRecipeView: View {
     @State private var title: String
     @State private var ingredientsText: String
     @State private var stepsText: String
+    @State private var stepLines: [String]
     @State private var course: Course
     @State private var selectedTags: Set<String>
     @State private var saving = false
@@ -26,7 +26,9 @@ struct AddRecipeView: View {
         self.prefill = prefill
         _title = State(initialValue: prefill?.title ?? "")
         _ingredientsText = State(initialValue: (prefill?.ingredients ?? []).joined(separator: "\n"))
-        _stepsText = State(initialValue: (prefill?.steps ?? []).joined(separator: "\n"))
+        let steps = prefill?.steps ?? []
+        _stepsText = State(initialValue: steps.joined(separator: "\n"))
+        _stepLines = State(initialValue: steps.isEmpty ? [""] : steps)
         _course = State(initialValue: Course(meal: prefill?.meal ?? "other"))
         _selectedTags = State(initialValue: Set(prefill?.tags ?? []))
     }
@@ -39,6 +41,17 @@ struct AddRecipeView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(isFromPhoto ? "From a photo" : "Type it in")
+                            .font(Theme.display(30))
+                            .foregroundStyle(Theme.ink)
+                        if isFromPhoto {
+                            Text("Check what we read off the page before it goes in the box.")
+                                .font(Theme.body(14))
+                                .foregroundStyle(Theme.neutral700)
+                        }
+                    }
+
                     if let prefill {
                         confidencePill(prefill)
                     }
@@ -52,7 +65,7 @@ struct AddRecipeView: View {
                             .clipShape(Capsule())
                     }
 
-                    field(kicker: "Ingredients", hint: "one per line") {
+                    field(kicker: "Ingredients", hint: isFromPhoto ? nil : "one per line") {
                         TextEditor(text: $ingredientsText)
                             .font(Theme.body(14.5))
                             .lineSpacing(14.5 * 0.9)
@@ -63,15 +76,19 @@ struct AddRecipeView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
 
-                    field(kicker: "Steps", hint: "one per line, in order") {
-                        TextEditor(text: $stepsText)
-                            .font(Theme.body(14.5))
-                            .lineSpacing(14.5 * 0.55)
-                            .scrollContentBackground(.hidden)
-                            .padding(12)
-                            .frame(minHeight: 130)
-                            .background(Theme.surface)
-                            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    if isFromPhoto {
+                        photoStepsField
+                    } else {
+                        field(kicker: "Steps", hint: "one per line, in order") {
+                            TextEditor(text: $stepsText)
+                                .font(Theme.body(14.5))
+                                .lineSpacing(14.5 * 0.55)
+                                .scrollContentBackground(.hidden)
+                                .padding(12)
+                                .frame(minHeight: 130)
+                                .background(Theme.surface)
+                                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                        }
                     }
 
                     field(kicker: "Course") {
@@ -112,15 +129,38 @@ struct AddRecipeView: View {
         .background(Theme.bg.ignoresSafeArea())
     }
 
+    /// Numbered, editable step rows for photo review (handoff §5).
+    private var photoStepsField: some View {
+        field(kicker: "Steps") {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(stepLines.indices, id: \.self) { index in
+                    HStack(alignment: .top, spacing: 12) {
+                        Text("\(index + 1)")
+                            .font(Theme.display(12))
+                            .foregroundStyle(Theme.accent800)
+                            .frame(width: 22, height: 22)
+                            .background(Theme.accent200)
+                            .clipShape(Circle())
+                            .padding(.top, 2)
+
+                        TextField("Step \(index + 1)", text: $stepLines[index], axis: .vertical)
+                            .font(Theme.body(14))
+                            .lineLimit(2...8)
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        }
+    }
+
     private var header: some View {
         HStack {
             Button("Cancel") { dismiss() }
                 .font(Theme.body(14, weight: .semibold))
                 .foregroundStyle(Theme.neutral700)
-            Spacer()
-            Text(isFromPhoto ? "From a photo" : "Type it in")
-                .font(Theme.display(20))
-                .foregroundStyle(Theme.ink)
             Spacer()
             Button(saving ? "Saving…" : "Save") {
                 Task { await save() }
@@ -161,10 +201,19 @@ struct AddRecipeView: View {
         errorMessage = nil
         defer { saving = false }
 
+        let steps: [String]
+        if isFromPhoto {
+            steps = stepLines
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        } else {
+            steps = lines(from: stepsText)
+        }
+
         let draft = RecipeCreate(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             ingredients: lines(from: ingredientsText),
-            steps: lines(from: stepsText),
+            steps: steps,
             course: course.rawValue,
             tags: Array(selectedTags),
             notes: ""

@@ -185,13 +185,13 @@ struct PantryItemSheet: View {
                     Button(action: save) {
                         Text(saveLabel)
                             .font(Theme.display(15))
-                            .foregroundStyle(Theme.bg)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
-                            .background(canSave ? Theme.accent : Theme.neutral400)
-                            .clipShape(Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AccentFillButtonStyle(
+                        fill: canSave ? Theme.accent : Theme.neutral400,
+                        pressedFill: canSave ? Theme.accent600 : Theme.neutral400
+                    ))
                     .disabled(!canSave)
                     .padding(.top, 4)
                     .padding(.bottom, 20)

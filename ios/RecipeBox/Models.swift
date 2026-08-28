@@ -95,12 +95,27 @@ struct PantryItem: Codable, Hashable, Identifiable {
 struct ToBuyItem: Codable, Hashable, Identifiable {
     var id: String
     var text: String
+    /// Free-text amount from a recipe ("200 g") or typed in on the To buy row.
+    var qty: String
     var checked: Bool
 
-    init(id: String = UUID().uuidString, text: String, checked: Bool = false) {
+    init(id: String = UUID().uuidString, text: String, qty: String = "", checked: Bool = false) {
         self.id = id
         self.text = text
+        self.qty = qty
         self.checked = checked
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        text = try container.decode(String.self, forKey: .text)
+        qty = try container.decodeIfPresent(String.self, forKey: .qty) ?? ""
+        checked = try container.decodeIfPresent(Bool.self, forKey: .checked) ?? false
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, text, qty, checked
     }
 }
 
@@ -497,8 +512,8 @@ enum DeepLinkRoute: Equatable {
 /// Add/Edit forms only ever offer these; there's no way to type a new one in.
 let recipeTags = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"]
 
-/// Only applies when no "have" ingredients are selected — pantry-match
-/// score always wins when it's active, same as before.
+/// Recent / A–Z / Z–A ordering for the recipe list. Ignored while
+/// ingredient filters are active — fit % ranking takes over then.
 enum SortOption: String, CaseIterable {
     case recent = "Recent"
     case az = "A–Z"
@@ -711,10 +726,18 @@ func namesMatch(_ left: String, _ right: String) -> Bool {
     left == right || left.contains(right) || right.contains(left) || stem(left) == stem(right)
 }
 
+/// True when the recipe's pantry stems cover every selected ingredient
+/// filter (AND). Independent of Pantry-tab inventory and of fit %.
+func recipeMatchesIngredientFilter(_ recipe: Recipe, ingredients: [String]) -> Bool {
+    guard !ingredients.isEmpty else { return true }
+    return ingredients.allSatisfy { wanted in
+        recipe.pantry.contains { namesMatch($0, wanted) }
+    }
+}
+
 /// How much of this recipe's core (non-staple) ingredients are covered by
-/// "what I have". Unlike the old ingredient-search behavior, marking more
-/// pantry items never hides a recipe — it only ever raises recipes' scores
-/// and shrinks their missing list, the way SuperCook-style matching works.
+/// the selected ingredient filters — drives list ranking and the card fit
+/// pill. List filtering (AND) is separate; see recipeMatchesIngredientFilter.
 func matchRecipe(_ recipe: Recipe, have: [String]) -> RecipeMatch? {
     guard !have.isEmpty else { return nil }
     let core = recipe.pantry.filter { !staples.contains($0) }
@@ -728,9 +751,7 @@ func matchRecipe(_ recipe: Recipe, have: [String]) -> RecipeMatch? {
     )
 }
 
-/// The ingredients from `recipe.pantry` not covered by `have` — used both to
-/// sort (closest fit first) and to call out what's missing on the detail
-/// view.
+/// The ingredients from `recipe.pantry` not covered by `have`.
 func missingIngredients(_ recipe: Recipe, have: [String]) -> [String] {
     let core = recipe.pantry.filter { !staples.contains($0) }
     return core.filter { item in !have.contains(where: { namesMatch(item, $0) }) }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Pantry tab — inventory (Items) and shopping checklist (To buy), plus
+/// Cupboard tab — inventory (Items) and shopping checklist (To buy), plus
 /// match-mode recipe suggestions. Stock lives in PantryStore; recipe fit %
 /// on the list screen stays on RecipeStore.have.
 struct PantryView: View {
@@ -15,6 +15,10 @@ struct PantryView: View {
     @State private var editingItem: PantryItem?
     @State private var showAddSheet = false
     @State private var newToBuyText = ""
+    /// Independent of each other and of the Cookbook search; switching
+    /// Items ↔ To buy keeps both queries (handoff §11).
+    @State private var stockQuery = ""
+    @State private var buyQuery = ""
 
     private enum PantrySegment: String, CaseIterable, Identifiable {
         case items = "Items"
@@ -31,6 +35,9 @@ struct PantryView: View {
                     .padding(.bottom, 12)
 
                 if segment == .items {
+                    stockSearchField
+                        .padding(.horizontal, Theme.screenPadding)
+                        .padding(.bottom, 10)
                     itemsToolbar
                         .padding(.horizontal, Theme.screenPadding)
                         .padding(.bottom, 12)
@@ -38,6 +45,9 @@ struct PantryView: View {
                         .padding(.horizontal, Theme.screenPadding)
                         .padding(.bottom, 16)
                 } else {
+                    buySearchField
+                        .padding(.horizontal, Theme.screenPadding)
+                        .padding(.bottom, 10)
                     toBuyToolbar
                         .padding(.horizontal, Theme.screenPadding)
                         .padding(.bottom, 12)
@@ -84,7 +94,7 @@ struct PantryView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Pantry")
+            Text("Cupboard")
                 .font(Theme.display(36))
                 .foregroundStyle(Theme.ink)
             Text(pantry.kickerLine)
@@ -97,6 +107,58 @@ struct PantryView: View {
         .padding(.top, 66)
         .padding(.horizontal, Theme.screenPadding)
         .padding(.bottom, 16)
+    }
+
+    private var stockSearchField: some View {
+        cupboardSearchField(placeholder: "Search what's in stock", text: $stockQuery)
+    }
+
+    private var buySearchField: some View {
+        cupboardSearchField(placeholder: "Search items to buy", text: $buyQuery)
+    }
+
+    private func cupboardSearchField(placeholder: String, text: Binding<String>) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.neutral600)
+            TextField(placeholder, text: text)
+                .font(Theme.body(14.5))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 46)
+        .background(Theme.surface)
+        .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+        .clipShape(Capsule())
+    }
+
+    private var filteredGroupedItems: [(category: PantryCategory, items: [PantryItem])] {
+        let q = stockQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return pantry.groupedItems }
+        return pantry.groupedItems.compactMap { group in
+            let rows = group.items.filter {
+                $0.name.lowercased().contains(q)
+                    || group.category.rawValue.lowercased().contains(q)
+            }
+            guard !rows.isEmpty else { return nil }
+            return (group.category, rows)
+        }
+    }
+
+    private var filteredToBuy: [ToBuyItem] {
+        let q = buyQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return pantry.toBuy }
+        return pantry.toBuy.filter { $0.text.lowercased().contains(q) }
+    }
+
+    private var stockFilterActive: Bool {
+        !stockQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var buyFilterActive: Bool {
+        !buyQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var segmentRow: some View {
@@ -168,13 +230,19 @@ struct PantryView: View {
         }
 
         if pantry.items.isEmpty {
-            Text("Nothing in your pantry yet.")
+            Text("Nothing in your cupboard yet.")
+                .font(Theme.body(14))
+                .foregroundStyle(Theme.neutral600)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 44)
+        } else if filteredGroupedItems.isEmpty {
+            Text(stockFilterActive ? "Nothing matches that yet." : "Nothing in your cupboard yet.")
                 .font(Theme.body(14))
                 .foregroundStyle(Theme.neutral600)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 44)
         } else {
-            ForEach(pantry.groupedItems, id: \.category) { group in
+            ForEach(filteredGroupedItems, id: \.category) { group in
                 VStack(alignment: .leading, spacing: 9) {
                     Text(group.category.rawValue.uppercased())
                         .font(Theme.body(10.5, weight: .semibold))
@@ -362,8 +430,14 @@ struct PantryView: View {
                 .foregroundStyle(Theme.neutral600)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 44)
+        } else if filteredToBuy.isEmpty {
+            Text(buyFilterActive ? "Nothing matches that yet." : "Your to-buy list is empty.")
+                .font(Theme.body(14))
+                .foregroundStyle(Theme.neutral600)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 44)
         } else {
-            ForEach(pantry.toBuy) { item in
+            ForEach(filteredToBuy) { item in
                 HStack(spacing: 12) {
                     Button {
                         pantry.toggleChecked(id: item.id)
@@ -381,6 +455,18 @@ struct PantryView: View {
                         .strikethrough(item.checked)
                         .foregroundStyle(item.checked ? Theme.neutral500 : Theme.ink)
                         .frame(maxWidth: .infinity, alignment: .leading)
+
+                    TextField("qty", text: Binding(
+                        get: { pantry.toBuy.first(where: { $0.id == item.id })?.qty ?? "" },
+                        set: { pantry.setToBuyQty(id: item.id, qty: $0) }
+                    ))
+                    .font(Theme.body(12.5))
+                    .multilineTextAlignment(.center)
+                    .frame(width: 64, height: 34)
+                    .background(Theme.bg)
+                    .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                    .clipShape(Capsule())
+                    .accessibilityLabel("Quantity for \(item.text)")
 
                     Button {
                         pantry.removeToBuy(id: item.id)

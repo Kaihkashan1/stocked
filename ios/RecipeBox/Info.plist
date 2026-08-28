@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Recipe Box</string>
+	<string>Stocked</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -30,9 +30,9 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Recipe Box can load recipes from a server on your local network when you are testing.</string>
+	<string>Stocked can load recipes from a server on your local network when you are testing.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Recipe Box uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.</string>
+	<string>Stocked uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
