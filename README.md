@@ -50,7 +50,7 @@ https://docs.google.com/spreadsheets/d/GOOGLE_SHEET_ID/edit
 
 3. Put that id in `.env` as `GOOGLE_SHEET_ID`.
 
-The first save creates the header row: Title, Servings, Ingredients, Steps, Source, Caption, Confidence, Thumbnail, Saved at, Cuisine, Meal, Time, Tags, Favorite, Notes.
+The first save creates the header row: Title, Ingredients, Steps, Source, Confidence, Saved at, Tags, Favorite, Notes, Course.
 
 ### Create a service account
 
@@ -211,7 +211,9 @@ Browsing the box works well on Vercel. Ingest has a **60 second** function limit
 - **Sources.** Instagram goes through Apify — required, no fallback (see section 4). YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption directly — no login needed for those, since they don't require it the way Instagram does. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. Neither yt-dlp nor the Apify actor is an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If yt-dlp fetches start failing (YouTube/TikTok/blog links, not Instagram), update with `pip install -U yt-dlp`.
 - **Photos** (a card, cookbook page, or screenshot) are added via the app's "Add from a photo" flow — reviewed and saved manually, not auto-ingested like a link.
 - **Pantry / What I have.** No separate tab — the same search box you use to find a recipe also lets you mark ingredients you have (a small suggestion row appears below it once you type something matching, or new, an ingredient). Once you've marked anything, the recipe list automatically sorts by closest fit, with a "% fit" badge per recipe. The full "What I have" list, tag filters, favorites, and sort all live together in the Filters panel. Independent of the ingest pipeline described above.
-- **Tags.** A small fixed set (mom's recipes, veg, non-veg, dessert, high protein, airfryer) shown as quick-pick chips when adding/editing a recipe, plus free-text entry for anything else — multi-select filtering on the Recipes tab.
+- **Tags.** A small fixed set (mom's recipes, veg, non-veg, dessert, high protein, airfryer) shown as quick-pick chips when adding/editing a recipe — enforced at the model layer, so nothing (not Gemini, not a stray API call) can add a tag outside this list. Multi-select filtering on the Recipes tab.
+- **Course.** Every recipe is Main course, Appetizers, or Desserts — its own column in the Sheet, shown as a filter row and a pill on the detail screen. A recipe captured through `/ingest` gets it derived from Gemini's meal classification; typing one in or reviewing a photo extraction lets you pick it directly. Not yet editable after creation via the app's Edit screen.
+- **API usage.** The app's Settings screen shows a small "API usage" card: today's Gemini read count against the free tier's 20/day cap (self-tracked — Gemini has no quota-remaining endpoint to query), and this month's Apify spend against your account's live credit limit (queried straight from Apify, so it can't drift from what you're actually billed), each with when it resets. The Apify half only appears when `APIFY_API_TOKEN` is set and reachable.
 
 ## Layout
 

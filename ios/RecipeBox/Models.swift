@@ -25,17 +25,15 @@ struct PantryGroup: Codable, Hashable, Identifiable {
 struct Recipe: Codable, Identifiable, Hashable {
     let id: Int
     let title: String
-    let servings: String?
     let ingredients: [String]
     let steps: [String]
     let source: String
-    let caption: String
     let confidence: String
-    let thumbnail: String
     let savedAt: String?
-    let cuisine: String
-    let meal: String
-    let time: String?
+    /// Main course / Appetizers / Desserts — a direct field from the sheet
+    /// now (see app.store's "Course" column), not derived from a `meal`
+    /// classification the way it used to be.
+    let course: Course
     let tags: [String]
     let pantry: [String]
     let favorite: Bool
@@ -52,31 +50,26 @@ struct Recipe: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, servings, ingredients, steps, source, caption, confidence, thumbnail, cuisine, meal, time, tags, pantry, favorite, notes
+        case id, title, ingredients, steps, source, confidence, course, tags, pantry, favorite, notes
         case savedAt = "saved_at"
     }
 
     /// Memberwise init for building a locally-modified copy (optimistic
     /// favorite toggles) without a round trip through Codable.
     init(
-        id: Int, title: String, servings: String?, ingredients: [String], steps: [String],
-        source: String, caption: String, confidence: String, thumbnail: String, savedAt: String?,
-        cuisine: String, meal: String, time: String?, tags: [String], pantry: [String],
+        id: Int, title: String, ingredients: [String], steps: [String],
+        source: String, confidence: String, savedAt: String?,
+        course: Course, tags: [String], pantry: [String],
         favorite: Bool, notes: String, searchBlob: String
     ) {
         self.id = id
         self.title = title
-        self.servings = servings
         self.ingredients = ingredients
         self.steps = steps
         self.source = source
-        self.caption = caption
         self.confidence = confidence
-        self.thumbnail = thumbnail
         self.savedAt = savedAt
-        self.cuisine = cuisine
-        self.meal = meal
-        self.time = time
+        self.course = course
         self.tags = tags
         self.pantry = pantry
         self.favorite = favorite
@@ -86,9 +79,9 @@ struct Recipe: Codable, Identifiable, Hashable {
 
     func withFavorite(_ value: Bool) -> Recipe {
         Recipe(
-            id: id, title: title, servings: servings, ingredients: ingredients, steps: steps,
-            source: source, caption: caption, confidence: confidence, thumbnail: thumbnail,
-            savedAt: savedAt, cuisine: cuisine, meal: meal, time: time, tags: tags, pantry: pantry,
+            id: id, title: title, ingredients: ingredients, steps: steps,
+            source: source, confidence: confidence,
+            savedAt: savedAt, course: course, tags: tags, pantry: pantry,
             favorite: value, notes: notes, searchBlob: searchBlob
         )
     }
@@ -97,60 +90,141 @@ struct Recipe: Codable, Identifiable, Hashable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(Int.self, forKey: .id)
         title = try container.decode(String.self, forKey: .title)
-        servings = try container.decodeIfPresent(String.self, forKey: .servings)
         ingredients = try container.decodeIfPresent([String].self, forKey: .ingredients) ?? []
         steps = try container.decodeIfPresent([String].self, forKey: .steps) ?? []
         source = try container.decodeIfPresent(String.self, forKey: .source) ?? ""
-        caption = try container.decodeIfPresent(String.self, forKey: .caption) ?? ""
         confidence = try container.decodeIfPresent(String.self, forKey: .confidence) ?? "medium"
-        thumbnail = try container.decodeIfPresent(String.self, forKey: .thumbnail) ?? ""
         savedAt = try container.decodeIfPresent(String.self, forKey: .savedAt)
-        cuisine = try container.decodeIfPresent(String.self, forKey: .cuisine) ?? "Uncategorized"
-        meal = try container.decodeIfPresent(String.self, forKey: .meal) ?? "other"
-        time = try container.decodeIfPresent(String.self, forKey: .time)
+        let courseRaw = try container.decodeIfPresent(String.self, forKey: .course)
+        course = courseRaw.flatMap(Course.init(rawValue:)) ?? .mainCourse
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         pantry = collapsePantryItems(try container.decodeIfPresent([String].self, forKey: .pantry) ?? [])
         favorite = try container.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
         notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
-        searchBlob = ([title, cuisine, meal] + tags + ingredients).joined(separator: " ").lowercased()
+        searchBlob = ([title, course.rawValue] + tags + ingredients).joined(separator: " ").lowercased()
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(title, forKey: .title)
-        try container.encodeIfPresent(servings, forKey: .servings)
         try container.encode(ingredients, forKey: .ingredients)
         try container.encode(steps, forKey: .steps)
         try container.encode(source, forKey: .source)
-        try container.encode(caption, forKey: .caption)
         try container.encode(confidence, forKey: .confidence)
-        try container.encode(thumbnail, forKey: .thumbnail)
         try container.encodeIfPresent(savedAt, forKey: .savedAt)
-        try container.encode(cuisine, forKey: .cuisine)
-        try container.encode(meal, forKey: .meal)
-        try container.encodeIfPresent(time, forKey: .time)
+        try container.encode(course.rawValue, forKey: .course)
         try container.encode(tags, forKey: .tags)
         try container.encode(pantry, forKey: .pantry)
         try container.encode(favorite, forKey: .favorite)
         try container.encode(notes, forKey: .notes)
     }
 
-    var mealLabel: String {
-        switch meal {
-        case "breakfast": "Breakfast"
-        case "lunch": "Lunch"
-        case "dinner": "Dinner"
-        case "snack": "Snack"
-        case "dessert": "Dessert"
-        case "drink": "Drink"
-        default: "Other"
-        }
-    }
-
     var sourceURL: URL? {
         URL(string: source)
     }
+
+    private static let savedAtFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm 'UTC'"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    private static let savedAtRelativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
+
+    /// "SAVED 2 DAYS AGO" — the hero kicker on the detail screen. Falls back
+    /// to nil (kicker just isn't shown) if `saved_at` is missing or in a
+    /// shape the store hasn't written before.
+    var savedAtRelativeLabel: String? {
+        guard let savedAt, let date = Self.savedAtFormatter.date(from: savedAt) else { return nil }
+        return "Saved " + Self.savedAtRelativeFormatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    /// Short, human label for the meta row / detail footer — "INSTAGRAM",
+    /// "YOUTUBE", "TIKTOK", the bare host for any other link, or "Typed in"
+    /// for a hand-entered recipe (source is "" for those — see store.py).
+    var sourceLabel: String {
+        guard let host = sourceURL?.host?.lowercased(), !host.isEmpty else {
+            return "Typed in"
+        }
+        if host.contains("instagram.com") { return "Instagram" }
+        if host.contains("youtube.com") || host.contains("youtu.be") { return "YouTube" }
+        if host.contains("tiktok.com") { return "TikTok" }
+        return host.replacingOccurrences(of: "www.", with: "")
+    }
+
+    /// The Filters sheet's Source row bucket for this recipe. Instagram,
+    /// YouTube and TikTok are read straight off the URL; anything else with
+    /// a URL is "Link". A recipe with no URL is "Typed in" — Photo and
+    /// Typed in are NOT actually distinguishable from stored data (both
+    /// save with an empty Source column; see store.py's "typed in by hand"
+    /// path, which a photo extraction also goes through once you hit Save),
+    /// so `.photo` never matches anything today. It's kept in the enum and
+    /// offered as its own chip because the handoff calls for both — should
+    /// the sheet ever grow a real Photo/Typed-in marker, only this switch
+    /// needs to change.
+    var sourceCategory: SourceCategory {
+        guard let host = sourceURL?.host?.lowercased(), !host.isEmpty else {
+            return .typedIn
+        }
+        if host.contains("instagram.com") { return .instagram }
+        if host.contains("youtube.com") || host.contains("youtu.be") { return .youtube }
+        if host.contains("tiktok.com") { return .tiktok }
+        return .link
+    }
+
+    /// True if this recipe belongs to any of the selected Source chips. A
+    /// no-URL recipe matches both "Typed in" and "Photo" — see the doc
+    /// comment on `sourceCategory` — so picking either one surfaces it,
+    /// rather than "Photo" being a chip that can never match anything.
+    func matchesSourceFilter(_ selected: Set<SourceCategory>) -> Bool {
+        guard !selected.isEmpty else { return true }
+        if selected.contains(sourceCategory) { return true }
+        return sourceCategory == .typedIn && selected.contains(.photo)
+    }
+}
+
+/// The three-way classification new to this redesign — "Main course" /
+/// "Appetizers" / "Desserts" — shown as a filter row and a detail pill. A
+/// direct field on a saved Recipe (see app.store's "Course" column) rather
+/// than derived from `meal` the way it used to be, back when Course rode
+/// along on the Meal column instead of having one of its own.
+enum Course: String, CaseIterable, Identifiable {
+    case mainCourse = "Main course"
+    case appetizers = "Appetizers"
+    case desserts = "Desserts"
+
+    var id: String { rawValue }
+
+    /// Only used to seed an initial guess from a photo extraction's Gemini
+    /// `meal` classification (see RecipeExtraction) before the user picks a
+    /// course explicitly in the Add-recipe form — extraction still reasons
+    /// in terms of meal, saving no longer does.
+    init(meal: String) {
+        switch meal {
+        case "dessert": self = .desserts
+        case "snack": self = .appetizers
+        default: self = .mainCourse
+        }
+    }
+}
+
+/// The Filters sheet's Source chip row — see `Recipe.sourceCategory`.
+enum SourceCategory: String, CaseIterable, Identifiable {
+    case instagram = "Instagram"
+    case youtube = "YouTube"
+    case tiktok = "TikTok"
+    case link = "Link"
+    case photo = "Photo"
+    case typedIn = "Typed in"
+
+    var id: String { rawValue }
 }
 
 /// Partial edit sent to PATCH /api/recipes/{id}. Optional properties are
@@ -158,12 +232,12 @@ struct Recipe: Codable, Identifiable, Hashable {
 /// from the request body — the server leaves it untouched.
 struct RecipePatch: Encodable {
     var title: String?
-    var servings: String?
     var ingredients: [String]?
     var steps: [String]?
     var favorite: Bool?
     var notes: String?
     var tags: [String]?
+    var course: String?
 }
 
 /// What POST /api/extract-photo hands back after reading a recipe out of a
@@ -183,17 +257,140 @@ struct RecipeExtraction: Decodable {
     let confidence: String
 }
 
+/// What POST /ingest hands back — the same endpoint the Save Recipe
+/// Shortcut uses. `status` is "saved", "duplicate", "queued" (background
+/// processing, local dev only — the hosted Vercel backend always finishes
+/// in-request) or "error".
+struct IngestResult: Decodable {
+    let status: String
+    let url: String?
+    let title: String?
+    let confidence: String?
+    let message: String?
+    let error: String?
+}
+
+/// What RecipeStore.ingestLink resolves to, once it's found (or given up
+/// looking for) the row /ingest produced.
+enum LinkIngestOutcome {
+    case saved(Recipe)
+    case error(String)
+}
+
+/// Backs the Settings screen's "API usage" card, from GET /api/usage.
+/// `apify` is nil when the server has no Apify token or the live account
+/// query failed — the card shows only the Gemini bar in that case rather
+/// than a faked dollar figure.
+struct UsageStats: Decodable {
+    let gemini: GeminiUsage
+    let apify: ApifyUsage?
+
+    struct GeminiUsage: Decodable {
+        let used: Int
+        let limit: Int
+
+        private static let pacific = TimeZone(identifier: "America/Los_Angeles")!
+        private static let cet = TimeZone(identifier: "CET")!
+        private static let display: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h a"
+            formatter.timeZone = cet
+            return formatter
+        }()
+
+        /// "Resets around 9 AM CET" — Gemini's free tier actually resets at
+        /// midnight Pacific (that's the real clock; see GEMINI_QUOTA_MESSAGE
+        /// server-side), converted here to CET so the Settings card shows a
+        /// time that means something without doing the math yourself. Not
+        /// server data — computed fresh against "now" each time, so it
+        /// stays correct as Pacific and CET daylight saving shift through
+        /// the year.
+        static var resetsLabel: String {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = pacific
+            let startOfToday = calendar.startOfDay(for: Date())
+            let nextMidnightPacific = calendar.date(byAdding: .day, value: 1, to: startOfToday) ?? Date()
+            return "Resets around \(display.string(from: nextMidnightPacific)) CET"
+        }
+    }
+
+    struct ApifyUsage: Decodable {
+        let usedUsd: Double
+        let limitUsd: Double
+        /// ISO 8601 — the end of Apify's current monthly-credit cycle
+        /// (the account's own billing-cycle anniversary, not the 1st of the
+        /// month). Absent on an older backend or if Apify didn't include it.
+        let resetsAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case usedUsd = "used_usd"
+            case limitUsd = "limit_usd"
+            case resetsAt = "resets_at"
+        }
+
+        private static let parser: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter
+        }()
+        private static let fallbackParser = ISO8601DateFormatter()
+        private static let display: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM d"
+            return formatter
+        }()
+
+        /// "Resets Sep 15" — nil (caption just isn't shown) if `resetsAt`
+        /// is missing or in a shape that doesn't parse.
+        var resetsLabel: String? {
+            guard let resetsAt else { return nil }
+            let date = Self.parser.date(from: resetsAt) ?? Self.fallbackParser.date(from: resetsAt)
+            guard let date else { return nil }
+            return "Resets \(Self.display.string(from: date))"
+        }
+    }
+}
+
+/// Compares two URLs loosely — host + path, lowercased, trailing slash
+/// trimmed — since the value POST /ingest hands back is the URL as typed,
+/// while the Source column ends up holding fetch_post's normalized form
+/// (redirects resolved, tracking params dropped). Falls back to substring
+/// containment if either string doesn't parse as a URL.
+func urlsRoughlyMatch(_ a: String, _ b: String) -> Bool {
+    guard !a.isEmpty, !b.isEmpty else { return false }
+    if let urlA = URL(string: a), let urlB = URL(string: b),
+       let hostA = urlA.host?.lowercased(), let hostB = urlB.host?.lowercased() {
+        let pathA = urlA.path.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let pathB = urlB.path.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return hostA.replacingOccurrences(of: "www.", with: "") == hostB.replacingOccurrences(of: "www.", with: "")
+            && pathA == pathB
+    }
+    return a.contains(b) || b.contains(a)
+}
+
+/// The paste-a-link screen's "we read <this> off it" line, keyed off the
+/// host — mirrors Recipe.sourceLabel but for a URL that isn't saved yet.
+func detectedSourceLine(for url: URL) -> String {
+    guard let host = url.host?.lowercased(), !host.isEmpty else {
+        return "Page — the text will be read"
+    }
+    if host.contains("instagram.com") {
+        return "Instagram reel — caption and owner comment will be read"
+    }
+    if host.contains("youtube.com") || host.contains("youtu.be") || host.contains("tiktok.com") {
+        return "Video — audio and description will be read"
+    }
+    return "Page — the text will be read"
+}
+
 /// A recipe typed straight into the app, sent to POST /api/recipes.
 /// Unlike RecipePatch every field is required — there's no existing row
 /// to fall back on.
 struct RecipeCreate: Encodable {
     var title: String
-    var servings: String?
     var ingredients: [String]
     var steps: [String]
-    var cuisine: String
-    var meal: String
-    var time: String?
+    var course: String
     var tags: [String]
     var notes: String
 }
@@ -216,6 +413,12 @@ enum SortOption: String, CaseIterable {
     case recent = "Recent"
     case az = "A–Z"
     case za = "Z–A"
+}
+
+/// The list screen's grid/list toggle. Persisted locally (not synced to the
+/// server — this is a per-device display preference, not app data).
+enum ViewMode: String {
+    case list, grid
 }
 
 struct RecipeMatch {

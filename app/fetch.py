@@ -150,6 +150,40 @@ def _is_instagram_url(url: str) -> bool:
     return host == "instagram.com" or host.endswith(".instagram.com")
 
 
+def get_apify_usage() -> dict | None:
+    """Live monthly spend vs. Apify's platform credit limit, straight from
+    Apify's own account API (GET /users/me/limits) — this app never tracks
+    dollars itself, so the Settings "API usage" card can't drift from what
+    Apify actually bills. Returns None (card should just omit itself rather
+    than show a stale/fake number) if there's no token or the call fails."""
+    token = settings.apify_api_token.strip()
+    if not token:
+        return None
+    try:
+        response = httpx.get(
+            f"{APIFY_API_BASE}/users/me/limits",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json().get("data") or {}
+        used = (data.get("current") or {}).get("monthlyUsageUsd")
+        limit = (data.get("limits") or {}).get("maxMonthlyUsageUsd")
+        if used is None or limit is None:
+            return None
+        result = {"used_usd": round(used, 2), "limit_usd": round(limit, 2)}
+        # The end of the current cycle — Apify resets on the account's own
+        # billing-cycle anniversary, not the 1st of the month, so this is
+        # worth surfacing rather than assuming a fixed date.
+        resets_at = (data.get("monthlyUsageCycle") or {}).get("endAt")
+        if resets_at:
+            result["resets_at"] = resets_at
+        return result
+    except Exception as exc:
+        logger.info("Apify usage check skipped: %s", exc)
+        return None
+
+
 class ApifyLimitError(RuntimeError):
     """Apify's account-wide usage limit (monthly platform credit) was hit.
     Raised (not swallowed) so it surfaces as a real error instead of

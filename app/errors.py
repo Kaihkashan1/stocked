@@ -11,8 +11,13 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.fetch import ApifyLimitError
 
+# The free tier's actual daily cap. Kept as one constant so the wording
+# below and the Settings "API usage" card (see app.store.get_gemini_reads_today)
+# can never drift apart.
+GEMINI_DAILY_QUOTA = 20
+
 GEMINI_QUOTA_MESSAGE = (
-    "Gemini's free daily quota (20 requests/day) is used up. "
+    f"Gemini's free daily quota ({GEMINI_DAILY_QUOTA} requests/day) is used up. "
     "Try again after it resets — usually around midnight Pacific time."
 )
 

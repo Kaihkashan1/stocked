@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/organic-235e2d3f-6423-4975-9805-e3e26a8eb65b/styles.css">
+<script src="_ds/organic-235e2d3f-6423-4975-9805-e3e26a8eb65b/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:#e6d8bd}
+a{color:var(--color-accent-700);text-decoration:none}
+a:hover{color:var(--color-accent-800)}
+.rb-scroll{overflow:auto;-webkit-overflow-scrolling:touch}
+.rb-scroll::-webkit-scrollbar{width:0}
+@keyframes rbfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes rbspin{to{transform:rotate(360deg)}}
+@keyframes rbpulse{0%,100%{opacity:.45}50%{opacity:.85}}
+</style>
+</helmet>
+
+<div style="display:flex;gap:48px;padding:52px 56px 72px;align-items:flex-start;font-family:var(--font-body);color:var(--color-text)">
+
+  <div style="width:300px;flex:none;display:flex;flex-direction:column;gap:26px;position:sticky;top:52px">
+    <div>
+      <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:8px">Recipe Box · iOS</div>
+      <h1 style="font-size:40px;margin:0 0 12px;line-height:1.05">A warmer recipe box</h1>
+      <p style="font-size:14px;line-height:1.6;margin:0;color:var(--color-neutral-700)">Text-first cards on a cream ground, terracotta for actions, sage for what you have. Source badges stay quiet. Every screen below is live — tap through the phone.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:4px">Screens</div>
+      <sc-for list="{{ rail }}" as="item" hint-placeholder-count="10">
+        <button onClick="{{ item.on }}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer;font:inherit;font-size:13.5px;padding:9px 16px;border-radius:999px;border:1px solid {{ item.bd }};background:{{ item.bg }};color:{{ item.fg }}" style-hover="border-color:var(--color-accent-400)">
+          <span>{{ item.label }}</span>
+          <span style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;opacity:.55">{{ item.hint }}</span>
+        </button>
+      </sc-for>
+    </div>
+    <p style="font-size:12px;line-height:1.6;margin:0;color:var(--color-neutral-600)">Try: type “paneer” in search to mark it as something you have, then watch the fit badges sort the list.</p>
+  </div>
+
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ frameW }}" height="{{ frameH }}" style="width:402px;height:874px;flex:none" hint-size="402px,874px">
+
+    <!-- ══ LIST ══ -->
+    <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);position:relative">
+        <div style="padding:66px 22px 14px;position:relative;overflow:hidden;flex:none">
+          <div style="position:absolute;top:-70px;right:-60px;width:210px;height:210px;border-radius:50%;background:var(--color-accent-200);opacity:.55"></div>
+          <div style="position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:4px">{{ collectionLine }}</div>
+              <h1 style="font-size:36px;margin:0;line-height:1">Recipe Box</h1>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button onClick="{{ openSettings }}" style="width:42px;height:42px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);color:var(--color-neutral-800);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--color-accent)" aria-label="Settings">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.5 1.5M17.3 17.3l1.5 1.5M18.8 5.2l-1.5 1.5M6.7 17.3l-1.5 1.5"></path></svg>
+              </button>
+              <button onClick="{{ openAddSheet }}" style="width:42px;height:42px;border-radius:999px;border:none;background:var(--color-accent);color:var(--color-bg);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm)" style-hover="background:var(--color-accent-600)" aria-label="Add recipe">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+              </button>
+            </div>
+          </div>
+          <div style="position:relative;display:flex;gap:9px;margin-top:18px">
+            <div style="flex:1;display:flex;align-items:center;gap:9px;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:0 16px;height:46px">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" style="color:var(--color-neutral-600);flex:none"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.8-3.8"></path></svg>
+              <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search, or type what you have…" style="flex:1;min-width:0;border:none;background:transparent;outline:none;font:inherit;font-size:14.5px;color:var(--color-text)">
+            </div>
+            <button onClick="{{ openFilters }}" style="width:46px;height:46px;flex:none;border-radius:999px;border:1px solid {{ filterBd }};background:{{ filterBg }};color:{{ filterFg }};display:flex;align-items:center;justify-content:center;cursor:pointer" aria-label="Filters">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M4 7h16M7 12h10M10 17h4"></path></svg>
+            </button>
+            <button onClick="{{ toggleView }}" style="width:46px;height:46px;flex:none;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);color:var(--color-neutral-800);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--color-accent)" aria-label="Toggle grid or list view">
+              <sc-if value="{{ isGridView }}" hint-placeholder-val="{{ false }}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.8"></rect><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.8"></rect><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.8"></rect><rect x="13" y="13" width="7.5" height="7.5" rx="1.8"></rect></svg>
+              </sc-if>
+              <sc-if value="{{ isListView }}" hint-placeholder-val="{{ true }}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M4 12h16M4 17.5h16"></path></svg>
+              </sc-if>
+            </button>
+          </div>
+          <sc-if value="{{ showSuggest }}" hint-placeholder-val="{{ false }}">
+            <div style="position:relative;margin-top:12px">
+              <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Mark as something you have</div>
+              <div style="display:flex;flex-wrap:wrap;gap:7px">
+                <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="2">
+                  <button onClick="{{ s.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:6px 14px;border-radius:999px;border:1px dashed var(--color-accent-2-400);background:var(--color-accent-2-100);color:var(--color-accent-2-800)" style-hover="background:var(--color-accent-2-200)">+ {{ s.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="flex:none;display:flex;gap:7px;padding:2px 22px 12px">
+          <sc-for list="{{ courseChips }}" as="c" hint-placeholder-count="3">
+            <button onClick="{{ c.on }}" style="flex:1;cursor:pointer;font:inherit;font-size:12.5px;padding:9px 0;border-radius:999px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
+          </sc-for>
+        </div>
+        <div class="rb-scroll" style="flex:1;padding:6px 22px 120px">
+          <sc-if value="{{ hasHave }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;background:var(--color-accent-2-100);margin-bottom:14px">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--color-accent-2-500);flex:none"></span>
+              <span style="font-size:12.5px;color:var(--color-accent-2-800);flex:1">{{ haveLine }}</span>
+              <button onClick="{{ clearHave }}" style="cursor:pointer;font:inherit;font-size:12px;border:none;background:transparent;color:var(--color-accent-2-800);text-decoration:underline;padding:0">Clear</button>
+            </div>
+          </sc-if>
+          <div style="display:{{ listDisplay }};flex-direction:column;grid-template-columns:1fr 1fr;gap:{{ cardGap }}">
+            <sc-for list="{{ visible }}" as="r" hint-placeholder-count="5">
+              <div onClick="{{ r.open }}" style="cursor:pointer;background:var(--color-surface);border-radius:{{ cardRadius }};padding:{{ cardPad }};display:flex;flex-direction:column;gap:{{ cardGap2 }};box-shadow:var(--shadow-sm);animation:rbfade .3s ease both" style-hover="box-shadow:var(--shadow-md)">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <sc-if value="{{ isListView }}" hint-placeholder-val="{{ true }}">
+                    <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600)">{{ r.source }}</span>
+                  </sc-if>
+                  <sc-if value="{{ r.showFit }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--color-accent-2-500);color:var(--color-bg)">{{ r.fitLabel }}</span>
+                  </sc-if>
+                  <span style="flex:1"></span>
+                  <button onClick="{{ r.fav }}" style="cursor:pointer;border:none;background:transparent;padding:0;line-height:0;color:{{ r.starColor }}" aria-label="Favorite">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="{{ r.starFill }}" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M12 3.2l2.7 5.5 6 .9-4.35 4.24 1.03 6-5.38-2.83L6.62 19.84l1.03-6L3.3 9.6l6-.9z"></path></svg>
+                  </button>
+                </div>
+                <div style="font-family:var(--font-heading);font-size:{{ cardTitleSize }};line-height:1.15">{{ r.title }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ noMatches }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:44px 8px;text-align:center;color:var(--color-neutral-600);font-size:14px">Nothing matches that yet.</div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ addSheet }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeAddSheet }}" style="position:absolute;inset:0;z-index:40;background:color-mix(in srgb,var(--color-neutral-900) 42%,transparent);display:flex;flex-direction:column;justify-content:flex-end">
+            <div style="background:var(--color-bg);border-radius:34px 34px 0 0;padding:26px 22px 40px;display:flex;flex-direction:column;gap:10px;animation:rbfade .22s ease both">
+              <div style="width:44px;height:5px;border-radius:999px;background:var(--color-neutral-300);align-self:center;margin-bottom:8px"></div>
+              <h3 style="font-size:24px;margin:0 0 8px">Add a recipe</h3>
+              <sc-for list="{{ addOptions }}" as="o" hint-placeholder-count="4">
+                <button onClick="{{ o.on }}" style="display:flex;align-items:center;gap:14px;text-align:left;cursor:pointer;font:inherit;background:var(--color-surface);border:none;border-radius:24px;padding:15px 18px" style-hover="background:var(--color-accent-200)">
+                  <span style="width:38px;height:38px;flex:none;border-radius:50%;background:var(--color-accent-200);color:var(--color-accent-800);display:flex;align-items:center;justify-content:center;font-family:var(--font-heading);font-size:15px">{{ o.glyph }}</span>
+                  <span style="flex:1">
+                    <span style="display:block;font-family:var(--font-heading);font-size:16px">{{ o.label }}</span>
+                    <span style="display:block;font-size:12.5px;color:var(--color-neutral-700);margin-top:2px">{{ o.sub }}</span>
+                  </span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ══ DETAIL ══ -->
+    <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
+        <div style="flex:none;padding:58px 22px 0;display:flex;gap:8px">
+          <button onClick="{{ goList }}" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);color:var(--color-neutral-800);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--color-accent)" aria-label="Back">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+          </button>
+          <span style="flex:1"></span>
+          <button onClick="{{ favCurrent }}" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:{{ detailStarColor }}" aria-label="Favorite">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="{{ detailStarFill }}" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M12 3.2l2.7 5.5 6 .9-4.35 4.24 1.03 6-5.38-2.83L6.62 19.84l1.03-6L3.3 9.6l6-.9z"></path></svg>
+          </button>
+          <button style="width:40px;height:40px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);color:var(--color-neutral-800);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--color-accent)" aria-label="More">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.9"></circle><circle cx="12" cy="12" r="1.9"></circle><circle cx="19" cy="12" r="1.9"></circle></svg>
+          </button>
+        </div>
+
+        <div class="rb-scroll" style="flex:1;padding:14px 22px 120px">
+          <div style="position:relative;overflow:hidden;border-radius:32px;background:var(--color-surface);padding:24px 22px 22px;margin-bottom:18px">
+            <div style="position:absolute;right:-46px;bottom:-58px;width:170px;height:170px;border-radius:50%;background:var(--color-accent-200);opacity:.7"></div>
+            <div style="position:relative">
+              <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:8px">{{ detailKicker }}</div>
+              <h2 style="font-size:31px;margin:0 0 14px;line-height:1.08;max-width:16ch">{{ detailTitle }}</h2>
+              <span style="display:inline-block;font-size:11.5px;padding:5px 13px;border-radius:999px;background:var(--color-accent);color:var(--color-bg)">{{ detailCourse }}</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ hasHave }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:13px 18px;border-radius:22px;background:var(--color-accent-2-100);color:var(--color-accent-2-800);font-size:13px;margin-bottom:18px">{{ detailPantryLine }}</div>
+          </sc-if>
+
+          <button onClick="{{ startCooking }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:16px;border:none;border-radius:999px;padding:16px;background:var(--color-accent);color:var(--color-bg);box-shadow:var(--shadow-sm);margin-bottom:26px" style-hover="background:var(--color-accent-600)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5l12 7.5-12 7.5z"></path></svg>
+            Start cooking
+          </button>
+
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+            <h3 style="font-size:23px;margin:0">Ingredients</h3>
+            <div style="display:flex;gap:5px">
+              <sc-for list="{{ scales }}" as="s" hint-placeholder-count="4">
+                <button onClick="{{ s.on }}" style="cursor:pointer;font:inherit;font-size:12px;padding:5px 11px;border-radius:999px;border:none;background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:var(--color-surface);border-radius:28px;padding:6px 20px;margin-bottom:28px">
+            <sc-for list="{{ detailIngredients }}" as="i" hint-placeholder-count="6">
+              <div style="display:flex;align-items:baseline;gap:12px;padding:13px 0;border-bottom:1px solid var(--color-divider)">
+                <sc-if value="{{ i.hasQty }}" hint-placeholder-val="{{ true }}">
+                  <span style="flex:none;min-width:62px;text-align:center;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;background:{{ i.qtyBg }};color:{{ i.qtyFg }}">{{ i.qty }}</span>
+                </sc-if>
+                <span style="font-size:14.5px;line-height:1.45;color:var(--color-neutral-900)">{{ i.text }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <h3 style="font-size:23px;margin:0 0 14px">Steps</h3>
+          <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:28px">
+            <sc-for list="{{ detailSteps }}" as="s" hint-placeholder-count="4">
+              <div style="display:flex;gap:14px;align-items:flex-start">
+                <span style="flex:none;width:28px;height:28px;border-radius:50%;background:var(--color-accent-200);color:var(--color-accent-800);font-family:var(--font-heading);font-size:13px;display:flex;align-items:center;justify-content:center">{{ s.n }}</span>
+                <span style="font-size:14.5px;line-height:1.55;padding-top:3px">{{ s.text }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ hasNotes }}" hint-placeholder-val="{{ false }}">
+            <div style="border-radius:26px;background:var(--color-accent-100);padding:18px 20px;margin-bottom:24px">
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:6px">Notes</div>
+              <div style="font-size:14px;line-height:1.55">{{ detailNotes }}</div>
+            </div>
+          </sc-if>
+
+          <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:20px">
+            <sc-for list="{{ detailTags }}" as="t" hint-placeholder-count="2">
+              <span style="font-size:11.5px;padding:5px 13px;border-radius:999px;background:var(--color-accent-100);color:var(--color-accent-800)">{{ t }}</span>
+            </sc-for>
+          </div>
+          <div style="font-size:12px;color:var(--color-neutral-600)">From <a href="#">{{ detailSourceLink }}</a></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ COOK MODE ══ -->
+    <sc-if value="{{ isCook }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:{{ cookBg }};color:{{ cookFg }};font-family:var(--font-body);position:relative;overflow:hidden">
+        <div style="position:absolute;top:-90px;left:-70px;width:260px;height:260px;border-radius:50%;background:{{ cookBlob }}"></div>
+        <div style="position:relative;flex:none;padding:58px 22px 0;display:flex;align-items:center;gap:12px">
+          <button onClick="{{ endCooking }}" style="width:40px;height:40px;border-radius:999px;border:none;background:{{ cookChip }};color:{{ cookFg }};display:flex;align-items:center;justify-content:center;cursor:pointer" aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+          <div style="flex:1;text-align:center;font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.65">{{ detailTitle }}</div>
+          <button onClick="{{ cookBack }}" style="width:40px;height:40px;border-radius:999px;border:none;background:{{ cookChip }};color:{{ cookFg }};display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:{{ cookBackOpacity }}" aria-label="Previous step">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+          </button>
+        </div>
+        <div style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;padding:0 30px;text-align:center">
+          <div style="flex:none;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:{{ cookAccent }};margin-bottom:20px">{{ cookCounter }}</div>
+          <div style="flex:0 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;-webkit-mask-image:{{ cookMask }};mask-image:{{ cookMask }}" onScroll="{{ cookScroll }}">
+            <div style="font-family:var(--font-heading);font-size:{{ cookStepSize }};line-height:1.24;padding:6px 0 8px;animation:rbfade .25s ease both">{{ cookStep }}</div>
+          </div>
+        </div>
+        <div style="position:relative;flex:none;padding:0 22px 44px">
+          <div style="display:flex;gap:6px;margin-bottom:22px">
+            <sc-for list="{{ cookTicks }}" as="t" hint-placeholder-count="5">
+              <span style="flex:1;height:5px;border-radius:999px;background:{{ t.bg }}"></span>
+            </sc-for>
+          </div>
+          <button onClick="{{ cookNext }}" style="width:100%;height:62px;border:none;border-radius:999px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:17px;background:var(--color-accent);color:#fff8ec" style-hover="background:var(--color-accent-400)">{{ cookNextLabel }}</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ PASTE A LINK ══ -->
+    <sc-if value="{{ isLink }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
+        <div style="flex:none;padding:58px 22px 0;display:flex;align-items:center;gap:12px">
+          <button onClick="{{ goList }}" style="cursor:pointer;font:inherit;font-size:14px;border:none;background:transparent;color:var(--color-accent-700);padding:0">Cancel</button>
+          <span style="flex:1"></span>
+        </div>
+        <div class="rb-scroll" style="flex:1;padding:20px 22px 60px">
+          <h2 style="font-size:30px;margin:0 0 8px;line-height:1.1">Paste a link</h2>
+          <p style="font-size:14px;color:var(--color-neutral-700);margin:0 0 22px">A reel, a video, or any recipe page. We read it and fill the card in for you.</p>
+          <div style="display:flex;gap:9px;margin-bottom:16px">
+            <input value="{{ linkValue }}" onChange="{{ onLink }}" placeholder="https://…" style="flex:1;min-width:0;height:50px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 18px;font:inherit;font-size:14.5px;color:var(--color-text);outline:none">
+            <button onClick="{{ pasteDemo }}" style="flex:none;padding:0 18px;height:50px;border-radius:999px;border:1px solid var(--color-divider);background:transparent;cursor:pointer;font:inherit;font-size:13.5px;color:var(--color-neutral-800)" style-hover="background:var(--color-accent-100)">Paste</button>
+          </div>
+          <sc-if value="{{ linkDetected }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-radius:22px;background:var(--color-accent-100);margin-bottom:20px">
+              <span style="width:9px;height:9px;border-radius:50%;background:var(--color-accent);flex:none"></span>
+              <span style="font-size:13px;color:var(--color-accent-800)">{{ linkSourceLine }}</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ linkFetching }}" hint-placeholder-val="{{ false }}">
+            <div style="border-radius:28px;background:var(--color-surface);padding:20px;display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
+              <sc-for list="{{ fetchSteps }}" as="f" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span style="width:22px;height:22px;flex:none;border-radius:50%;border:2.5px solid {{ f.ring }};border-top-color:{{ f.top }};animation:{{ f.anim }}"></span>
+                  <span style="font-size:14px;color:{{ f.fg }}">{{ f.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ linkDone }}" hint-placeholder-val="{{ false }}">
+            <div style="border-radius:28px;background:var(--color-accent-2-100);padding:22px;margin-bottom:20px">
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-2-800);margin-bottom:8px">Saved to your box</div>
+              <div style="font-family:var(--font-heading);font-size:21px;margin-bottom:6px">Chili Crisp Butter Noodles</div>
+              <div style="font-size:13px;color:var(--color-accent-2-800)">7 ingredients · 5 steps · 15 min</div>
+            </div>
+          </sc-if>
+          <button onClick="{{ submitLink }}" style="width:100%;border:none;border-radius:999px;padding:16px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:16px;background:var(--color-accent);color:var(--color-bg)" style-hover="background:var(--color-accent-600)">{{ linkButtonLabel }}</button>
+          <p style="font-size:12.5px;color:var(--color-neutral-600);margin-top:18px">Sharing from the app’s share sheet still works exactly as before — this is for when the link is already on your clipboard.</p>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ ADD FROM PHOTO ══ -->
+    <sc-if value="{{ isPhoto }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
+        <div style="flex:none;padding:58px 22px 0;display:flex;align-items:center">
+          <button onClick="{{ goList }}" style="cursor:pointer;font:inherit;font-size:14px;border:none;background:transparent;color:var(--color-accent-700);padding:0">Cancel</button>
+          <span style="flex:1"></span>
+          <button onClick="{{ goList }}" style="cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:14px;border:none;background:transparent;color:var(--color-accent-700);padding:0">Save</button>
+        </div>
+        <div class="rb-scroll" style="flex:1;padding:18px 22px 60px">
+          <h2 style="font-size:30px;margin:0 0 8px;line-height:1.1">From a photo</h2>
+          <p style="font-size:14px;color:var(--color-neutral-700);margin:0 0 20px">Check what we read off the page before it goes in the box.</p>
+          <div style="display:flex;align-items:center;gap:9px;padding:12px 18px;border-radius:22px;background:var(--color-accent-2-100);margin-bottom:20px">
+            <span style="font-size:13px;color:var(--color-accent-2-800)">Read 9 ingredients and 6 steps. Confidence: high.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Title</div>
+              <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:13px 18px;font-family:var(--font-heading);font-size:17px">Nani’s Coconut Chutney</div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Ingredients</div>
+              <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:26px;padding:16px 18px;font-size:14px;line-height:1.9;color:var(--color-neutral-900)">1 cup grated coconut<br>2 tbsp roasted chana dal<br>2 green chillies<br>1 tsp tamarind paste<br>Salt, to taste</div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Course</div>
+              <div style="display:flex;gap:7px">
+                <sc-for list="{{ formCourseChips }}" as="c" hint-placeholder-count="3">
+                  <button onClick="{{ c.on }}" style="flex:1;cursor:pointer;font:inherit;font-size:12.5px;padding:9px 0;border-radius:999px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Tags</div>
+              <div style="display:flex;flex-wrap:wrap;gap:7px">
+                <sc-for list="{{ tagChips }}" as="t" hint-placeholder-count="6">
+                  <button onClick="{{ t.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid {{ t.bd }};background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="font-size:12.5px;color:var(--color-neutral-600);line-height:1.5">Source is set automatically — this one files under <strong style="font-weight:600">Photo</strong> in Filters.</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ TYPE IT IN ══ -->
+    <sc-if value="{{ isType }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
+        <div style="flex:none;padding:58px 22px 0;display:flex;align-items:center">
+          <button onClick="{{ goList }}" style="cursor:pointer;font:inherit;font-size:14px;border:none;background:transparent;color:var(--color-accent-700);padding:0">Cancel</button>
+          <span style="flex:1"></span>
+          <button onClick="{{ goList }}" style="cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:14px;border:none;background:transparent;color:var(--color-accent-700);padding:0">Save</button>
+        </div>
+        <div class="rb-scroll" style="flex:1;padding:18px 22px 60px">
+          <h2 style="font-size:30px;margin:0 0 20px;line-height:1.1">Type it in</h2>
+          <div style="display:flex;flex-direction:column;gap:18px">
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Title</div>
+              <input placeholder="What is it called?" style="width:100%;height:50px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 18px;font:inherit;font-size:15px;outline:none;color:var(--color-text)">
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+                <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600)">Ingredients</span>
+                <span style="font-size:11.5px;color:var(--color-neutral-600)">one per line</span>
+              </div>
+              <textarea placeholder="200 g wheat noodles
+2 tbsp chili crisp" style="width:100%;height:120px;border-radius:26px;border:1px solid var(--color-divider);background:var(--color-surface);padding:14px 18px;font:inherit;font-size:14.5px;outline:none;resize:none;color:var(--color-text)"></textarea>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+                <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600)">Steps</span>
+                <span style="font-size:11.5px;color:var(--color-neutral-600)">one per line, in order</span>
+              </div>
+              <textarea placeholder="Boil the noodles
+Melt butter with chili crisp" style="width:100%;height:130px;border-radius:26px;border:1px solid var(--color-divider);background:var(--color-surface);padding:14px 18px;font:inherit;font-size:14.5px;outline:none;resize:none;color:var(--color-text)"></textarea>
+            </div>
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Course</div>
+              <div style="display:flex;gap:7px">
+                <sc-for list="{{ formCourseChips }}" as="c" hint-placeholder-count="3">
+                  <button onClick="{{ c.on }}" style="flex:1;cursor:pointer;font:inherit;font-size:12.5px;padding:9px 0;border-radius:999px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Tags</div>
+              <div style="display:flex;flex-wrap:wrap;gap:7px">
+                <sc-for list="{{ tagChips }}" as="t" hint-placeholder-count="6">
+                  <button onClick="{{ t.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid {{ t.bd }};background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="font-size:12.5px;color:var(--color-neutral-600);line-height:1.5">Source is set automatically — this one files under <strong style="font-weight:600">Typed in</strong> in Filters.</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ FILTERS ══ -->
+    <sc-if value="{{ isFilters }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
+        <div style="flex:none;padding:58px 22px 0;display:flex;align-items:center">
+          <button onClick="{{ resetFilters }}" style="cursor:pointer;font:inherit;font-size:14px;border:none;background:transparent;color:var(--color-accent-700);padding:0">Reset</button>
+          <span style="flex:1"></span>
+          <button onClick="{{ goList }}" style="cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:14px;border:none;background:transparent;color:var(--color-accent-700);padding:0">Done</button>
+        </div>
+        <div class="rb-scroll" style="flex:1;padding:16px 22px 60px">
+          <h2 style="font-size:30px;margin:0 0 22px;line-height:1.1">Filters</h2>
+          <div style="border-radius:30px;background:var(--color-accent-2-100);padding:20px;margin-bottom:18px">
+            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-2-800);margin-bottom:10px">What I have</div>
+            <sc-if value="{{ hasHave }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">
+                <sc-for list="{{ haveChips }}" as="h" hint-placeholder-count="3">
+                  <button onClick="{{ h.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:none;background:var(--color-accent-2-500);color:var(--color-bg)">{{ h.label }} ×</button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noHave }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size:13.5px;color:var(--color-accent-2-800);margin-bottom:10px">Nothing marked yet.</div>
+            </sc-if>
+            <div style="font-size:12.5px;color:var(--color-accent-2-800);opacity:.85">Sorts recipes by closest fit. Type an ingredient in search to add one.</div>
+          </div>
+          <div style="margin-bottom:22px">
+            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:10px">Source</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ sourceChips }}" as="c" hint-placeholder-count="6">
+                <button onClick="{{ c.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="margin-bottom:22px">
+            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:10px">Tags</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ tagChips }}" as="t" hint-placeholder-count="6">
+                <button onClick="{{ t.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid {{ t.bd }};background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <button onClick="{{ toggleFavOnly }}" style="width:100%;display:flex;align-items:center;gap:11px;cursor:pointer;font:inherit;text-align:left;border:1px solid var(--color-divider);border-radius:26px;background:var(--color-surface);padding:16px 18px;margin-bottom:22px;color:{{ favOnlyFg }}">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="{{ favOnlyFill }}" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M12 3.2l2.7 5.5 6 .9-4.35 4.24 1.03 6-5.38-2.83L6.62 19.84l1.03-6L3.3 9.6l6-.9z"></path></svg>
+            <span style="font-size:14.5px">{{ favOnlyLabel }}</span>
+          </button>
+          <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:10px">Sort</div>
+          <div style="display:flex;gap:7px">
+            <sc-for list="{{ sortChips }}" as="s" hint-placeholder-count="3">
+              <button onClick="{{ s.on }}" style="flex:1;cursor:pointer;font:inherit;font-size:13px;padding:11px 0;border-radius:999px;border:1px solid {{ s.bd }};background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ SETTINGS ══ -->
+    <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
+        <div style="flex:none;padding:58px 22px 0;display:flex;align-items:center">
+          <span style="flex:1"></span>
+          <button onClick="{{ goList }}" style="cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:14px;border:none;background:transparent;color:var(--color-accent-700);padding:0">Close</button>
+        </div>
+        <div class="rb-scroll" style="flex:1;padding:16px 22px 60px">
+          <h2 style="font-size:30px;margin:0 0 22px;line-height:1.1">Settings</h2>
+          <div style="margin-bottom:20px">
+            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Server</div>
+            <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:14px 18px;font-size:13.5px;color:var(--color-neutral-800);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">kaihkashan-recipe-box.vercel.app</div>
+            <div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:9px;line-height:1.5">Recipes load from the hosted server. Your Mac does not need to be running.</div>
+          </div>
+          <div style="margin-bottom:20px">
+            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Edit key</div>
+            <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:14px 18px;font-size:15px;letter-spacing:.22em;color:var(--color-neutral-700)">••••••••••••</div>
+            <div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:9px;line-height:1.5">Only needed to favorite or edit. Same value the Shortcut sends.</div>
+          </div>
+          <div style="border-radius:28px;background:var(--color-surface);padding:18px 20px;margin-bottom:20px">
+            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:12px">API usage</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ quotaRows }}" as="q" hint-placeholder-count="2">
+                <div>
+                  <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:6px"><span>{{ q.label }}</span><span style="color:var(--color-neutral-700)">{{ q.value }}</span></div>
+                  <div style="height:6px;border-radius:999px;background:var(--color-neutral-200);overflow:hidden"><div style="height:100%;border-radius:999px;background:var(--color-accent);width:{{ q.pct }}"></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <button onClick="{{ goList }}" style="width:100%;border:none;border-radius:999px;padding:15px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:15px;background:var(--color-accent);color:var(--color-bg)" style-hover="background:var(--color-accent-600)">Save and reload</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ EMPTY ══ -->
+    <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body);position:relative;overflow:hidden">
+        <div style="position:absolute;top:120px;right:-80px;width:240px;height:240px;border-radius:50%;background:var(--color-accent-200);opacity:.6"></div>
+        <div style="position:absolute;bottom:60px;left:-70px;width:200px;height:200px;border-radius:50%;background:var(--color-accent-2-200);opacity:.6"></div>
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 34px;text-align:left">
+          <div style="width:78px;height:78px;border-radius:50%;background:var(--color-accent);color:var(--color-bg);display:flex;align-items:center;justify-content:center;margin-bottom:26px">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+          </div>
+          <h2 style="font-size:34px;margin:0 0 12px;line-height:1.08">Add your first recipe</h2>
+          <p style="font-size:15px;line-height:1.6;color:var(--color-neutral-700);margin:0 0 26px">Share a reel from Instagram, paste a link, snap a cookbook page, or write one down yourself.</p>
+          <button onClick="{{ openLink }}" style="align-self:flex-start;border:none;border-radius:999px;padding:15px 26px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:16px;background:var(--color-accent);color:var(--color-bg)" style-hover="background:var(--color-accent-600)">Get started</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ LOADING ══ -->
+    <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
+        <div style="flex:none;padding:66px 22px 14px">
+          <h1 style="font-size:36px;margin:0;line-height:1">Recipe Box</h1>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
+            <span style="width:18px;height:18px;flex:none;border-radius:50%;border:2.5px solid var(--color-accent-200);border-top-color:var(--color-accent);animation:rbspin .9s linear infinite"></span>
+            <span style="font-size:13px;color:var(--color-neutral-700)">Loading your recipes…</span>
+          </div>
+          <div style="height:46px;border-radius:999px;background:var(--color-surface);margin-top:16px;animation:rbpulse 1.4s ease-in-out infinite"></div>
+        </div>
+        <div style="flex:1;padding:6px 22px;display:flex;flex-direction:column;gap:13px">
+          <sc-for list="{{ skeletons }}" as="s" hint-placeholder-count="4">
+            <div style="background:var(--color-surface);border-radius:30px;padding:18px 20px;display:flex;flex-direction:column;gap:11px;animation:rbpulse 1.4s ease-in-out infinite">
+              <div style="height:9px;width:34%;border-radius:999px;background:var(--color-neutral-300)"></div>
+              <div style="height:17px;width:{{ s.w }};border-radius:999px;background:var(--color-neutral-300)"></div>
+              <div style="height:11px;width:52%;border-radius:999px;background:var(--color-neutral-200)"></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+  </x-import>
+
+  <div style="width:330px;flex:none;display:flex;flex-direction:column;gap:30px">
+    <div>
+      <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:8px">App icon</div>
+      <h2 style="font-size:28px;margin:0 0 8px;line-height:1.08">Nine directions</h2>
+      <p style="font-size:13.5px;line-height:1.6;margin:0;color:var(--color-neutral-700)">No letterform in any. Each is shown large and at 60px, the size it actually lives at on a home screen.</p>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:var(--color-accent-200);color:var(--color-accent-800)">A</span>
+        <span style="font-size:13px;color:var(--color-neutral-700)">Lidded pot — the box, steaming</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <div style="width:168px;height:168px;border-radius:38px;background:var(--color-bg);position:relative;overflow:hidden;box-shadow:var(--shadow-md);flex:none">
+          <div style="position:absolute;left:71px;top:20px;width:11px;height:30px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(-14deg)"></div>
+          <div style="position:absolute;left:92px;top:14px;width:11px;height:40px;border-radius:999px;background:var(--color-accent-2-500);transform:rotate(12deg)"></div>
+          <div style="position:absolute;left:54px;bottom:38px;width:60px;height:60px;border-radius:50%;background:var(--color-accent-2-300)"></div>
+          <div style="position:absolute;left:28px;bottom:36px;width:112px;height:62px;border-radius:14px 14px 34px 34px;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:20px;bottom:90px;width:128px;height:16px;border-radius:999px;background:var(--color-accent-600)"></div>
+          <div style="position:absolute;left:73px;bottom:104px;width:22px;height:12px;border-radius:999px 999px 0 0;background:var(--color-accent-600)"></div>
+        </div>
+        <div style="width:60px;height:60px;border-radius:14px;background:var(--color-bg);position:relative;overflow:hidden;flex:none;box-shadow:var(--shadow-sm)">
+          <div style="position:absolute;left:25px;top:7px;width:4px;height:11px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(-14deg)"></div>
+          <div style="position:absolute;left:33px;top:5px;width:4px;height:14px;border-radius:999px;background:var(--color-accent-2-500);transform:rotate(12deg)"></div>
+          <div style="position:absolute;left:10px;bottom:13px;width:40px;height:22px;border-radius:5px 5px 12px 12px;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:7px;bottom:32px;width:46px;height:6px;border-radius:999px;background:var(--color-accent-600)"></div>
+          <div style="position:absolute;left:26px;bottom:37px;width:8px;height:5px;border-radius:999px 999px 0 0;background:var(--color-accent-600)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:var(--color-accent-200);color:var(--color-accent-800)">B</span>
+        <span style="font-size:13px;color:var(--color-neutral-700)">Box of cards, steam rising out of it</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <div style="width:168px;height:168px;border-radius:38px;background:var(--color-accent);position:relative;overflow:hidden;box-shadow:var(--shadow-md);flex:none">
+          <div style="position:absolute;left:56px;top:16px;width:11px;height:32px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(-16deg)"></div>
+          <div style="position:absolute;left:78px;top:10px;width:11px;height:42px;border-radius:999px;background:var(--color-accent-2-300);transform:rotate(10deg)"></div>
+          <div style="position:absolute;left:100px;top:18px;width:11px;height:28px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(20deg)"></div>
+          <div style="position:absolute;left:38px;bottom:82px;width:92px;height:22px;border-radius:11px;background:var(--color-accent-200)"></div>
+          <div style="position:absolute;left:26px;bottom:30px;width:116px;height:62px;border-radius:16px 16px 30px 30px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:66px;bottom:52px;width:36px;height:11px;border-radius:999px;background:var(--color-accent-300)"></div>
+        </div>
+        <div style="width:60px;height:60px;border-radius:14px;background:var(--color-accent);position:relative;overflow:hidden;flex:none;box-shadow:var(--shadow-sm)">
+          <div style="position:absolute;left:20px;top:6px;width:4px;height:11px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(-16deg)"></div>
+          <div style="position:absolute;left:28px;top:4px;width:4px;height:15px;border-radius:999px;background:var(--color-accent-2-300);transform:rotate(10deg)"></div>
+          <div style="position:absolute;left:36px;top:7px;width:4px;height:10px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(20deg)"></div>
+          <div style="position:absolute;left:14px;bottom:29px;width:33px;height:8px;border-radius:999px;background:var(--color-accent-200)"></div>
+          <div style="position:absolute;left:9px;bottom:11px;width:42px;height:22px;border-radius:6px 6px 11px 11px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:24px;bottom:19px;width:13px;height:4px;border-radius:999px;background:var(--color-accent-300)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:var(--color-accent-200);color:var(--color-accent-800)">C</span>
+        <span style="font-size:13px;color:var(--color-neutral-700)">Pot and plates — cooking and eating</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <div style="width:168px;height:168px;border-radius:38px;background:var(--color-bg);position:relative;overflow:hidden;box-shadow:var(--shadow-md);flex:none">
+          <div style="position:absolute;left:14px;top:34px;width:62px;height:62px;border-radius:50%;background:var(--color-accent-2-300)"></div>
+          <div style="position:absolute;left:34px;top:54px;width:22px;height:22px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:96px;top:46px;width:58px;height:58px;border-radius:50%;background:var(--color-accent-2-500)"></div>
+          <div style="position:absolute;left:115px;top:65px;width:20px;height:20px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:44px;bottom:22px;width:80px;height:48px;border-radius:12px 12px 26px 26px;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:34px;bottom:66px;width:100px;height:14px;border-radius:999px;background:var(--color-accent-600)"></div>
+          <div style="position:absolute;left:76px;bottom:78px;width:18px;height:10px;border-radius:999px 999px 0 0;background:var(--color-accent-600)"></div>
+        </div>
+        <div style="width:60px;height:60px;border-radius:14px;background:var(--color-bg);position:relative;overflow:hidden;flex:none;box-shadow:var(--shadow-sm)">
+          <div style="position:absolute;left:5px;top:12px;width:22px;height:22px;border-radius:50%;background:var(--color-accent-2-300)"></div>
+          <div style="position:absolute;left:12px;top:19px;width:8px;height:8px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:34px;top:16px;width:21px;height:21px;border-radius:50%;background:var(--color-accent-2-500)"></div>
+          <div style="position:absolute;left:41px;top:23px;width:7px;height:7px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:16px;bottom:8px;width:28px;height:17px;border-radius:4px 4px 9px 9px;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:12px;bottom:23px;width:36px;height:5px;border-radius:999px;background:var(--color-accent-600)"></div>
+          <div style="position:absolute;left:27px;bottom:27px;width:7px;height:4px;border-radius:999px 999px 0 0;background:var(--color-accent-600)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:var(--color-accent-200);color:var(--color-accent-800)">D</span>
+        <span style="font-size:13px;color:var(--color-neutral-700)">Outline — drawn, not filled</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <div style="width:168px;height:168px;border-radius:38px;background:var(--color-bg);position:relative;overflow:hidden;box-shadow:var(--shadow-md);flex:none">
+          <div style="position:absolute;left:64px;top:18px;width:10px;height:30px;border-radius:999px;background:var(--color-accent-2-500);transform:rotate(-14deg)"></div>
+          <div style="position:absolute;left:88px;top:12px;width:10px;height:40px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(12deg)"></div>
+          <div style="position:absolute;left:30px;bottom:32px;width:108px;height:62px;border:10px solid var(--color-accent);border-radius:10px 10px 30px 30px;box-sizing:border-box"></div>
+          <div style="position:absolute;left:22px;bottom:88px;width:124px;height:12px;border-radius:999px;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:74px;bottom:99px;width:20px;height:11px;border-radius:999px 999px 0 0;background:var(--color-accent)"></div>
+        </div>
+        <div style="width:60px;height:60px;border-radius:14px;background:var(--color-bg);position:relative;overflow:hidden;flex:none;box-shadow:var(--shadow-sm)">
+          <div style="position:absolute;left:23px;top:6px;width:4px;height:11px;border-radius:999px;background:var(--color-accent-2-500);transform:rotate(-14deg)"></div>
+          <div style="position:absolute;left:31px;top:4px;width:4px;height:14px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(12deg)"></div>
+          <div style="position:absolute;left:11px;bottom:11px;width:38px;height:22px;border:4px solid var(--color-accent);border-radius:4px 4px 11px 11px;box-sizing:border-box"></div>
+          <div style="position:absolute;left:8px;bottom:31px;width:44px;height:5px;border-radius:999px;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:26px;bottom:35px;width:8px;height:5px;border-radius:999px 999px 0 0;background:var(--color-accent)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:var(--color-accent-200);color:var(--color-accent-800)">E</span>
+        <span style="font-size:13px;color:var(--color-neutral-700)">Top-down pot — rings, reads at any size</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <div style="width:168px;height:168px;border-radius:38px;background:var(--color-accent-2-500);position:relative;overflow:hidden;box-shadow:var(--shadow-md);flex:none">
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:126px;height:126px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:84px;height:84px;border-radius:50%;background:var(--color-accent-300)"></div>
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:6px;top:50%;transform:translateY(-50%);width:26px;height:16px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:26px;height:16px;border-radius:999px;background:var(--color-bg)"></div>
+        </div>
+        <div style="width:60px;height:60px;border-radius:14px;background:var(--color-accent-2-500);position:relative;overflow:hidden;flex:none;box-shadow:var(--shadow-sm)">
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:45px;height:45px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--color-accent-300)"></div>
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:2px;top:50%;transform:translateY(-50%);width:9px;height:6px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;right:2px;top:50%;transform:translateY(-50%);width:9px;height:6px;border-radius:999px;background:var(--color-bg)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:var(--color-accent-200);color:var(--color-accent-800)">F</span>
+        <span style="font-size:13px;color:var(--color-neutral-700)">Steam only — the most abstract</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <div style="width:168px;height:168px;border-radius:38px;background:var(--color-accent);position:relative;overflow:hidden;box-shadow:var(--shadow-md);flex:none">
+          <div style="position:absolute;left:38px;bottom:34px;width:18px;height:62px;border-radius:999px;background:var(--color-bg);opacity:.75"></div>
+          <div style="position:absolute;left:66px;bottom:34px;width:18px;height:96px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:94px;bottom:34px;width:18px;height:76px;border-radius:999px;background:var(--color-accent-2-300)"></div>
+          <div style="position:absolute;left:38px;bottom:20px;width:92px;height:12px;border-radius:999px;background:var(--color-bg)"></div>
+        </div>
+        <div style="width:60px;height:60px;border-radius:14px;background:var(--color-accent);position:relative;overflow:hidden;flex:none;box-shadow:var(--shadow-sm)">
+          <div style="position:absolute;left:14px;bottom:12px;width:6px;height:22px;border-radius:999px;background:var(--color-bg);opacity:.75"></div>
+          <div style="position:absolute;left:24px;bottom:12px;width:6px;height:34px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:34px;bottom:12px;width:6px;height:27px;border-radius:999px;background:var(--color-accent-2-300)"></div>
+          <div style="position:absolute;left:14px;bottom:7px;width:32px;height:4px;border-radius:999px;background:var(--color-bg)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:var(--color-accent-200);color:var(--color-accent-800)">G</span>
+        <span style="font-size:13px;color:var(--color-neutral-700)">Place setting, steaming — cooking and eating</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <div style="width:168px;height:168px;border-radius:38px;background:var(--color-accent-2-500);position:relative;overflow:hidden;box-shadow:var(--shadow-md);flex:none">
+          <div style="position:absolute;left:66px;top:14px;width:11px;height:26px;border-radius:999px;background:var(--color-accent-300);transform:rotate(-15deg)"></div>
+          <div style="position:absolute;left:88px;top:9px;width:11px;height:34px;border-radius:999px;background:var(--color-accent-200);transform:rotate(13deg)"></div>
+          <div style="position:absolute;left:44px;bottom:24px;width:80px;height:80px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:66px;bottom:46px;width:36px;height:36px;border-radius:50%;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:20px;bottom:34px;width:11px;height:56px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:16px;bottom:84px;width:5px;height:18px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:23px;bottom:84px;width:5px;height:18px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:30px;bottom:84px;width:5px;height:18px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;right:20px;bottom:34px;width:11px;height:46px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;right:14px;bottom:76px;width:23px;height:28px;border-radius:50%;background:var(--color-bg)"></div>
+        </div>
+        <div style="width:60px;height:60px;border-radius:14px;background:var(--color-accent-2-500);position:relative;overflow:hidden;flex:none;box-shadow:var(--shadow-sm)">
+          <div style="position:absolute;left:24px;top:5px;width:4px;height:9px;border-radius:999px;background:var(--color-accent-300);transform:rotate(-15deg)"></div>
+          <div style="position:absolute;left:32px;top:3px;width:4px;height:12px;border-radius:999px;background:var(--color-accent-200);transform:rotate(13deg)"></div>
+          <div style="position:absolute;left:16px;bottom:9px;width:28px;height:28px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:24px;bottom:17px;width:12px;height:12px;border-radius:50%;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:7px;bottom:12px;width:4px;height:24px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;right:7px;bottom:12px;width:4px;height:19px;border-radius:999px;background:var(--color-bg)"></div>
+          <div style="position:absolute;right:5px;bottom:28px;width:8px;height:10px;border-radius:50%;background:var(--color-bg)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:var(--color-accent-200);color:var(--color-accent-800)">H</span>
+        <span style="font-size:13px;color:var(--color-neutral-700)">Bowl with a spoon in it, steam above</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <div style="width:168px;height:168px;border-radius:38px;background:var(--color-bg);position:relative;overflow:hidden;box-shadow:var(--shadow-md);flex:none">
+          <div style="position:absolute;left:56px;top:18px;width:11px;height:28px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(-15deg)"></div>
+          <div style="position:absolute;left:78px;top:12px;width:11px;height:38px;border-radius:999px;background:var(--color-accent-2-500);transform:rotate(12deg)"></div>
+          <div style="position:absolute;right:26px;bottom:66px;width:12px;height:64px;border-radius:999px;background:var(--color-accent-2-600);transform:rotate(28deg)"></div>
+          <div style="position:absolute;right:16px;bottom:118px;width:26px;height:20px;border-radius:50%;background:var(--color-accent-2-600);transform:rotate(28deg)"></div>
+          <div style="position:absolute;left:24px;bottom:38px;width:120px;height:58px;border-radius:0 0 999px 999px;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:34px;bottom:26px;width:100px;height:14px;border-radius:999px;background:var(--color-accent-600)"></div>
+        </div>
+        <div style="width:60px;height:60px;border-radius:14px;background:var(--color-bg);position:relative;overflow:hidden;flex:none;box-shadow:var(--shadow-sm)">
+          <div style="position:absolute;left:20px;top:6px;width:4px;height:10px;border-radius:999px;background:var(--color-accent-2-400);transform:rotate(-15deg)"></div>
+          <div style="position:absolute;left:28px;top:4px;width:4px;height:13px;border-radius:999px;background:var(--color-accent-2-500);transform:rotate(12deg)"></div>
+          <div style="position:absolute;right:9px;bottom:24px;width:5px;height:23px;border-radius:999px;background:var(--color-accent-2-600);transform:rotate(28deg)"></div>
+          <div style="position:absolute;right:6px;bottom:42px;width:10px;height:8px;border-radius:50%;background:var(--color-accent-2-600);transform:rotate(28deg)"></div>
+          <div style="position:absolute;left:9px;bottom:14px;width:42px;height:21px;border-radius:0 0 999px 999px;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:13px;bottom:9px;width:34px;height:5px;border-radius:999px;background:var(--color-accent-600)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:var(--color-accent-200);color:var(--color-accent-800)">I</span>
+        <span style="font-size:13px;color:var(--color-neutral-700)">Half pot, half plate — split down the middle</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px">
+        <div style="width:168px;height:168px;border-radius:38px;background:var(--color-accent);position:relative;overflow:hidden;box-shadow:var(--shadow-md);flex:none">
+          <div style="position:absolute;right:0;top:0;bottom:0;width:84px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:20px;top:26px;width:11px;height:30px;border-radius:999px;background:var(--color-accent-200);transform:rotate(-14deg)"></div>
+          <div style="position:absolute;left:44px;top:20px;width:11px;height:38px;border-radius:999px;background:var(--color-accent-200);transform:rotate(12deg)"></div>
+          <div style="position:absolute;left:10px;bottom:38px;width:74px;height:52px;border-radius:10px 0 0 26px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:4px;bottom:88px;width:84px;height:13px;border-radius:999px 0 0 999px;background:var(--color-accent-200)"></div>
+          <div style="position:absolute;left:98px;bottom:44px;width:56px;height:56px;border-radius:50%;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:112px;bottom:58px;width:28px;height:28px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:118px;bottom:16px;width:11px;height:24px;border-radius:999px;background:var(--color-accent-2-500)"></div>
+          <div style="position:absolute;left:134px;bottom:16px;width:11px;height:24px;border-radius:999px;background:var(--color-accent-2-500)"></div>
+        </div>
+        <div style="width:60px;height:60px;border-radius:14px;background:var(--color-accent);position:relative;overflow:hidden;flex:none;box-shadow:var(--shadow-sm)">
+          <div style="position:absolute;right:0;top:0;bottom:0;width:30px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:7px;top:9px;width:4px;height:11px;border-radius:999px;background:var(--color-accent-200);transform:rotate(-14deg)"></div>
+          <div style="position:absolute;left:15px;top:7px;width:4px;height:13px;border-radius:999px;background:var(--color-accent-200);transform:rotate(12deg)"></div>
+          <div style="position:absolute;left:4px;bottom:14px;width:26px;height:19px;border-radius:4px 0 0 9px;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:1px;bottom:32px;width:30px;height:5px;border-radius:999px 0 0 999px;background:var(--color-accent-200)"></div>
+          <div style="position:absolute;left:35px;bottom:16px;width:20px;height:20px;border-radius:50%;background:var(--color-accent)"></div>
+          <div style="position:absolute;left:40px;bottom:21px;width:10px;height:10px;border-radius:50%;background:var(--color-bg)"></div>
+          <div style="position:absolute;left:40px;bottom:6px;width:4px;height:9px;border-radius:999px;background:var(--color-accent-2-500)"></div>
+          <div style="position:absolute;left:46px;bottom:6px;width:4px;height:9px;border-radius:999px;background:var(--color-accent-2-500)"></div>
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size:12.5px;line-height:1.6;margin:0;color:var(--color-neutral-600)">G–I put cooking and eating in one mark: a steaming plate with fork and spoon, a bowl with the spoon still in it, and a split frame with the pot on one side and the plate on the other. G reads fastest; H is the calmest; I is the boldest but busiest at 60px.<br><br>A–C are solid silhouettes, D is the same pot drawn as an outline, E is a pot from above in flat rings, F drops the object entirely and keeps only steam over a lid line. E and F hold up best at 60px; C carries the most meaning and loses the most. Say which and I'll export it at every iOS size.</p>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'list', query: '', have: [], favs: {2:true}, tags: [], favOnly: false, viewMode: 'list',
+    sort: 'Recent', currentId: 1, step: 0, scale: 1, addSheet: false, sources: [], course: null, formCourse: 'Main course',
+    link: '', linkPhase: 'idle', fetchIndex: 0, meal: 'Dinner',
+  };
+
+  RECIPES = [
+    { id:1, title:'Chili Crisp Butter Noodles', source:'Instagram', course:'Main course', time:'15 min', servings:2, tags:['veg','high protein'], saved:'2 days ago',
+      notes:'Double the chili crisp. Vinegar at the end is what makes it.',
+      ingredients:[['200 g','wheat noodles'],['2 tbsp','chili crisp'],['40 g','salted butter'],['1 tbsp','soy sauce'],['1 tsp','black vinegar'],['2','spring onions, sliced'],[null,'Sesame seeds, to finish']],
+      steps:['Boil the noodles in well-salted water until just past al dente, then lift them out and keep a mug of the water.','Melt the butter in a wide pan over low heat until it foams and smells nutty.','Stir in the chili crisp, soy sauce and a splash of the noodle water to make a loose sauce.','Toss the noodles through the sauce until every strand is glossy.','Off the heat, add the vinegar, spring onions and sesame seeds.'] },
+    { id:2, title:'Sheet Pan Harissa Chicken', source:'YouTube', course:'Main course', time:'45 min', servings:4, tags:['high protein','non-veg'], saved:'last week',
+      notes:'', ingredients:[['6','chicken thighs'],['3 tbsp','harissa paste'],['1','red onion, wedged'],['400 g','new potatoes'],['1','lemon']],
+      steps:['Heat the oven to 220°C.','Toss everything with the harissa and a good glug of oil.','Roast 35 minutes, turning once, until the skin is dark at the edges.','Squeeze the lemon over while hot.'] },
+    { id:3, title:'Mom’s Chana Masala', source:'Typed in', course:'Main course', time:'50 min', servings:6, tags:['mom’s recipes','veg'], saved:'3 weeks ago',
+      notes:'She uses the tea bag trick — one black tea bag in the soaking water.',
+      ingredients:[['2 cups','dried chickpeas, soaked'],['2','onions, finely chopped'],['3','tomatoes, blended'],['1 tbsp','chana masala'],['1 tsp','amchur'],['200 g','paneer, cubed (optional)']],
+      steps:['Pressure cook the chickpeas until soft enough to crush between two fingers.','Brown the onions slowly — this is most of the flavour.','Add the tomatoes and spices, cook until the oil separates.','Fold in the chickpeas with a cup of their water and simmer 15 minutes.'] },
+    { id:4, title:'Airfryer Gochujang Cauliflower', source:'TikTok', course:'Appetizers', time:'25 min', servings:3, tags:['airfryer','veg'], saved:'a month ago',
+      notes:'', ingredients:[['1','cauliflower, in florets'],['2 tbsp','gochujang'],['1 tbsp','honey'],['1 tbsp','rice vinegar'],['2 tsp','sesame oil']],
+      steps:['Air fry the florets at 200°C for 12 minutes, shaking halfway.','Whisk the sauce while they cook.','Toss the hot cauliflower in the sauce and return for 4 minutes.'] },
+    { id:5, title:'Brown Butter Banana Bread', source:'Photo', course:'Desserts', time:'1 hr 10', servings:8, tags:['dessert'], saved:'a month ago',
+      notes:'', ingredients:[['3','very ripe bananas'],['115 g','butter, browned'],['150 g','brown sugar'],['2','eggs'],['220 g','flour'],['1 tsp','baking soda']],
+      steps:['Brown the butter and let it cool slightly.','Mash the bananas, then beat in butter, sugar and eggs.','Fold in the dry ingredients — stop while it still looks rough.','Bake at 175°C for 55 minutes.'] },
+    { id:6, title:'Lemon Tahini Salmon Bowl', source:'Link', course:'Main course', time:'30 min', servings:2, tags:['high protein','non-veg'], saved:'a month ago',
+      notes:'', ingredients:[['2','salmon fillets'],['3 tbsp','tahini'],['1','lemon, juiced'],['150 g','rice'],['1','cucumber, sliced']],
+      steps:['Roast the salmon at 200°C for 12 minutes.','Loosen the tahini with lemon and cold water until pourable.','Build the bowls, spoon the sauce over everything.'] },
+  ];
+
+  ALL_TAGS = ['mom’s recipes','veg','non-veg','dessert','high protein','airfryer'];
+  MEALS = ['Breakfast','Lunch','Dinner','Snack','Dessert'];
+  FETCH_LABELS = ['Fetching the post','Reading the recipe','Saving to your box'];
+
+  go = (screen) => () => this.setState({ screen, addSheet: false });
+
+  fitFor(r) {
+    if (!this.state.have.length) return null;
+    const text = r.ingredients.map(i => i[1].toLowerCase()).join(' | ');
+    const hits = this.state.have.filter(h => text.includes(h.toLowerCase())).length;
+    return Math.round((hits / this.state.have.length) * 100);
+  }
+
+  advanceFetch = () => {
+    const next = this.state.fetchIndex + 1;
+    if (next >= this.FETCH_LABELS.length) {
+      this.setState({ linkPhase: 'done' });
+    } else {
+      this.setState({ fetchIndex: next });
+      this.timer = setTimeout(this.advanceFetch, 1100);
+    }
+  };
+
+  componentWillUnmount() { clearTimeout(this.timer); }
+
+  renderVals() {
+    const s = this.state;
+    const chip = (on) => on
+      ? { bg: 'var(--color-accent)', fg: 'var(--color-bg)', bd: 'var(--color-accent)' }
+      : { bg: 'var(--color-surface)', fg: 'var(--color-neutral-800)', bd: 'var(--color-divider)' };
+
+    const q = s.query.trim().toLowerCase();
+    let list = this.RECIPES.filter(r => {
+      if (s.favOnly && !s.favs[r.id]) return false;
+      if (s.sources.length && !s.sources.includes(r.source)) return false;
+      if (s.course && r.course !== s.course) return false;
+      if (s.tags.length && !s.tags.some(t => r.tags.includes(t))) return false;
+      if (!q) return true;
+      return (r.title + ' ' + r.tags.join(' ') + ' ' + r.ingredients.map(i => i[1]).join(' ')).toLowerCase().includes(q);
+    });
+    if (s.have.length) list = list.slice().sort((a, b) => this.fitFor(b) - this.fitFor(a));
+    else if (s.sort === 'A–Z') list = list.slice().sort((a, b) => a.title.localeCompare(b.title));
+    else if (s.sort === 'Z–A') list = list.slice().sort((a, b) => b.title.localeCompare(a.title));
+
+    const current = this.RECIPES.find(r => r.id === s.currentId) || this.RECIPES[0];
+    const scaleQty = (qty) => {
+      if (!qty) return qty;
+      const m = qty.match(/^([\d.]+)(.*)$/);
+      if (!m) return qty;
+      const n = parseFloat(m[1]) * s.scale;
+      return (Math.round(n * 100) / 100) + m[2];
+    };
+    const missing = current.ingredients
+      .filter(i => !s.have.some(h => i[1].toLowerCase().includes(h.toLowerCase())))
+      .map(i => i[1].split(',')[0]);
+
+    const pantryPool = ['paneer','chickpeas','butter','noodles','salmon','cauliflower','bananas','tahini','onions','lemon'];
+    const suggestions = q
+      ? pantryPool.filter(p => p.includes(q) && !s.have.includes(p)).slice(0, 3)
+          .map(p => ({ label: p, on: () => this.setState({ have: s.have.concat(p), query: '' }) }))
+      : [];
+
+    const favCount = Object.values(s.favs).filter(Boolean).length;
+    const activeFilters = s.tags.length || s.favOnly || s.have.length || s.sources.length;
+
+    const rail = [
+      ['Recipe list','list','6'], ['Recipe detail','detail',''], ['Cook mode','cook',''],
+      ['Paste a link','link','new'], ['From a photo','photo',''], ['Type it in','type',''],
+      ['Filters','filters',''], ['Settings','settings',''], ['Empty state','empty',''], ['Loading','loading',''],
+    ].map(([label, key, hint]) => ({
+      label, hint, on: this.go(key),
+      bg: s.screen === key ? 'var(--color-accent-200)' : 'transparent',
+      fg: s.screen === key ? 'var(--color-accent-800)' : 'var(--color-neutral-800)',
+      bd: s.screen === key ? 'var(--color-accent-300)' : 'var(--color-divider)',
+    }));
+
+    const cook = { bg: 'var(--color-accent-900)', fg: '#f7ecd9', chip: 'rgba(247,236,217,0.14)', blob: 'rgba(198,113,57,0.18)', accent: 'var(--color-accent-400)' };
+
+    return {
+      frameW: 402, frameH: 874,
+      rail,
+      isList: s.screen === 'list', isDetail: s.screen === 'detail', isCook: s.screen === 'cook',
+      isLink: s.screen === 'link', isPhoto: s.screen === 'photo', isType: s.screen === 'type',
+      isFilters: s.screen === 'filters', isSettings: s.screen === 'settings',
+      isEmpty: s.screen === 'empty', isLoading: s.screen === 'loading',
+
+      collectionLine: this.RECIPES.length + ' recipes · ' + favCount + ' favorite' + (favCount === 1 ? '' : 's'),
+      isGridView: s.viewMode === 'grid', isListView: s.viewMode !== 'grid',
+      toggleView: () => this.setState({ viewMode: s.viewMode === 'grid' ? 'list' : 'grid' }),
+      listDisplay: s.viewMode === 'grid' ? 'grid' : 'flex',
+      cardGap: s.viewMode === 'grid' ? '13px' : '13px',
+      cardGap2: s.viewMode === 'grid' ? '8px' : '10px',
+      cardRadius: s.viewMode === 'grid' ? '22px' : '30px',
+      cardPad: s.viewMode === 'grid' ? '15px 16px 14px' : '18px 20px 17px',
+      cardTitleSize: s.viewMode === 'grid' ? '16px' : '21px',
+      query: s.query,
+      onQuery: (e) => this.setState({ query: e.target.value }),
+      showSuggest: suggestions.length > 0,
+      suggestions,
+      hasHave: s.have.length > 0,
+      noHave: s.have.length === 0,
+      haveLine: 'Sorted by fit to ' + s.have.join(', '),
+      clearHave: () => this.setState({ have: [] }),
+      haveChips: s.have.map(h => ({ label: h, on: () => this.setState({ have: s.have.filter(x => x !== h) }) })),
+      filterBg: activeFilters ? 'var(--color-accent)' : 'var(--color-surface)',
+      filterFg: activeFilters ? 'var(--color-bg)' : 'var(--color-neutral-800)',
+      filterBd: activeFilters ? 'var(--color-accent)' : 'var(--color-divider)',
+      noMatches: list.length === 0,
+
+      visible: list.map(r => {
+        const fit = this.fitFor(r);
+        return {
+          title: r.title, source: r.source, tags: r.tags,
+          showFit: fit !== null, fitLabel: fit + '% fit',
+          starColor: s.favs[r.id] ? 'var(--color-accent)' : 'var(--color-neutral-400)',
+          starFill: s.favs[r.id] ? 'currentColor' : 'none',
+          open: () => this.setState({ screen: 'detail', currentId: r.id, step: 0, scale: 1 }),
+          fav: (e) => { e.stopPropagation(); this.setState({ favs: Object.assign({}, s.favs, { [r.id]: !s.favs[r.id] }) }); },
+        };
+      }),
+
+      openSettings: this.go('settings'), openFilters: this.go('filters'), goList: this.go('list'),
+      openLink: this.go('link'),
+      openAddSheet: () => this.setState({ addSheet: true }),
+      closeAddSheet: () => this.setState({ addSheet: false }),
+      addSheet: s.addSheet,
+      addOptions: [
+        { glyph: '↗', label: 'Paste a link', sub: 'Reel, video, or recipe page', on: this.go('link') },
+        { glyph: '◎', label: 'Take a photo', sub: 'Cookbook page or recipe card', on: this.go('photo') },
+        { glyph: '▣', label: 'Choose from library', sub: 'A screenshot you already saved', on: this.go('photo') },
+        { glyph: '✎', label: 'Type it in', sub: 'Write it down yourself', on: this.go('type') },
+      ],
+
+      detailTitle: current.title,
+      detailKicker: 'Saved ' + current.saved,
+      detailCourse: current.course,
+      courseChips: ['Main course','Appetizers','Desserts'].map(c => Object.assign(
+        { label: c, on: () => this.setState({ course: s.course === c ? null : c }) },
+        chip(s.course === c)
+      )),
+      detailTags: current.tags,
+      detailNotes: current.notes, hasNotes: !!current.notes,
+      detailSaved: 'saved ' + current.saved,
+      detailSourceLink: current.source,
+      detailStarColor: s.favs[current.id] ? 'var(--color-accent)' : 'var(--color-neutral-500)',
+      detailStarFill: s.favs[current.id] ? 'currentColor' : 'none',
+      favCurrent: () => this.setState({ favs: Object.assign({}, s.favs, { [current.id]: !s.favs[current.id] }) }),
+      detailPantryLine: missing.length === 0 ? 'You have everything for this.' : 'Missing ' + missing.length + ': ' + missing.slice(0, 3).join(', '),
+      detailIngredients: current.ingredients.map(([qty, text]) => ({
+        hasQty: !!qty, qty: scaleQty(qty), text,
+        qtyBg: s.scale === 1 ? 'var(--color-accent-200)' : 'var(--color-accent)',
+        qtyFg: s.scale === 1 ? 'var(--color-accent-800)' : 'var(--color-bg)',
+      })),
+      detailSteps: current.steps.map((text, i) => ({ n: i + 1, text })),
+      scales: [0.5, 1, 2, 3].map(f => Object.assign(
+        { label: (f === 0.5 ? '½' : f) + '×', on: () => this.setState({ scale: f }) },
+        s.scale === f ? { bg: 'var(--color-accent)', fg: 'var(--color-bg)' } : { bg: 'var(--color-surface)', fg: 'var(--color-neutral-700)' }
+      )),
+
+      startCooking: () => this.setState({ screen: 'cook', step: 0 }),
+      endCooking: this.go('detail'),
+      cookBg: cook.bg, cookFg: cook.fg, cookChip: cook.chip, cookBlob: cook.blob, cookAccent: cook.accent,
+      cookCounter: 'Step ' + (s.step + 1) + ' of ' + current.steps.length,
+      cookStep: current.steps[s.step],
+      cookStepSize: (() => { const n = (current.steps[s.step] || '').length;
+        return n <= 70 ? '32px' : n <= 120 ? '27px' : n <= 190 ? '23px' : '20px'; })(),
+      cookMask: (current.steps[s.step] || '').length > 300 && !s.cookAtEnd
+        ? 'linear-gradient(180deg,#000 0,#000 78%,rgba(0,0,0,0) 100%)' : 'none',
+      cookScroll: (e) => { const el = e.currentTarget,
+          atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+        if (atEnd !== !!s.cookAtEnd) this.setState({ cookAtEnd: atEnd }); },
+      cookTicks: current.steps.map((_, i) => ({ bg: i <= s.step ? 'var(--color-accent)' : 'rgba(247,236,217,0.18)' })),
+      cookNextLabel: s.step < current.steps.length - 1 ? 'Next step' : 'Done cooking',
+      cookNext: () => s.step < current.steps.length - 1 ? this.setState({ step: s.step + 1, cookAtEnd: false }) : this.setState({ screen: 'detail' }),
+      cookBack: () => this.setState({ step: Math.max(0, s.step - 1), cookAtEnd: false }),
+      cookBackOpacity: s.step === 0 ? 0.4 : 1,
+
+      linkValue: s.link,
+      onLink: (e) => this.setState({ link: e.target.value, linkPhase: 'idle' }),
+      pasteDemo: () => this.setState({ link: 'https://www.instagram.com/reel/C8xk2Qd1/', linkPhase: 'idle' }),
+      linkDetected: /instagram|youtube|tiktok|http/i.test(s.link) && s.linkPhase === 'idle',
+      linkSourceLine: /instagram/i.test(s.link) ? 'Instagram reel — caption and owner comment will be read'
+        : /youtube|tiktok/i.test(s.link) ? 'Video — audio and description will be read' : 'Page — the text will be read',
+      linkFetching: s.linkPhase === 'fetching',
+      linkDone: s.linkPhase === 'done',
+      fetchSteps: this.FETCH_LABELS.map((label, i) => ({
+        label,
+        ring: i < s.fetchIndex ? 'var(--color-accent-2-500)' : i === s.fetchIndex ? 'var(--color-accent-200)' : 'var(--color-neutral-200)',
+        top: i === s.fetchIndex ? 'var(--color-accent)' : i < s.fetchIndex ? 'var(--color-accent-2-500)' : 'var(--color-neutral-200)',
+        anim: i === s.fetchIndex ? 'rbspin .9s linear infinite' : 'none',
+        fg: i <= s.fetchIndex ? 'var(--color-text)' : 'var(--color-neutral-600)',
+      })),
+      linkButtonLabel: s.linkPhase === 'done' ? 'Open the recipe' : s.linkPhase === 'fetching' ? 'Reading…' : 'Save recipe',
+      submitLink: () => {
+        if (s.linkPhase === 'done') { this.setState({ screen: 'detail', currentId: 1, linkPhase: 'idle', link: '', fetchIndex: 0 }); return; }
+        if (s.linkPhase === 'fetching') return;
+        this.setState({ linkPhase: 'fetching', fetchIndex: 0 });
+        clearTimeout(this.timer);
+        this.timer = setTimeout(this.advanceFetch, 1100);
+      },
+
+      sourceChips: ['Instagram','YouTube','TikTok','Link','Photo','Typed in'].map(c => Object.assign(
+        { label: c, on: () => this.setState({ sources: s.sources.includes(c) ? s.sources.filter(x => x !== c) : s.sources.concat(c) }) },
+        chip(s.sources.includes(c))
+      )),
+      tagChips: this.ALL_TAGS.map(t => Object.assign(
+        { label: t, on: () => this.setState({ tags: s.tags.includes(t) ? s.tags.filter(x => x !== t) : s.tags.concat(t) }) },
+        chip(s.tags.includes(t))
+      )),
+      formCourseChips: ['Main course','Appetizers','Desserts'].map(c => Object.assign(
+        { label: c, on: () => this.setState({ formCourse: c }) }, chip(s.formCourse === c)
+      )),
+      sortChips: ['Recent','A–Z','Z–A'].map(o => Object.assign(
+        { label: o, on: () => this.setState({ sort: o }) }, chip(s.sort === o)
+      )),
+      favOnlyLabel: s.favOnly ? 'Showing favorites only' : 'Favorites only',
+      favOnlyFg: s.favOnly ? 'var(--color-accent)' : 'var(--color-neutral-800)',
+      favOnlyFill: s.favOnly ? 'currentColor' : 'none',
+      toggleFavOnly: () => this.setState({ favOnly: !s.favOnly }),
+      resetFilters: () => this.setState({ tags: [], favOnly: false, sort: 'Recent', have: [], sources: [] }),
+
+      quotaRows: [
+        { label: 'Gemini reads today', value: '6 of 20', pct: '30%' },
+        { label: 'Instagram credit', value: '$1.20 of $5', pct: '24%' },
+      ],
+      skeletons: [{ w: '78%' }, { w: '62%' }, { w: '84%' }, { w: '55%' }],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

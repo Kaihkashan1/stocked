@@ -15,14 +15,16 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.auth import require_secret
 from app.config import ROOT, settings
-from app.errors import GEMINI_QUOTA_MESSAGE
+from app.errors import GEMINI_DAILY_QUOTA, GEMINI_QUOTA_MESSAGE
 from app.extract import extract_recipe
+from app.fetch import get_apify_usage
 from app.match import STAPLES, grouped_pantry
 from app.models import FetchedPost, PantryUpdate, RecipeCreate, RecipeUpdate
 from app.pipeline import jobs, process_recipe
 from app.store import (
     create_recipe,
     delete_recipe,
+    get_gemini_reads_today,
     get_have_items,
     get_recipe,
     list_recipes,
@@ -176,6 +178,20 @@ async def api_get_pantry():
 @app.put("/api/pantry", dependencies=[Depends(require_secret)])
 async def api_put_pantry(body: PantryUpdate):
     return {"items": save_have_items(body.items)}
+
+
+@app.get("/api/usage", dependencies=[Depends(require_secret)])
+async def api_usage():
+    """Backs the Settings screen's "API usage" card. Gemini has no
+    quota-remaining endpoint for a free-tier key, so that count is
+    self-tracked (see app.store.record_gemini_read); Apify's is a live
+    account query, so it can't drift from what Apify actually bills.
+    `apify` is null when the token is missing or the call fails — the app
+    should just hide that half of the card rather than fake a number."""
+    return {
+        "gemini": {"used": get_gemini_reads_today(), "limit": GEMINI_DAILY_QUOTA},
+        "apify": get_apify_usage(),
+    }
 
 
 @app.get("/jobs", dependencies=[Depends(require_secret)])

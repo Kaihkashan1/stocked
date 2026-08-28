@@ -21,6 +21,12 @@
 		A1000000000000000000001D /* CookModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* CookModeView.swift */; };
 		A1000000000000000000001E /* AddRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003F /* AddRecipeView.swift */; };
 		A1000000000000000000001A /* CameraPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003B /* CameraPicker.swift */; };
+		A20000000000000000000011 /* Caprasimo-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* Caprasimo-Regular.ttf */; };
+		A20000000000000000000012 /* Figtree-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* Figtree-Regular.ttf */; };
+		A20000000000000000000013 /* Figtree-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* Figtree-SemiBold.ttf */; };
+		A20000000000000000000014 /* Figtree-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* Figtree-Bold.ttf */; };
+		A20000000000000000000015 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* Components.swift */; };
+		A20000000000000000000017 /* PasteALinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* PasteALinkView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +46,12 @@
 		A1000000000000000000003E /* CookModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookModeView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003F /* AddRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRecipeView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003B /* CameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPicker.swift; sourceTree = "<group>"; };
+		A20000000000000000000001 /* Caprasimo-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Caprasimo-Regular.ttf"; sourceTree = "<group>"; };
+		A20000000000000000000002 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Regular.ttf"; sourceTree = "<group>"; };
+		A20000000000000000000003 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-SemiBold.ttf"; sourceTree = "<group>"; };
+		A20000000000000000000004 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Bold.ttf"; sourceTree = "<group>"; };
+		A20000000000000000000006 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* PasteALinkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteALinkView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,6 +73,7 @@
 				A10000000000000000000032 /* APIClient.swift */,
 				A10000000000000000000033 /* RecipeStore.swift */,
 				A10000000000000000000034 /* Theme.swift */,
+				A20000000000000000000006 /* Components.swift */,
 				A10000000000000000000035 /* RootView.swift */,
 				A10000000000000000000036 /* RecipeListView.swift */,
 				A10000000000000000000037 /* RecipeDetailView.swift */,
@@ -69,10 +82,23 @@
 				A1000000000000000000003F /* AddRecipeView.swift */,
 				A1000000000000000000003B /* CameraPicker.swift */,
 				A10000000000000000000038 /* SettingsView.swift */,
+				A20000000000000000000007 /* PasteALinkView.swift */,
 				A10000000000000000000039 /* Assets.xcassets */,
 				A1000000000000000000003A /* Info.plist */,
+				A20000000000000000000005 /* Fonts */,
 			);
 			path = RecipeBox;
+			sourceTree = "<group>";
+		};
+		A20000000000000000000005 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* Caprasimo-Regular.ttf */,
+				A20000000000000000000002 /* Figtree-Regular.ttf */,
+				A20000000000000000000003 /* Figtree-SemiBold.ttf */,
+				A20000000000000000000004 /* Figtree-Bold.ttf */,
+			);
+			path = Fonts;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000051 = {
@@ -150,6 +176,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000019 /* Assets.xcassets in Resources */,
+				A20000000000000000000011 /* Caprasimo-Regular.ttf in Resources */,
+				A20000000000000000000012 /* Figtree-Regular.ttf in Resources */,
+				A20000000000000000000013 /* Figtree-SemiBold.ttf in Resources */,
+				A20000000000000000000014 /* Figtree-Bold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -173,6 +203,8 @@
 				A1000000000000000000001D /* CookModeView.swift in Sources */,
 				A1000000000000000000001E /* AddRecipeView.swift in Sources */,
 				A1000000000000000000001A /* CameraPicker.swift in Sources */,
+				A20000000000000000000015 /* Components.swift in Sources */,
+				A20000000000000000000017 /* PasteALinkView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -55,15 +55,15 @@ class Recipe(BaseModel):
 
 class RecipeCreate(BaseModel):
     """A recipe typed in by hand from the app — skips capture/Gemini
-    entirely, so every field is supplied by the user up front."""
+    entirely, so every field is supplied by the user up front. Course is a
+    direct field here (the user picks it in the Add-recipe form) rather than
+    derived from a `meal` classification the way an ingested recipe's is —
+    see app.store.save_recipe / _meal_to_course."""
 
     title: str
-    servings: str | None = None
     ingredients: list[str] = Field(default_factory=list)
     steps: list[str] = Field(default_factory=list)
-    cuisine: str = "Uncategorized"
-    meal: Meal = "other"
-    time: str | None = None
+    course: str = "Main course"
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
 
@@ -74,12 +74,12 @@ class RecipeUpdate(BaseModel):
     """Partial edit from the app. Unset fields are left alone in the sheet."""
 
     title: str | None = None
-    servings: str | None = None
     ingredients: list[str] | None = None
     steps: list[str] | None = None
     favorite: bool | None = None
     notes: str | None = None
     tags: list[str] | None = None
+    course: str | None = None
 
     _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_tags(v) if v is not None else v)
 

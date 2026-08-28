@@ -205,6 +205,40 @@ struct APIClient {
         }
     }
 
+    /// Posts a link to the same `/ingest` endpoint the Save Recipe Shortcut
+    /// uses. On the hosted (Vercel) backend this runs the whole fetch →
+    /// Gemini → save pipeline in-request and can take close to 60s, so the
+    /// timeout here is set well past that rather than the usual 15s.
+    func ingest(url: String, secret: String) async throws -> IngestResult {
+        guard let base = URL(string: trimmedBase),
+              let endpoint = URL(string: "/ingest", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: endpoint.absoluteURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 65
+        request.setValue("text/plain; charset=utf-8", forHTTPHeaderField: "Content-Type")
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+        request.httpBody = Data(url.utf8)
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(IngestResult.self, from: data)
+    }
+
     func fetchPantry() async throws -> [String] {
         guard let base = URL(string: trimmedBase),
               let url = URL(string: "/api/pantry", relativeTo: base)
@@ -257,6 +291,35 @@ struct APIClient {
             try throwForStatus(status, data: data)
         }
         return try Self.decoder.decode(PantryResponse.self, from: data).items
+    }
+
+    /// Backs the Settings screen's "API usage" card.
+    func fetchUsage(secret: String) async throws -> UsageStats {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/usage", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(UsageStats.self, from: data)
     }
 
     private var trimmedBase: String {

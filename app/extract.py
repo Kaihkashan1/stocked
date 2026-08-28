@@ -10,6 +10,7 @@ from google.genai import types
 
 from app.config import settings
 from app.models import RECIPE_TAGS, FetchedPost, Recipe, RecipeCategory
+from app.store import record_gemini_read
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,7 @@ def _generate_with_retry(client: genai.Client, contents: list, attempts: int = 5
     last_error: Exception | None = None
     for i in range(attempts):
         try:
+            record_gemini_read()
             response = client.models.generate_content(
                 model=settings.gemini_model,
                 contents=contents,
@@ -148,6 +150,7 @@ def categorize_recipe(
         steps=steps or "(none)",
         caption=caption or "(none)",
     )
+    record_gemini_read()
     response = client.models.generate_content(
         model=settings.gemini_model,
         contents=prompt,
