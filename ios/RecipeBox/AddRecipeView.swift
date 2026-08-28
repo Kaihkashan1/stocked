@@ -1,122 +1,157 @@
 import SwiftUI
 
-/// Full-screen form for typing a recipe in by hand — no Instagram link, no
-/// Gemini extraction, just title/ingredients/steps like EditRecipeView, plus
-/// the categorization fields Gemini would normally fill in (meal, time,
-/// tags) since nothing else will set them for a manual entry. Cuisine isn't
-/// shown here — it's not used anywhere in the app anymore — but a photo
-/// extraction's own guess still rides along silently if there is one.
+/// Full-screen form for typing a recipe in by hand, or reviewing a photo
+/// extraction before it's saved. Servings, time and a free meal picker are
+/// gone on purpose — Course and Tags are the only classifications this form
+/// collects, so anything created here is reachable from every filter on the
+/// list screen. Cuisine isn't collected either: a photo extraction still
+/// produces one, but nothing downstream reads or stores it anymore.
 struct AddRecipeView: View {
-    @EnvironmentObject private var store: RecipeStore
+    @Environment(RecipeStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
+    let prefill: RecipeExtraction?
+
     @State private var title: String
-    @State private var servings: String
     @State private var ingredientsText: String
     @State private var stepsText: String
-    @State private var cuisine: String
-    @State private var meal: String
-    @State private var time: String
+    @State private var course: Course
     @State private var selectedTags: Set<String>
-    @State private var notes = ""
     @State private var saving = false
     @State private var errorMessage: String?
-
-    private static let meals = [
-        ("breakfast", "Breakfast"),
-        ("lunch", "Lunch"),
-        ("dinner", "Dinner"),
-        ("snack", "Snack"),
-        ("dessert", "Dessert"),
-        ("drink", "Drink"),
-        ("other", "Other"),
-    ]
 
     /// `prefill` comes from a photo extraction (POST /api/extract-photo) —
     /// nothing is saved until Save is tapped, same as typing it in by hand.
     init(prefill: RecipeExtraction? = nil) {
+        self.prefill = prefill
         _title = State(initialValue: prefill?.title ?? "")
-        _servings = State(initialValue: prefill?.servings ?? "")
         _ingredientsText = State(initialValue: (prefill?.ingredients ?? []).joined(separator: "\n"))
         _stepsText = State(initialValue: (prefill?.steps ?? []).joined(separator: "\n"))
-        _cuisine = State(initialValue: prefill?.cuisine ?? "")
-        _meal = State(initialValue: prefill?.meal ?? "other")
-        _time = State(initialValue: prefill?.time ?? "")
+        _course = State(initialValue: Course(meal: prefill?.meal ?? "other"))
         _selectedTags = State(initialValue: Set(prefill?.tags ?? []))
     }
 
+    private var isFromPhoto: Bool { prefill != nil }
+
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Title") {
-                    TextField("Title", text: $title)
-                }
-                Section("Servings") {
-                    TextField("e.g. 4", text: $servings)
-                }
-                Section {
-                    TextEditor(text: $ingredientsText)
-                        .frame(minHeight: 160)
-                        .font(.callout)
-                } header: {
-                    Text("Ingredients")
-                } footer: {
-                    Text("One ingredient per line.")
-                }
-                Section {
-                    TextEditor(text: $stepsText)
-                        .frame(minHeight: 200)
-                        .font(.callout)
-                } header: {
-                    Text("Steps")
-                } footer: {
-                    Text("One step per line, in order.")
-                }
-                Section("Meal") {
-                    Picker("Meal", selection: $meal) {
-                        ForEach(Self.meals, id: \.0) { key, label in
-                            Text(label).tag(key)
+        VStack(spacing: 0) {
+            header
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if let prefill {
+                        confidencePill(prefill)
+                    }
+
+                    field(kicker: "Title") {
+                        TextField("Title", text: $title)
+                            .font(Theme.display(17))
+                            .padding(.horizontal, 18)
+                            .frame(height: 50)
+                            .background(Theme.surface)
+                            .clipShape(Capsule())
+                    }
+
+                    field(kicker: "Ingredients", hint: "one per line") {
+                        TextEditor(text: $ingredientsText)
+                            .font(Theme.body(14.5))
+                            .lineSpacing(14.5 * 0.9)
+                            .scrollContentBackground(.hidden)
+                            .padding(12)
+                            .frame(minHeight: 120)
+                            .background(Theme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    }
+
+                    field(kicker: "Steps", hint: "one per line, in order") {
+                        TextEditor(text: $stepsText)
+                            .font(Theme.body(14.5))
+                            .lineSpacing(14.5 * 0.55)
+                            .scrollContentBackground(.hidden)
+                            .padding(12)
+                            .frame(minHeight: 130)
+                            .background(Theme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    }
+
+                    field(kicker: "Course") {
+                        HStack(spacing: 7) {
+                            ForEach(Course.allCases) { option in
+                                ChipButton(title: option.rawValue, selected: course == option) {
+                                    course = option
+                                }
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
-                }
-                Section("Time") {
-                    TextField("e.g. 20 min", text: $time)
-                }
-                Section {
-                    FilterWrap(items: recipeTags, selected: selectedTags) { tag in
-                        toggleTag(tag)
+
+                    field(kicker: "Tags") {
+                        FlowLayout(spacing: 8) {
+                            ForEach(recipeTags, id: \.self) { tag in
+                                ChipButton(title: tag, selected: selectedTags.contains(tag)) {
+                                    toggleTag(tag)
+                                }
+                                .fixedSize()
+                            }
+                        }
                     }
-                } header: {
-                    Text("Tags")
-                } footer: {
-                    Text("A fixed set, on purpose — no way to add a new one, here or automatically.")
-                }
-                Section("Notes") {
-                    TextEditor(text: $notes)
-                        .frame(minHeight: 80)
-                        .font(.callout)
-                }
-                if let errorMessage {
-                    Section {
+
+                    Text("Source is set automatically — this one files under **\(isFromPhoto ? "Photo" : "Typed in")** in Filters.")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.neutral600)
+
+                    if let errorMessage {
                         Text(errorMessage)
-                            .font(.footnote)
+                            .font(Theme.body(12.5))
                             .foregroundStyle(.red)
                     }
                 }
+                .padding(.horizontal, Theme.screenPadding)
+                .padding(.bottom, 40)
             }
-            .navigationTitle("Add Recipe")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Saving…" : "Save") {
-                        Task { await save() }
-                    }
-                    .disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
+        }
+        .background(Theme.bg.ignoresSafeArea())
+    }
+
+    private var header: some View {
+        HStack {
+            Button("Cancel") { dismiss() }
+                .font(Theme.body(14, weight: .semibold))
+                .foregroundStyle(Theme.neutral700)
+            Spacer()
+            Text(isFromPhoto ? "From a photo" : "Type it in")
+                .font(Theme.display(20))
+                .foregroundStyle(Theme.ink)
+            Spacer()
+            Button(saving ? "Saving…" : "Save") {
+                Task { await save() }
+            }
+            .font(Theme.body(14, weight: .bold))
+            .foregroundStyle(Theme.accent700)
+            .disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(.horizontal, Theme.screenPadding)
+        .padding(.vertical, 16)
+    }
+
+    private func confidencePill(_ prefill: RecipeExtraction) -> some View {
+        Text("Read \(prefill.ingredients.count) ingredients and \(prefill.steps.count) steps. Confidence: \(prefill.confidence).")
+            .font(Theme.body(13))
+            .foregroundStyle(Theme.sage800)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.sage100)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private func field<Content: View>(kicker: String, hint: String? = nil, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Kicker(text: kicker, color: Theme.neutral600)
+            content()
+            if let hint {
+                Text(hint)
+                    .font(Theme.body(11.5))
+                    .foregroundStyle(Theme.neutral600)
             }
         }
     }
@@ -126,19 +161,13 @@ struct AddRecipeView: View {
         errorMessage = nil
         defer { saving = false }
 
-        let trimmedServings = servings.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedTime = time.trimmingCharacters(in: .whitespacesAndNewlines)
         let draft = RecipeCreate(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            servings: trimmedServings.isEmpty ? nil : trimmedServings,
             ingredients: lines(from: ingredientsText),
             steps: lines(from: stepsText),
-            cuisine: cuisine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "Uncategorized" : cuisine.trimmingCharacters(in: .whitespacesAndNewlines),
-            meal: meal,
-            time: trimmedTime.isEmpty ? nil : trimmedTime,
+            course: course.rawValue,
             tags: Array(selectedTags),
-            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            notes: ""
         )
         if let failure = await store.addRecipe(draft) {
             errorMessage = failure

@@ -1,12 +1,44 @@
 import PhotosUI
 import SwiftUI
 
+/// Everything presentable from the Recipes screen, as one item so there's
+/// exactly one `.sheet()` modifier on RootView. Chaining several separate
+/// `.sheet(isPresented:)` modifiers on the same view is unreliable in
+/// SwiftUI — a later one can render without ever accepting touches while an
+/// earlier one is still torn down — and that's exactly what happened here
+/// during testing. `.sheet(item:)` switching between non-nil cases doesn't
+/// have that problem; only handing off to a *different* presentation kind
+/// (the camera's fullScreenCover, PhotosPicker's own sheet) still needs the
+/// dismiss-then-onDismiss handoff below.
+private enum ActiveSheet: Identifiable, Equatable {
+    case addOptions
+    case settings
+    case addRecipe
+    case pasteLink
+
+    var id: Int {
+        switch self {
+        case .addOptions: 0
+        case .settings: 1
+        case .addRecipe: 2
+        case .pasteLink: 3
+        }
+    }
+}
+
+private enum PendingAddAction {
+    case photo, library
+}
+
 struct RootView: View {
-    @EnvironmentObject private var store: RecipeStore
-    @State private var showSettings = false
-    @State private var showAddRecipe = false
+    @Environment(RecipeStore.self) private var store
+    @State private var activeSheet: ActiveSheet?
     @State private var addRecipePrefill: RecipeExtraction?
-    @State private var showAddOptions = false
+    /// What to do once `activeSheet` has actually finished dismissing —
+    /// only needed for handoffs to a different presentation kind (camera,
+    /// photo library) than the ones `.sheet(item:)` covers. See the
+    /// ActiveSheet doc comment above.
+    @State private var pendingAddAction: PendingAddAction?
     @State private var showCamera = false
     @State private var showPhotoPicker = false
     @State private var photoPickerItem: PhotosPickerItem?
@@ -16,33 +48,24 @@ struct RootView: View {
 
     var body: some View {
         NavigationStack(path: $recipesPath) {
-            RecipeListView()
-                .navigationTitle("Recipe Box")
-                .toolbar { addButton }
-                .toolbar { settingsButton }
+            RecipeListView(
+                onAdd: { activeSheet = .addOptions },
+                onSettings: { activeSheet = .settings }
+            )
+            .toolbar(.hidden, for: .navigationBar)
         }
         .tint(Theme.accent)
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-                .environmentObject(store)
-        }
-        .sheet(isPresented: $showAddRecipe) {
-            AddRecipeView(prefill: addRecipePrefill)
-                .environmentObject(store)
-        }
-        .confirmationDialog("Add Recipe", isPresented: $showAddOptions, titleVisibility: .hidden) {
-            Button("Type it in") {
-                addRecipePrefill = nil
-                showAddRecipe = true
-            }
-            if CameraPicker.isAvailable {
-                Button("Take Photo") { showCamera = true }
-            }
-            Button("Choose from Library") {
-                photoPickerItem = nil
-                showPhotoPicker = true
-            }
-            Button("Cancel", role: .cancel) {}
+        .sheet(item: $activeSheet, onDismiss: performPendingAddAction) { sheet in
+            // Presentation modifiers (detents etc.) are applied ONCE, here,
+            // uniformly on the composed content — not per-branch inside the
+            // switch. Per-branch presentationDetents (a different value in
+            // each case of the switch) left every one of these sheets
+            // visually correct but completely untappable during testing;
+            // applying them outside the switch is what actually fixed it.
+            sheetContent(for: sheet)
+                .presentationDetents(detents(for: sheet))
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(sheet == .addOptions ? 34 : nil)
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in
@@ -64,16 +87,16 @@ struct RootView: View {
         .overlay {
             if extracting {
                 ZStack {
-                    Color.black.opacity(0.35).ignoresSafeArea()
+                    Theme.neutral900.opacity(0.42).ignoresSafeArea()
                     VStack(spacing: 12) {
                         ProgressView()
-                            .tint(.white)
+                            .tint(Theme.accent)
                         Text("Reading the recipe…")
-                            .font(Theme.mono(13, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .font(Theme.body(13, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
                     }
                     .padding(24)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .cardBackground(radius: 20)
                 }
             }
         }
@@ -95,43 +118,77 @@ struct RootView: View {
         }
     }
 
-    private var addButton: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                showAddOptions = true
-            } label: {
-                Image(systemName: "plus")
-            }
-            .accessibilityLabel("Add recipe")
+    @ViewBuilder
+    private func sheetContent(for sheet: ActiveSheet) -> some View {
+        switch sheet {
+        case .addOptions:
+            AddOptionsSheet(
+                onLink: { activeSheet = .pasteLink },
+                onPhoto: { pendingAddAction = .photo; activeSheet = nil },
+                onLibrary: { pendingAddAction = .library; activeSheet = nil },
+                onTyped: {
+                    addRecipePrefill = nil
+                    activeSheet = .addRecipe
+                }
+            )
+        case .settings:
+            SettingsView()
+                .environment(store)
+        case .addRecipe:
+            AddRecipeView(prefill: addRecipePrefill)
+                .environment(store)
+        case .pasteLink:
+            PasteALinkView(onOpenRecipe: { id in
+                activeSheet = nil
+                recipesPath = NavigationPath()
+                recipesPath.append(id)
+            })
+            .environment(store)
+        }
+    }
+
+    private func detents(for sheet: ActiveSheet) -> Set<PresentationDetent> {
+        switch sheet {
+        case .addOptions: [.height(CameraPicker.isAvailable ? 428 : 360)]
+        case .settings, .addRecipe, .pasteLink: [.large]
+        }
+    }
+
+    private func performPendingAddAction() {
+        guard let action = pendingAddAction else { return }
+        pendingAddAction = nil
+        switch action {
+        case .photo:
+            showCamera = true
+        case .library:
+            photoPickerItem = nil
+            showPhotoPicker = true
         }
     }
 
     private func extractPhoto(_ image: UIImage) {
-        guard let data = image.recipePhotoJPEGData() else {
-            extractError = "Could not process that photo."
-            return
-        }
+        // Show the spinner immediately — the resize + JPEG encode below used
+        // to run synchronously on the main thread before this state change
+        // ever got a chance to render, so tapping camera/library visibly
+        // hung for a beat with no feedback at all.
         extracting = true
         Task {
+            let data = await Task.detached(priority: .userInitiated) {
+                image.recipePhotoJPEGData()
+            }.value
+            guard let data else {
+                extracting = false
+                extractError = "Could not process that photo."
+                return
+            }
             let (extraction, error) = await store.extractRecipePhoto(data)
             extracting = false
             if let extraction {
                 addRecipePrefill = extraction
-                showAddRecipe = true
+                activeSheet = .addRecipe
             } else {
                 extractError = error ?? "Something went wrong."
             }
-        }
-    }
-
-    private var settingsButton: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .accessibilityLabel("Server settings")
         }
     }
 

@@ -1,25 +1,48 @@
 import Foundation
+import Observation
 
+/// @Observable rather than ObservableObject on purpose: with objectWillChange,
+/// every view holding the store re-rendered on every change, so one keystroke
+/// in the search box invalidated the whole list screen. The macro tracks reads
+/// per property per view body instead, so a change to `query` only re-runs the
+/// bodies that actually read `query`. Its generated setters also skip
+/// notification when an Equatable value is assigned its current value, which
+/// matters here because updateVisible() rewrites all of the derived properties
+/// below on every pass.
+@Observable
 @MainActor
-final class RecipeStore: ObservableObject {
-    @Published var recipes: [Recipe] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+final class RecipeStore {
+    var recipes: [Recipe] = []
+    var isLoading = false
+    var errorMessage: String?
     /// Tags cover cooking method/appliance (air-fryer, one-pot, ...), diet
     /// (vegetarian, non-vegetarian), course (dessert), and source (mom's
     /// recipes) — whatever a recipe is tagged with — so this is the one
     /// filter dimension that covers any category without a hardcoded list.
     /// Multi-select (AND): a recipe must carry every selected tag.
-    @Published var tagFilters: Set<String> = [] {
+    var tagFilters: Set<String> = [] {
         didSet { if oldValue != tagFilters { updateVisible() } }
     }
-    @Published var query = "" {
+    /// The course filter row on the list screen — Main course / Appetizers /
+    /// Desserts. nil means no course filter is applied. Composes with every
+    /// other filter (AND), same as tagFilters.
+    var courseFilter: Course? {
+        didSet { if oldValue != courseFilter { updateVisible() } }
+    }
+    /// Filters' Source chip row (Instagram/YouTube/TikTok/Link/Photo/Typed
+    /// in). Multi-select, but OR'd together rather than AND'd like
+    /// tagFilters — a recipe only ever has one source, so requiring all
+    /// selected sources at once would just show nothing past the first pick.
+    var sourceFilters: Set<SourceCategory> = [] {
+        didSet { if oldValue != sourceFilters { updateVisible() } }
+    }
+    var query = "" {
         didSet { if oldValue != query { updateVisible() } }
     }
     /// The pantry — ingredients you currently have on hand. Synced across
     /// devices via /api/pantry, so it's a real inventory rather than a
     /// per-session browsing filter.
-    @Published var have: [String] = [] {
+    var have: [String] = [] {
         didSet {
             if oldValue != have {
                 UserDefaults.standard.set(have, forKey: Self.haveKey)
@@ -27,39 +50,45 @@ final class RecipeStore: ObservableObject {
             }
         }
     }
-    @Published var favoritesOnly = false {
+    var favoritesOnly = false {
         didSet { if oldValue != favoritesOnly { updateVisible() } }
     }
-    @Published var sortOption: SortOption = .recent {
+    var sortOption: SortOption = .recent {
         didSet { if oldValue != sortOption { updateVisible() } }
     }
-    @Published var pantryGroups: [PantryGroup] = []
+    /// The list screen's grid/list toggle — a per-device display
+    /// preference, not app data, so it's local-only rather than synced.
+    var viewMode: ViewMode {
+        didSet { UserDefaults.standard.set(viewMode.rawValue, forKey: Self.viewModeKey) }
+    }
+    var pantryGroups: [PantryGroup] = []
 
     /// Transient error from a favorite toggle or edit save — separate from
     /// errorMessage, which is reserved for "couldn't load the list at all".
-    @Published var actionError: String?
+    var actionError: String?
     /// Set by RecipeBoxApp's onOpenURL; consumed once by RootView.
-    @Published var pendingRoute: DeepLinkRoute?
+    var pendingRoute: DeepLinkRoute?
 
-    @Published private(set) var visibleRecipes: [Recipe] = []
-    @Published private(set) var matchesByID: [Int: RecipeMatch] = [:]
+    private(set) var visibleRecipes: [Recipe] = []
+    private(set) var matchesByID: [Int: RecipeMatch] = [:]
     /// The fixed six (see recipeTags in Models.swift), always offered, plus
     /// whatever else recipes actually carry — tag entry is free text, so
-    /// that "whatever else" can grow.
-    var tags: [String] {
-        Array(Set(recipeTags).union(recipes.flatMap(\.tags))).sorted()
-    }
-    @Published private(set) var selectedPantryGroups: [PantryGroup] = []
-    @Published private(set) var visiblePantryGroups: [PantryGroup] = []
-    @Published private(set) var haveSet: Set<String> = []
+    /// that "whatever else" can grow. Recomputed once per updateDerived()
+    /// call (i.e. whenever `recipes` actually changes) rather than
+    /// re-unioning and re-sorting every recipe's tags on every access — the
+    /// Filters sheet reads this twice per render.
+    private(set) var tags: [String] = []
+    private(set) var selectedPantryGroups: [PantryGroup] = []
+    private(set) var visiblePantryGroups: [PantryGroup] = []
+    private(set) var haveSet: Set<String> = []
 
-    @Published var serverURL: String {
+    var serverURL: String {
         didSet { UserDefaults.standard.set(serverURL, forKey: Self.urlKey) }
     }
 
     /// Only needed to favorite/edit from the phone — sent as X-Recipe-Box-Key.
     /// Blank is fine against a dev server with no RECIPE_BOX_SECRET set.
-    @Published var serverSecret: String {
+    var serverSecret: String {
         didSet { UserDefaults.standard.set(serverSecret, forKey: Self.secretKey) }
     }
 
@@ -68,15 +97,26 @@ final class RecipeStore: ObservableObject {
     private static let urlKey = "recipeBox.serverURL"
     private static let secretKey = "recipeBox.serverSecret"
     private static let haveKey = "recipeBox.have"
+    private static let viewModeKey = "recipeBox.viewMode"
     private static let legacyLANDefault = "http://192.168.0.54:8000"
     private static let legacyHostedHosts: Set<String> = [
         "recipe-box-ashen-alpha.vercel.app",
     ]
-    private static let encoder = JSONEncoder()
-    private static let decoder = JSONDecoder()
+    // nonisolated: encode/decode need to run from persistCache()'s background
+    // task (see below), not hop back to the main actor just to reach these.
+    // Plain JSONEncoder/JSONDecoder instances hold no actor-isolated state,
+    // so sharing them across a sequential (never-concurrent) call pattern
+    // like this one is safe.
+    private nonisolated static let encoder = JSONEncoder()
+    private nonisolated static let decoder = JSONDecoder()
 
+    /// Tracked despite being private: recipe(id:) reads it, and that's what
+    /// RecipeDetailView renders from. Marking it @ObservationIgnored would
+    /// leave the detail screen with no observable read at all, so favoriting
+    /// or editing from there would update the store without redrawing.
     private var recipesByID: [Int: Recipe] = [:]
-    private var refreshTask: Task<Bool, Never>?
+    /// Nothing reads this, so there's no reason to pay for tracking it.
+    @ObservationIgnored private var refreshTask: Task<Bool, Never>?
 
     init() {
         let stored = UserDefaults.standard.string(forKey: Self.urlKey) ?? ""
@@ -84,6 +124,10 @@ final class RecipeStore: ObservableObject {
         serverURL = resolved
         UserDefaults.standard.set(resolved, forKey: Self.urlKey)
         serverSecret = UserDefaults.standard.string(forKey: Self.secretKey) ?? ""
+        // Ahead of `have`, whose didSet reaches back into the rest of the
+        // store: the properties without a default value all have to be
+        // initialized before anything here can touch self.
+        viewMode = UserDefaults.standard.string(forKey: Self.viewModeKey).flatMap(ViewMode.init(rawValue:)) ?? .list
         have = UserDefaults.standard.array(forKey: Self.haveKey) as? [String] ?? []
         loadCache()
     }
@@ -203,6 +247,13 @@ final class RecipeStore: ObservableObject {
         have = items
     }
 
+    /// For the Settings screen's "API usage" card. Not cached/published on
+    /// the store like `recipes` — it's read once when Settings appears, not
+    /// something the rest of the app needs to react to.
+    func fetchUsage() async -> UsageStats? {
+        try? await APIClient(baseURLString: serverURL).fetchUsage(secret: serverSecret)
+    }
+
     /// Optimistic: flips the star immediately, then confirms with the server.
     /// Reverts and surfaces actionError if the request fails.
     func toggleFavorite(_ recipe: Recipe) async {
@@ -233,6 +284,58 @@ final class RecipeStore: ObservableObject {
         }
     }
 
+    /// Posts a link to /ingest (same endpoint the Save Recipe Shortcut
+    /// uses), then polls the recipe list for the row it produced — the
+    /// endpoint itself only returns a title/URL, not a full Recipe, and the
+    /// sheet write can lag slightly behind the response. "duplicate" is
+    /// treated the same as "saved": either way there's a matching row to
+    /// find and open.
+    func ingestLink(_ urlString: String) async -> LinkIngestOutcome {
+        let result: IngestResult
+        do {
+            result = try await APIClient(baseURLString: serverURL).ingest(url: urlString, secret: serverSecret)
+        } catch {
+            return .error(error.localizedDescription)
+        }
+        if result.status == "error" {
+            return .error(result.error ?? result.message ?? "Something went wrong.")
+        }
+        if let recipe = await findRecipe(afterIngest: result, fallbackURL: urlString) {
+            return .saved(recipe)
+        }
+        return .error("Saved, but it hasn't shown up in your box yet — pull to refresh in a moment.")
+    }
+
+    /// Polls for the row /ingest just produced. Fetches directly via
+    /// APIClient rather than calling the full refresh() (which also
+    /// re-syncs the pantry from a second endpoint, re-persists the local
+    /// cache, and republishes visibleRecipes/tags) on every one of up to 5
+    /// attempts — this loop only needs to know when one specific recipe
+    /// shows up, so the store is only actually updated once: when it's
+    /// found, or on the final attempt if it never is.
+    private func findRecipe(afterIngest result: IngestResult, fallbackURL: String, attempts: Int = 5) async -> Recipe? {
+        let targetURL = result.url ?? fallbackURL
+        let client = APIClient(baseURLString: serverURL)
+        for attempt in 0..<attempts {
+            let isLastAttempt = attempt == attempts - 1
+            guard let payload = try? await client.fetchRecipes() else {
+                if !isLastAttempt { try? await Task.sleep(for: .seconds(1.5)) }
+                continue
+            }
+            let match = result.title.flatMap { title in payload.recipes.first { $0.title == title } }
+                ?? payload.recipes.first { urlsRoughlyMatch($0.source, targetURL) }
+            if match != nil || isLastAttempt {
+                apply(recipes: payload.recipes, pantry: payload.pantry)
+                persistCache()
+            }
+            if let match { return match }
+            if !isLastAttempt {
+                try? await Task.sleep(for: .seconds(1.5))
+            }
+        }
+        return nil
+    }
+
     /// Returns an error message on failure, nil on success. Not optimistic —
     /// there's no local id to assign until the server hands back the row
     /// number, so the new recipe only appears once it's actually saved.
@@ -250,8 +353,8 @@ final class RecipeStore: ObservableObject {
     }
 
     /// Returns an error message on failure, nil on success.
-    func saveEdits(id: Int, title: String, servings: String?, ingredients: [String], steps: [String], notes: String, tags: [String]) async -> String? {
-        let patch = RecipePatch(title: title, servings: servings, ingredients: ingredients, steps: steps, notes: notes, tags: tags)
+    func saveEdits(id: Int, title: String, ingredients: [String], steps: [String], notes: String, tags: [String], course: Course) async -> String? {
+        let patch = RecipePatch(title: title, ingredients: ingredients, steps: steps, notes: notes, tags: tags, course: course.rawValue)
         do {
             let saved = try await APIClient(baseURLString: serverURL).updateRecipe(id: id, patch: patch, secret: serverSecret)
             replace(saved)
@@ -349,11 +452,15 @@ final class RecipeStore: ObservableObject {
     }
 
     private func updateVisible() {
-        haveSet = Set(have)
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var rows = recipes.filter { recipe in
             if favoritesOnly, !recipe.favorite { return false }
-            if !tagFilters.isEmpty, !tagFilters.isSubset(of: Set(recipe.tags)) { return false }
+            // Same result as tagFilters.isSubset(of: Set(recipe.tags)), without
+            // allocating a fresh Set per recipe on every keystroke — tagFilters
+            // and recipe.tags are both tiny, so a linear scan is cheaper.
+            if !tagFilters.isEmpty, !tagFilters.allSatisfy(recipe.tags.contains) { return false }
+            if let courseFilter, recipe.course != courseFilter { return false }
+            if !recipe.matchesSourceFilter(sourceFilters) { return false }
             if needle.isEmpty { return true }
             return recipe.searchBlob.contains(needle)
         }
@@ -417,6 +524,7 @@ final class RecipeStore: ObservableObject {
     }
 
     private func updateDerived() {
+        tags = Array(Set(recipeTags).union(recipes.flatMap(\.tags))).sorted()
         updateVisible()
     }
 
@@ -449,11 +557,20 @@ final class RecipeStore: ObservableObject {
         apply(recipes: payload.recipes, pantry: payload.pantry)
     }
 
+    /// Called after every optimistic update (a favorite tap, an edit, an
+    /// add, a delete, a refresh) — encoding the whole recipe collection and
+    /// writing it to disk synchronously here would block the main thread on
+    /// actions that are meant to feel instant. Snapshotting `recipes`/
+    /// `pantryGroups` has to happen here on the main actor (cheap — just
+    /// copying array references), but the actual encode + disk write is
+    /// pushed to a background task.
     private func persistCache() {
         guard let url = cacheURL() else { return }
         let payload = RecipeCache(serverURL: serverURL, recipes: recipes, pantry: pantryGroups)
-        guard let data = try? Self.encoder.encode(payload) else { return }
-        try? data.write(to: url, options: .atomic)
+        Task.detached(priority: .utility) {
+            guard let data = try? Self.encoder.encode(payload) else { return }
+            try? data.write(to: url, options: .atomic)
+        }
     }
 }
 
