@@ -22,6 +22,7 @@ struct RecipeListView: View {
                 SearchBlock(showFilters: $showFilters)
                 CourseFilterRow()
                 PantryBanner()
+                ClearFiltersRow()
                 ResultsSection(onAdd: onAdd)
             }
         }
@@ -155,9 +156,11 @@ private struct SearchBlock: View {
 
     @Binding var showFilters: Bool
 
+    /// Ingredients aren't counted: they get their own visible row below, so
+    /// counting them here would show a badge for something already on screen.
     private var activeFilterCount: Int {
         [
-            !store.tagFilters.isEmpty, store.favoritesOnly, !store.have.isEmpty,
+            !store.tagFilters.isEmpty, store.favoritesOnly,
             store.courseFilter != nil, !store.sourceFilters.isEmpty,
         ]
         .filter { $0 }.count
@@ -300,23 +303,76 @@ private struct PantryBanner: View {
         }
     }
 
+    /// Each ingredient is its own removable chip rather than one joined line
+    /// with a single Clear, so a wrong pick costs one tap instead of losing
+    /// the whole selection. Wraps too, so nothing gets truncated out of reach.
     private var banner: some View {
-        HStack(spacing: 8) {
-            Circle().fill(Theme.sage500).frame(width: 8, height: 8)
-            Text("Sorted by fit to \(store.have.joined(separator: ", "))")
-                .font(Theme.body(12.5, weight: .semibold))
-                .foregroundStyle(Theme.sage800)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            Button("Clear") { store.setHave([]) }
-                .font(Theme.body(12.5, weight: .semibold))
-                .foregroundStyle(Theme.sage800)
-                .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Circle().fill(Theme.sage500).frame(width: 8, height: 8)
+                Text("Sorted by closest fit to")
+                    .font(Theme.body(12.5, weight: .semibold))
+                    .foregroundStyle(Theme.sage800)
+            }
+            FlowLayout(spacing: 8) {
+                ForEach(store.have, id: \.self) { item in
+                    Button {
+                        store.toggleIngredient(item)
+                    } label: {
+                        Text("\(item) ×")
+                            .font(Theme.body(12.5, weight: .semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(Theme.sage500)
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove \(item)")
+                }
+            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
         .background(Theme.sage100)
-        .clipShape(Capsule())
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusCard, style: .continuous))
+        .padding(.horizontal, Theme.screenPadding)
+        .padding(.top, 14)
+    }
+}
+
+// MARK: - Clear filters
+
+/// One tap back to the full list, from search, course, tags, favorites and
+/// ingredients at once. Sits on the list screen rather than only in the
+/// Filters sheet because search and course are applied from out here.
+private struct ClearFiltersRow: View {
+    @Environment(RecipeStore.self) private var store
+
+    var body: some View {
+        if store.hasActiveFilters {
+            row
+        }
+    }
+
+    private var row: some View {
+        Button {
+            store.clearFilters()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                Text("Clear all filters")
+                    .font(Theme.body(12.5, weight: .semibold))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(Theme.accent100)
+            .foregroundStyle(Theme.accent700)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Theme.screenPadding)
         .padding(.top, 14)
     }
@@ -527,14 +583,11 @@ struct FiltersSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button("Reset") {
-                    store.tagFilters = []
-                    store.sourceFilters = []
-                    store.favoritesOnly = false
-                    store.sortOption = .recent
-                }
-                .font(Theme.body(14, weight: .semibold))
-                .foregroundStyle(Theme.accent700)
+                Button("Clear all") { store.clearFilters() }
+                    .font(Theme.body(14, weight: .semibold))
+                    .foregroundStyle(Theme.accent700)
+                    .disabled(!store.hasActiveFilters)
+                    .opacity(store.hasActiveFilters ? 1 : 0.4)
 
                 Spacer()
                 Text("Filters")

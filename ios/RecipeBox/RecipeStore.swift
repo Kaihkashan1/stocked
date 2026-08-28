@@ -39,9 +39,9 @@ final class RecipeStore {
     var query = "" {
         didSet { if oldValue != query { updateVisible() } }
     }
-    /// The pantry — ingredients you currently have on hand. Synced across
-    /// devices via /api/pantry, so it's a real inventory rather than a
-    /// per-session browsing filter.
+    /// Ingredients to find recipes from. Synced across devices via
+    /// /api/pantry, but it behaves as a search input rather than a standing
+    /// inventory, so clearFilters() empties it along with everything else.
     var have: [String] = [] {
         didSet {
             if oldValue != have {
@@ -152,6 +152,33 @@ final class RecipeStore {
 
     func recipe(id: Int) -> Recipe? {
         recipesByID[id]
+    }
+
+    /// Sort is excluded on purpose: it reorders results but never hides any,
+    /// so a non-default sort shouldn't make the screen advertise itself as
+    /// filtered.
+    var hasActiveFilters: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !tagFilters.isEmpty
+            || courseFilter != nil
+            || !sourceFilters.isEmpty
+            || favoritesOnly
+            || !have.isEmpty
+    }
+
+    /// Back to the full list in one tap. Ingredients go too — they narrow
+    /// what you see just like the other filters do. Routed through setHave so
+    /// the emptied list reaches the server like any other change to it.
+    func clearFilters() {
+        query = ""
+        tagFilters = []
+        courseFilter = nil
+        sourceFilters = []
+        favoritesOnly = false
+        sortOption = .recent
+        if !have.isEmpty {
+            setHave([])
+        }
     }
 
     /// Optimistic, like toggleFavorite: flips locally (so the UI is
