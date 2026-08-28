@@ -41,13 +41,13 @@ struct Recipe: Codable, Identifiable, Hashable {
     /// Lowercased blob used for search so we do not rebuild it on every keystroke.
     let searchBlob: String
 
-    static func == (lhs: Recipe, rhs: Recipe) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
+    // Equality is field-wise (synthesized) and has to stay that way: it is
+    // what RecipeStore's @Observable properties use to decide whether a write
+    // is a real change worth notifying SwiftUI about. An id-only == made
+    // `recipes = payload.recipes` look like a no-op whenever a refresh brought
+    // back the same rows with different contents, so a favorite set on another
+    // device landed in the store but never redrew. Anything that wants
+    // identity rather than value compares `id` explicitly.
 
     enum CodingKeys: String, CodingKey {
         case id, title, ingredients, steps, source, confidence, course, tags, pantry, favorite, notes
@@ -421,7 +421,10 @@ enum ViewMode: String {
     case list, grid
 }
 
-struct RecipeMatch {
+/// Equatable so that matchesByID, which updateVisible() rewrites on every
+/// pass, only notifies observers when a recipe's fit actually changed —
+/// otherwise every keystroke invalidates every visible card.
+struct RecipeMatch: Equatable {
     let score: Double
     let missingCount: Int
     let fullyCovered: Bool
