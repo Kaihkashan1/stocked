@@ -116,9 +116,7 @@ header is inline content.
   chip (min width 62pt, centered) then ingredient text (14.5pt). Quantity-less lines render as plain text.
   **No servings/time line.**
 - **Steps**: heading Caprasimo 23pt; rows 16pt apart — 28pt accent-200 circle with the number in
-  Figtree Bold 13pt (line-height 1) accent-800, 2pt top margin so the circle lines up with the first line
-  of wrapping text, then the step text at 14.5pt / line height 1.55. Caprasimo is not used in the circle —
-  its baseline sits too low at this size.
+  Caprasimo 13pt accent-800, then the step text at 14.5pt / line height 1.55.
 - **Notes**: accent-100 card, 26pt radius, "NOTES" kicker, 14pt body.
 - **End of page, in this order**: tag pills (11.5pt, accent-100/accent-800) then a single quiet line
   "From Instagram" (12pt neutral-600, the source name being the link to the original post). The source is
@@ -174,8 +172,8 @@ Cancel / Save in the header. Title "From a photo" (Caprasimo 30pt) and the line 
 before it goes in the box." **The photo itself is not shown or stored** — go straight to the read-back: a sage-100
 confidence pill ("Read 9 ingredients and 6 steps. Confidence: high."), then Title (pill field, Caprasimo 17pt),
 Ingredients (26pt-radius surface field, one per line, line height 1.9), **Steps — NEW** (same 26pt-radius surface
-card, numbered rows: 22pt accent-200 circle with the step number in Figtree Bold 12pt accent-800, 1pt top margin,
-then the step text at 14pt; this block was missing even though the confidence pill already claimed a step count), the Course pill row, the
+card, numbered rows: 22pt accent-200 circle with the step number in 12pt accent-800, then the step text at 14pt;
+this block was missing even though the confidence pill already claimed a step count), the Course pill row, the
 Tags chip row, and the line "Source is set automatically — this one files under **Photo** in Filters."
 
 ### 6. Type it in (AddRecipeView)
@@ -241,8 +239,9 @@ neutral-500 otherwise. This is the user's own inventory — it is not required t
   Items are **grouped by category** (Produce, Dairy & eggs, Meat & seafood, Grains & pantry, Condiments &
   spices, Other) under 10.5pt uppercase kickers. Each row: surface card, 22pt radius, shadow-sm — name (14.5pt
   semibold) with a chip line below it: amount+unit (neutral-100 pill), Open/Unopened status (sage or neutral
-  tint), and an **expiry badge** when set — neutral outline showing the date normally, switching to a solid
-  accent-500 fill ("Expires in 2d" / "Expires today") inside 3 days, and accent-800 ("Expired") once past.
+  tint), and an **expiry badge** when set — neutral outline showing the date normally, a sage-200/800 tint for
+  "Expires in Nd" between 4-7 days out, a solid accent-500 fill ("Expires in 2d" / "Expires today") inside
+  3 days, and accent-800 ("Expired") once past.
   Tapping a row (outside match mode) opens it in the same add/edit sheet, prefilled, for editing; a trash
   icon on the row deletes it directly.
   **No photos or avatar icons on rows** — deliberately left out.
@@ -285,6 +284,10 @@ Add a **course** value per recipe — "Main course", "Appetizers" or "Desserts" 
 screen and driven by the new top filter row. Options: derive it from the existing `meal` column
 (dessert → Desserts, snack → Appetizers, everything else → Main course), or add a Course column to the sheet and
 have Gemini fill it. Derivation needs no backend change and is the recommended first step.
+
+### Back button ring — fixed
+The recipe detail back button's ring now uses an inset `box-shadow` (1px, divider color; 1.5px accent on hover)
+instead of a `border` — a uniform stroke at any render scale, where the border could appear uneven.
 
 ## Assets
 - `AppIcon-1024.png` — the app icon, square 1024×1024, no transparency, no pre-rounded corners. Drop it on the

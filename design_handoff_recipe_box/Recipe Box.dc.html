@@ -332,7 +332,7 @@ a:hover{color:var(--color-accent-800)}
     <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
       <div style="height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)">
         <div style="flex:none;padding:58px 22px 0;display:flex;gap:8px">
-          <button onClick="{{ goList }}" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);color:var(--color-neutral-800);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--color-accent)" aria-label="Back">
+          <button onClick="{{ goList }}" style="width:40px;height:40px;flex:none;border-radius:999px;border:none;box-shadow:inset 0 0 0 1px var(--color-divider);background:var(--color-surface);color:var(--color-neutral-800);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="box-shadow:inset 0 0 0 1.5px var(--color-accent)" aria-label="Back">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
           </button>
           <span style="flex:1"></span>
@@ -1192,6 +1192,7 @@ class Component extends DCLogic {
       const diff = Math.round((d - today0) / 86400000);
       if (diff < 0) return { label: 'Expired', bg: 'var(--color-accent-800)', fg: '#fff8ec', bd: 'transparent' };
       if (diff <= 3) return { label: diff === 0 ? 'Expires today' : 'Expires in ' + diff + 'd', bg: 'var(--color-accent-500)', fg: '#fff8ec', bd: 'transparent' };
+      if (diff <= 7) return { label: 'Expires in ' + diff + 'd', bg: 'var(--color-accent-2-200)', fg: 'var(--color-accent-2-800)', bd: 'transparent' };
       return { label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), bg: 'transparent', fg: 'var(--color-neutral-600)', bd: 'var(--color-divider)' };
     };
     const pantrySel = s.pantryMatchSelected || [];

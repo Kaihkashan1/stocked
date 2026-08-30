@@ -6,6 +6,10 @@ struct RecipeBoxApp: App {
     @State private var pantryStore = PantryStore()
     @State private var connectivity = Connectivity()
 
+    init() {
+        BundledFonts.register()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

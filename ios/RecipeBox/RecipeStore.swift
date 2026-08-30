@@ -119,7 +119,7 @@ final class RecipeStore {
     /// Nothing reads this, so there's no reason to pay for tracking it.
     @ObservationIgnored private var refreshTask: Task<Bool, Never>?
     @ObservationIgnored private var lastSuccessfulRefresh: Date?
-    private static let staleInterval: TimeInterval = 15
+    private static let staleInterval: TimeInterval = 90
 
     init() {
         let stored = UserDefaults.standard.string(forKey: Self.urlKey) ?? ""
@@ -267,13 +267,6 @@ final class RecipeStore {
                 actionError = error.localizedDescription
             }
         }
-    }
-
-    /// Pulls the latest pantry from the server — called after each refresh
-    /// so a change made on another device shows up here too.
-    private func syncPantryFromServer() async {
-        guard let items = try? await APIClient(baseURLString: serverURL).fetchPantry() else { return }
-        have = items
     }
 
     /// For the Settings screen's "API usage" card. Not cached/published on
@@ -444,13 +437,18 @@ final class RecipeStore {
         defer { isLoading = false }
 
         do {
-            let payload = try await APIClient(baseURLString: serverURL).fetchRecipes()
+            let client = APIClient(baseURLString: serverURL)
+            async let catalog = client.fetchRecipes()
+            async let haveItems = client.fetchPantry()
+            let payload = try await catalog
             guard !Task.isCancelled else { return false }
             apply(recipes: payload.recipes, pantry: payload.pantry)
+            if let items = try? await haveItems {
+                have = items
+            }
             errorMessage = nil
             lastSuccessfulRefresh = Date()
             persistCache()
-            await syncPantryFromServer()
             return true
         } catch {
             guard !Task.isCancelled else { return false }
@@ -464,9 +462,19 @@ final class RecipeStore {
     }
 
     private func apply(recipes: [Recipe], pantry: [PantryGroup]) {
-        self.recipes = recipes
         let fresh = pantry.map { PantryGroup(category: $0.category, items: collapsePantryItems($0.items)) }
-        pantryGroups = mergeCustomPantryItems(into: fresh)
+        let merged = mergeCustomPantryItems(into: fresh)
+        // A foreground refresh that brought back the same catalog used to
+        // rewrite `recipes` and `visibleRecipes` anyway, which rebuilt the
+        // whole list (and replayed card fade-ins). Skip when nothing moved.
+        if self.recipes == recipes, pantryGroups == merged {
+            if recipesByID.isEmpty {
+                recipesByID = Dictionary(uniqueKeysWithValues: recipes.map { ($0.id, $0) })
+            }
+            return
+        }
+        self.recipes = recipes
+        pantryGroups = merged
         recipesByID = Dictionary(uniqueKeysWithValues: recipes.map { ($0.id, $0) })
         updateDerived()
     }

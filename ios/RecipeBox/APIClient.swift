@@ -51,28 +51,7 @@ struct APIClient {
     }()
 
     func fetchRecipes() async throws -> RecipesResponse {
-        guard let base = URL(string: trimmedBase),
-              let url = URL(string: "/api/recipes", relativeTo: base)
-        else { throw APIError.badURL }
-
-        var request = URLRequest(url: url.absoluteURL)
-        request.timeoutInterval = 15
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await Self.session.data(for: request)
-        } catch {
-            throw APIError.unreachable(trimmedBase)
-        }
-
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200 ..< 300).contains(status) else {
-            try throwForStatus(status, data: data)
-        }
-
-        return try Self.decoder.decode(RecipesResponse.self, from: data)
+        try await decodeJSON(RecipesResponse.self, from: get("/api/recipes"))
     }
 
     /// Reads a recipe out of a photo (card, cookbook page, screenshot — a
@@ -240,27 +219,7 @@ struct APIClient {
     }
 
     func fetchPantry() async throws -> [String] {
-        guard let base = URL(string: trimmedBase),
-              let url = URL(string: "/api/pantry", relativeTo: base)
-        else { throw APIError.badURL }
-
-        var request = URLRequest(url: url.absoluteURL)
-        request.timeoutInterval = 15
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await Self.session.data(for: request)
-        } catch {
-            throw APIError.unreachable(trimmedBase)
-        }
-
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200 ..< 300).contains(status) else {
-            try throwForStatus(status, data: data)
-        }
-        return try Self.decoder.decode(PantryResponse.self, from: data).items
+        try await decodeJSON(PantryResponse.self, from: get("/api/pantry")).items
     }
 
     func updatePantry(items: [String], secret: String) async throws -> [String] {
@@ -294,27 +253,7 @@ struct APIClient {
     }
 
     func fetchPantryInventory() async throws -> [PantryItem] {
-        guard let base = URL(string: trimmedBase),
-              let url = URL(string: "/api/pantry-inventory", relativeTo: base)
-        else { throw APIError.badURL }
-
-        var request = URLRequest(url: url.absoluteURL)
-        request.timeoutInterval = 15
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await Self.session.data(for: request)
-        } catch {
-            throw APIError.unreachable(trimmedBase)
-        }
-
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200 ..< 300).contains(status) else {
-            try throwForStatus(status, data: data)
-        }
-        return try Self.decoder.decode(PantryInventoryResponse.self, from: data).items
+        try await decodeJSON(PantryInventoryResponse.self, from: get("/api/pantry-inventory")).items
     }
 
     func updatePantryInventory(items: [PantryItem], secret: String) async throws -> [PantryItem] {
@@ -348,27 +287,7 @@ struct APIClient {
     }
 
     func fetchToBuy() async throws -> [ToBuyItem] {
-        guard let base = URL(string: trimmedBase),
-              let url = URL(string: "/api/to-buy", relativeTo: base)
-        else { throw APIError.badURL }
-
-        var request = URLRequest(url: url.absoluteURL)
-        request.timeoutInterval = 15
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await Self.session.data(for: request)
-        } catch {
-            throw APIError.unreachable(trimmedBase)
-        }
-
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200 ..< 300).contains(status) else {
-            try throwForStatus(status, data: data)
-        }
-        return try Self.decoder.decode(ToBuyResponse.self, from: data).items
+        try await decodeJSON(ToBuyResponse.self, from: get("/api/to-buy")).items
     }
 
     func updateToBuy(items: [ToBuyItem], secret: String) async throws -> [ToBuyItem] {
@@ -432,6 +351,33 @@ struct APIClient {
 
     private var trimmedBase: String {
         baseURLString.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private func get(_ path: String) async throws -> Data {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: path, relativeTo: base)
+        else { throw APIError.badURL }
+        var request = URLRequest(url: url.absoluteURL)
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return data
+    }
+
+    private func decodeJSON<T: Decodable>(_ type: T.Type, from data: Data) async throws -> T {
+        try await Task.detached(priority: .userInitiated) {
+            try JSONDecoder().decode(T.self, from: data)
+        }.value
     }
 }
 

@@ -12,6 +12,11 @@ struct CircleIconButton: View {
     var background: Color = Theme.surface
     var foreground: Color = Theme.neutral800
     var bordered: Bool = true
+    /// Detail back button: inset ring (1pt divider, 1.5pt accent when pressed)
+    /// so the stroke stays even at any scale. Other circles keep a 1pt border.
+    var insetRing: Bool = false
+    /// Ellipsis while its menu is open — accent ring, same as the handoff.
+    var highlighted: Bool = false
     let action: () -> Void
 
     var body: some View {
@@ -21,14 +26,34 @@ struct CircleIconButton: View {
                 .foregroundStyle(foreground)
                 .frame(width: size, height: size)
                 .background(background)
-                .overlay {
-                    if bordered {
-                        Circle().strokeBorder(Theme.divider, lineWidth: 1)
-                    }
-                }
                 .clipShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CircleIconButtonStyle(bordered: bordered, insetRing: insetRing, highlighted: highlighted))
+    }
+}
+
+private struct CircleIconButtonStyle: ButtonStyle {
+    var bordered: Bool
+    var insetRing: Bool
+    var highlighted: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .overlay {
+                if insetRing {
+                    Circle().strokeBorder(
+                        configuration.isPressed ? Theme.accent : Theme.divider,
+                        lineWidth: configuration.isPressed ? 1.5 : 1
+                    )
+                    .padding(1)
+                } else if bordered || highlighted {
+                    Circle().strokeBorder(
+                        highlighted || configuration.isPressed ? Theme.accent : Theme.divider,
+                        lineWidth: 1
+                    )
+                }
+            }
+            .clipShape(Circle())
     }
 }
 
@@ -88,10 +113,15 @@ struct AccentFillButtonStyle: ButtonStyle {
 
 /// Destructive confirm fill (accent-800) with pressed darkening to
 /// accent-900, cream label, and the everyday button shadow.
+/// Font, padding, and max-width live in the style so iOS 26 glass chrome
+/// cannot sit outside a tiny text-only capsule.
 struct DestructiveFillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .font(Theme.body(14.5, weight: .semibold))
             .foregroundStyle(Color(hex: 0xfff8ec))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
             .background(configuration.isPressed ? Theme.accent900 : Theme.accent800)
             .clipShape(Capsule())
             .themeShadow(Theme.shadowSM)
@@ -103,7 +133,10 @@ struct DestructiveFillButtonStyle: ButtonStyle {
 struct OutlinedCapsuleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .font(Theme.body(14.5, weight: .semibold))
             .foregroundStyle(Theme.neutral800)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
             .background(configuration.isPressed ? Theme.neutral100 : Theme.surface)
             .overlay {
                 Capsule().strokeBorder(Theme.divider, lineWidth: 1)
@@ -180,6 +213,70 @@ private struct FadeInOnAppear: ViewModifier {
 extension View {
     func fadeInOnAppear() -> some View {
         modifier(FadeInOnAppear())
+    }
+}
+
+/// Lucide strokes from the detail ⋯ menu (17pt, stroke 2.5 in a 24pt grid).
+/// SF Symbols on the ellipsis button were leaking into the overlay and no
+/// longer matched the handoff.
+struct HandoffMenuIcon: View {
+    enum Kind {
+        case originalPost, edit, trash
+    }
+
+    let kind: Kind
+    var size: CGFloat = 17
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let scale = min(canvasSize.width, canvasSize.height) / 24
+            var path = Path()
+            switch kind {
+            case .originalPost:
+                path.addPath(Self.roundedRect(x: 7, y: 8, w: 11, h: 12, r: 2))
+                path.move(to: CGPoint(x: 14, y: 5))
+                path.addLine(to: CGPoint(x: 19, y: 5))
+                path.addLine(to: CGPoint(x: 19, y: 10))
+                path.move(to: CGPoint(x: 19, y: 5))
+                path.addLine(to: CGPoint(x: 11, y: 13))
+            case .edit:
+                path.move(to: CGPoint(x: 12, y: 20))
+                path.addLine(to: CGPoint(x: 21, y: 20))
+                path.move(to: CGPoint(x: 16.5, y: 3.5))
+                path.addQuadCurve(to: CGPoint(x: 19.5, y: 6.5), control: CGPoint(x: 18.7, y: 3.5))
+                path.addLine(to: CGPoint(x: 7, y: 19))
+                path.addLine(to: CGPoint(x: 3, y: 20))
+                path.addLine(to: CGPoint(x: 4, y: 16))
+                path.closeSubpath()
+            case .trash:
+                path.move(to: CGPoint(x: 5, y: 6))
+                path.addLine(to: CGPoint(x: 19, y: 6))
+                path.move(to: CGPoint(x: 9, y: 6))
+                path.addLine(to: CGPoint(x: 9, y: 4.5))
+                path.addQuadCurve(to: CGPoint(x: 10.5, y: 3), control: CGPoint(x: 9, y: 3))
+                path.addLine(to: CGPoint(x: 13.5, y: 3))
+                path.addQuadCurve(to: CGPoint(x: 15, y: 4.5), control: CGPoint(x: 15, y: 3))
+                path.addLine(to: CGPoint(x: 15, y: 6))
+                path.move(to: CGPoint(x: 17, y: 6))
+                path.addLine(to: CGPoint(x: 16.2, y: 19))
+                path.addQuadCurve(to: CGPoint(x: 14.2, y: 20.9), control: CGPoint(x: 16.2, y: 20.9))
+                path.addLine(to: CGPoint(x: 9.8, y: 20.9))
+                path.addQuadCurve(to: CGPoint(x: 7.8, y: 19), control: CGPoint(x: 7.8, y: 20.9))
+                path.addLine(to: CGPoint(x: 7, y: 6))
+            }
+            var t = CGAffineTransform(scaleX: scale, y: scale)
+            let scaled = path.applying(t)
+            context.stroke(
+                scaled,
+                with: .foreground,
+                style: StrokeStyle(lineWidth: 2.5 * scale, lineCap: .round, lineJoin: .round)
+            )
+        }
+        .frame(width: size, height: size)
+    }
+
+    private static func roundedRect(x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, r: CGFloat) -> Path {
+        Path(roundedRect: CGRect(x: x, y: y, width: w, height: h), cornerRadius: r)
     }
 }
 

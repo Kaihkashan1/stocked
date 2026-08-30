@@ -6,7 +6,11 @@ import Observation
 /// with RecipeStore so Settings changes apply here without a second form.
 @Observable @MainActor
 final class PantryStore {
-    var items: [PantryItem] = []
+    var items: [PantryItem] = [] {
+        didSet {
+            if oldValue != items { rebuildGroups() }
+        }
+    }
     var toBuy: [ToBuyItem] = []
     var isLoading = false
     var actionError: String?
@@ -19,7 +23,7 @@ final class PantryStore {
     @ObservationIgnored private var toBuySyncTask: Task<Void, Never>?
     @ObservationIgnored private var refreshTask: Task<Bool, Never>?
     @ObservationIgnored private var lastSuccessfulRefresh: Date?
-    private static let staleInterval: TimeInterval = 15
+    private static let staleInterval: TimeInterval = 90
 
     init() {
         loadCache()
@@ -35,8 +39,11 @@ final class PantryStore {
     }
 
     /// Items grouped in handoff category order; empty categories omitted.
-    var groupedItems: [(category: PantryCategory, items: [PantryItem])] {
-        PantryCategory.allCases.compactMap { category in
+    /// Rebuilt when `items` changes rather than on every Cupboard body.
+    private(set) var groupedItems: [(category: PantryCategory, items: [PantryItem])] = []
+
+    private func rebuildGroups() {
+        groupedItems = PantryCategory.allCases.compactMap { category in
             let rows = items.filter { $0.pantryCategory == category }
             guard !rows.isEmpty else { return nil }
             return (category, rows)
@@ -80,8 +87,10 @@ final class PantryStore {
             let client = APIClient(baseURLString: serverURL)
             async let inventory = client.fetchPantryInventory()
             async let buyList = client.fetchToBuy()
-            items = try await inventory
-            toBuy = try await buyList
+            let nextItems = try await inventory
+            let nextBuy = try await buyList
+            if items != nextItems { items = nextItems }
+            if toBuy != nextBuy { toBuy = nextBuy }
             lastSuccessfulRefresh = Date()
             persistCache()
             return true

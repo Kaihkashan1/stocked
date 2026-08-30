@@ -16,11 +16,10 @@
 		A10000000000000000000016 /* RecipeListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000036 /* RecipeListView.swift */; };
 		A10000000000000000000017 /* RecipeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000037 /* RecipeDetailView.swift */; };
 		A10000000000000000000018 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* SettingsView.swift */; };
-		A10000000000000000000019 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000039 /* Assets.xcassets */; };
+		A1000000000000000000001A /* CameraPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003B /* CameraPicker.swift */; };
 		A1000000000000000000001B /* EditRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003C /* EditRecipeView.swift */; };
 		A1000000000000000000001D /* CookModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* CookModeView.swift */; };
 		A1000000000000000000001E /* AddRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003F /* AddRecipeView.swift */; };
-		A1000000000000000000001A /* CameraPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003B /* CameraPicker.swift */; };
 		A20000000000000000000011 /* Caprasimo-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* Caprasimo-Regular.ttf */; };
 		A20000000000000000000012 /* Figtree-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* Figtree-Regular.ttf */; };
 		A20000000000000000000013 /* Figtree-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* Figtree-SemiBold.ttf */; };
@@ -31,6 +30,7 @@
 		A20000000000000000000019 /* PantryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PantryStore.swift */; };
 		A2000000000000000000001A /* PantryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* PantryItemSheet.swift */; };
 		A2000000000000000000001C /* Connectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Connectivity.swift */; };
+		A2000000000000000000001E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,22 +44,21 @@
 		A10000000000000000000036 /* RecipeListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeListView.swift; sourceTree = "<group>"; };
 		A10000000000000000000037 /* RecipeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDetailView.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		A10000000000000000000039 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A1000000000000000000003A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1000000000000000000003B /* CameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPicker.swift; sourceTree = "<group>"; };
 		A1000000000000000000003C /* EditRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRecipeView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003E /* CookModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookModeView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003F /* AddRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRecipeView.swift; sourceTree = "<group>"; };
-		A1000000000000000000003B /* CameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPicker.swift; sourceTree = "<group>"; };
-		A20000000000000000000001 /* Caprasimo-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Caprasimo-Regular.ttf"; sourceTree = "<group>"; };
-		A20000000000000000000002 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Regular.ttf"; sourceTree = "<group>"; };
-		A20000000000000000000003 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-SemiBold.ttf"; sourceTree = "<group>"; };
-		A20000000000000000000004 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Bold.ttf"; sourceTree = "<group>"; };
+		A20000000000000000000001 /* Caprasimo-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Caprasimo-Regular.ttf"; sourceTree = "<group>"; };
+		A20000000000000000000002 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Figtree-Regular.ttf"; sourceTree = "<group>"; };
+		A20000000000000000000003 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Figtree-SemiBold.ttf"; sourceTree = "<group>"; };
+		A20000000000000000000004 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Figtree-Bold.ttf"; sourceTree = "<group>"; };
 		A20000000000000000000006 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* PasteALinkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteALinkView.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* PantryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryView.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* PantryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryStore.swift; sourceTree = "<group>"; };
 		A2000000000000000000000A /* PantryItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryItemSheet.swift; sourceTree = "<group>"; };
 		A2000000000000000000000B /* Connectivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connectivity.swift; sourceTree = "<group>"; };
+		A2000000000000000000000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,22 +94,10 @@
 				A20000000000000000000007 /* PasteALinkView.swift */,
 				A20000000000000000000008 /* PantryView.swift */,
 				A2000000000000000000000A /* PantryItemSheet.swift */,
-				A10000000000000000000039 /* Assets.xcassets */,
-				A1000000000000000000003A /* Info.plist */,
+				A2000000000000000000000D /* Assets.xcassets */,
 				A20000000000000000000005 /* Fonts */,
 			);
 			path = RecipeBox;
-			sourceTree = "<group>";
-		};
-		A20000000000000000000005 /* Fonts */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000001 /* Caprasimo-Regular.ttf */,
-				A20000000000000000000002 /* Figtree-Regular.ttf */,
-				A20000000000000000000003 /* Figtree-SemiBold.ttf */,
-				A20000000000000000000004 /* Figtree-Bold.ttf */,
-			);
-			path = Fonts;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000051 = {
@@ -129,6 +116,17 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		A20000000000000000000005 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* Caprasimo-Regular.ttf */,
+				A20000000000000000000002 /* Figtree-Regular.ttf */,
+				A20000000000000000000003 /* Figtree-SemiBold.ttf */,
+				A20000000000000000000004 /* Figtree-Bold.ttf */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -139,6 +137,7 @@
 				A10000000000000000000070 /* Sources */,
 				A10000000000000000000040 /* Frameworks */,
 				A10000000000000000000071 /* Resources */,
+				A30000000000000000000001 /* Embed URL scheme and ATS */,
 			);
 			buildRules = (
 			);
@@ -187,7 +186,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000019 /* Assets.xcassets in Resources */,
+				A2000000000000000000001E /* Assets.xcassets in Resources */,
 				A20000000000000000000011 /* Caprasimo-Regular.ttf in Resources */,
 				A20000000000000000000012 /* Figtree-Regular.ttf in Resources */,
 				A20000000000000000000013 /* Figtree-SemiBold.ttf in Resources */,
@@ -196,6 +195,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A30000000000000000000001 /* Embed URL scheme and ATS */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed URL scheme and ATS";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "PLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n[ -f \"$PLIST\" ] || exit 0\n/usr/libexec/PlistBuddy -c \"Delete :CFBundleURLTypes\" \"$PLIST\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes array\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0 dict\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLName string com.kaihkashan.RecipeBox\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLSchemes array\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string recipebox\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Delete :NSAppTransportSecurity\" \"$PLIST\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :NSAppTransportSecurity dict\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Delete :UIAppFonts\" \"$PLIST\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :UIAppFonts array\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :UIAppFonts:0 string Caprasimo-Regular.ttf\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :UIAppFonts:1 string Figtree-Regular.ttf\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :UIAppFonts:2 string Figtree-SemiBold.ttf\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :UIAppFonts:3 string Figtree-Bold.ttf\" \"$PLIST\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A10000000000000000000070 /* Sources */ = {
@@ -255,7 +277,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -303,7 +325,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
@@ -325,15 +347,24 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PMLXUJ2NU2;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = RecipeBox/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Recipe Box";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Stocked;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Stocked uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Stocked can load recipes from a server on your local network when you are testing.";
+				INFOPLIST_KEY_UIAppFonts = (
+					"Caprasimo-Regular.ttf",
+					"Figtree-Regular.ttf",
+					"Figtree-SemiBold.ttf",
+					"Figtree-Bold.ttf",
+				);
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -354,15 +385,24 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PMLXUJ2NU2;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = RecipeBox/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Recipe Box";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Stocked;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Stocked uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Stocked can load recipes from a server on your local network when you are testing.";
+				INFOPLIST_KEY_UIAppFonts = (
+					"Caprasimo-Regular.ttf",
+					"Figtree-Regular.ttf",
+					"Figtree-SemiBold.ttf",
+					"Figtree-Bold.ttf",
+				);
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

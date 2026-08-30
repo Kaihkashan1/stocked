@@ -524,6 +524,14 @@ extension PantryItem {
             let label = diff == 0 ? "Expires today" : "Expires in \(diff)d"
             return ExpiryBadge(label: label, fill: Theme.accent500, foreground: Self.expiryCream, border: nil)
         }
+        if diff <= 7 {
+            return ExpiryBadge(
+                label: "Expires in \(diff)d",
+                fill: Theme.sage200,
+                foreground: Theme.sage800,
+                border: nil
+            )
+        }
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
         return ExpiryBadge(

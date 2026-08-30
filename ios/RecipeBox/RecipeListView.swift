@@ -22,6 +22,7 @@ struct RecipeListView: View {
                 SearchBlock(showFilters: $showFilters)
                 CourseFilterRow()
                 PantryBanner()
+                ClearFiltersRow()
                 ResultsSection(onAdd: onAdd)
             }
         }
@@ -322,6 +323,39 @@ private struct PantryBanner: View {
     }
 }
 
+// MARK: - Clear filters
+
+/// One tap back to the full list from search, course, tags, favorites and
+/// ingredients. Lives on the list because search and course are applied here,
+/// not only inside the Filters sheet.
+private struct ClearFiltersRow: View {
+    @Environment(RecipeStore.self) private var store
+
+    var body: some View {
+        if store.hasActiveFilters {
+            Button {
+                store.clearFilters()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("Clear all filters")
+                        .font(Theme.body(12.5, weight: .semibold))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(Theme.accent100)
+                .foregroundStyle(Theme.accent700)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.screenPadding)
+            .padding(.top, 14)
+        }
+    }
+}
+
 // MARK: - Result states
 
 private struct LoadingState: View {
@@ -485,7 +519,6 @@ struct RecipeCard: View, Equatable {
         )
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardBackground(radius: isGrid ? Theme.radiusCardGrid : Theme.radiusCard)
-        .fadeInOnAppear()
     }
 }
 
@@ -532,56 +565,27 @@ struct FiltersSheet: View {
                     .foregroundStyle(Theme.accent700)
                     .disabled(!store.hasActiveFilters)
                     .opacity(store.hasActiveFilters ? 1 : 0.4)
+                    .buttonStyle(.plain)
 
-                Spacer()
-                Text("Filters")
-                    .font(Theme.display(30))
-                    .foregroundStyle(Theme.ink)
                 Spacer()
 
                 Button("Done") { dismiss() }
                     .font(Theme.body(14, weight: .bold))
                     .foregroundStyle(Theme.accent700)
+                    .buttonStyle(.plain)
             }
             .padding(.horizontal, Theme.screenPadding)
-            .padding(.vertical, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.sectionGap) {
-                    whatIHaveCard
+                    Text("Filters")
+                        .font(Theme.display(30))
+                        .foregroundStyle(Theme.ink)
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Kicker(text: "Source", color: Theme.neutral600)
-                        FlowLayout(spacing: 8) {
-                            ForEach(SourceCategory.allCases) { category in
-                                ChipButton(title: category.rawValue, selected: store.sourceFilters.contains(category)) {
-                                    if store.sourceFilters.contains(category) {
-                                        store.sourceFilters.remove(category)
-                                    } else {
-                                        store.sourceFilters.insert(category)
-                                    }
-                                }
-                                .fixedSize()
-                            }
-                        }
-                    }
-
-                    if !store.tags.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Kicker(text: "Tags", color: Theme.neutral600)
-                            FlowLayout(spacing: 8) {
-                                ForEach(store.tags, id: \.self) { tag in
-                                    ChipButton(title: tag, selected: store.tagFilters.contains(tag)) {
-                                        if store.tagFilters.contains(tag) {
-                                            store.tagFilters.remove(tag)
-                                        } else {
-                                            store.tagFilters.insert(tag)
-                                        }
-                                    }
-                                    .fixedSize()
-                                }
-                            }
-                        }
+                    if !store.have.isEmpty {
+                        whatIHaveCard
                     }
 
                     Button {
@@ -614,6 +618,40 @@ struct FiltersSheet: View {
                             Text("Ignored while ingredient filters are active — closest fit comes first then.")
                                 .font(Theme.body(11.5))
                                 .foregroundStyle(Theme.neutral600)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Kicker(text: "Source", color: Theme.neutral600)
+                        FlowLayout(spacing: 8) {
+                            ForEach(SourceCategory.allCases) { category in
+                                ChipButton(title: category.rawValue, selected: store.sourceFilters.contains(category)) {
+                                    if store.sourceFilters.contains(category) {
+                                        store.sourceFilters.remove(category)
+                                    } else {
+                                        store.sourceFilters.insert(category)
+                                    }
+                                }
+                                .fixedSize()
+                            }
+                        }
+                    }
+
+                    if !store.tags.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Kicker(text: "Tags", color: Theme.neutral600)
+                            FlowLayout(spacing: 8) {
+                                ForEach(store.tags, id: \.self) { tag in
+                                    ChipButton(title: tag, selected: store.tagFilters.contains(tag)) {
+                                        if store.tagFilters.contains(tag) {
+                                            store.tagFilters.remove(tag)
+                                        } else {
+                                            store.tagFilters.insert(tag)
+                                        }
+                                    }
+                                    .fixedSize()
+                                }
+                            }
                         }
                     }
                 }

@@ -16,33 +16,33 @@ struct RecipeDetailView: View {
     private var recipe: Recipe? { store.recipe(id: id) }
 
     var body: some View {
-        Group {
-            if let recipe {
-                content(for: recipe)
-            } else {
-                Text("This recipe is no longer available.")
-                    .font(Theme.body(14))
-                    .foregroundStyle(Theme.neutral700)
-                    .padding()
+        VStack(spacing: 0) {
+            detailHeader
+                .zIndex(1)
+
+            Group {
+                if let recipe {
+                    content(for: recipe)
+                } else {
+                    Text("This recipe is no longer available.")
+                        .font(Theme.body(14))
+                        .foregroundStyle(Theme.neutral700)
+                        .padding()
+                    Spacer()
+                }
+            }
+            .overlay {
+                if showMoreMenu {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { showMoreMenu = false }
+                }
             }
         }
         .background(Theme.bg.ignoresSafeArea())
-        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                CircleIconButton(systemImage: "chevron.left", size: 40) { dismiss() }
-                    .accessibilityLabel("Back")
-            }
-            if let recipe {
-                // One toolbar item, not two — two adjacent ToolbarItems get
-                // an automatic pill-grouping background on newer iOS. A
-                // plain Button keeps these flat circles.
-                trailingToolbarButtons(for: recipe)
-            }
-        }
         .sheet(isPresented: $showEdit) {
             if let recipe {
                 EditRecipeView(recipe: recipe)
@@ -54,12 +54,13 @@ struct RecipeDetailView: View {
                 CookModeView(recipe: recipe)
             }
         }
+        // Delete confirm is its own overlay so it isn't clipped when the
+        // more menu is not on screen.
         .overlay {
-            if showMoreMenu {
-                moreMenuOverlay
-            }
             if showDeleteConfirm {
                 deleteConfirmOverlay
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
             }
         }
         .alert(
@@ -88,24 +89,21 @@ struct RecipeDetailView: View {
         }
     }
 
-    /// A grouped ToolbarItem gets an automatic pill-grouping "glass"
-    /// background on iOS 26+, which clashes with these already being their
-    /// own flat circles — `sharedBackgroundVisibility(.hidden)` turns that
-    /// off, but only exists on iOS 26+, so it's applied conditionally.
-    @ToolbarContentBuilder
-    private func trailingToolbarButtons(for recipe: Recipe) -> some ToolbarContent {
-        if #available(iOS 26.0, *) {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                favoriteButton(for: recipe)
-                moreButton
-            }
-            .sharedBackgroundVisibility(.hidden)
-        } else {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+    /// Drawn in the screen, not the system nav bar — iOS 26 glass otherwise
+    /// replaces the inset back ring and detaches the ⋯ menu from the button.
+    private var detailHeader: some View {
+        HStack(spacing: 8) {
+            CircleIconButton(systemImage: "chevron.left", size: 40, insetRing: true) { dismiss() }
+                .accessibilityLabel("Back")
+            Spacer(minLength: 0)
+            if let recipe {
                 favoriteButton(for: recipe)
                 moreButton
             }
         }
+        .padding(.horizontal, Theme.screenPadding)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
     }
 
     private func favoriteButton(for recipe: Recipe) -> some View {
@@ -120,62 +118,64 @@ struct RecipeDetailView: View {
     }
 
     private var moreButton: some View {
-        CircleIconButton(systemImage: "ellipsis", size: 40) {
-            showMoreMenu = true
+        CircleIconButton(systemImage: "ellipsis", size: 40, highlighted: showMoreMenu) {
+            showMoreMenu.toggle()
         }
         .disabled(deleting)
         .accessibilityLabel("More")
-    }
-
-    private var moreMenuOverlay: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.clear
-                .contentShape(Rectangle())
-                .ignoresSafeArea()
-                .onTapGesture { showMoreMenu = false }
-
-            VStack(alignment: .leading, spacing: 0) {
-                if let url = recipe?.sourceURL {
-                    menuRow(systemImage: "arrow.up.right.square", title: "Original post", destructive: false) {
-                        showMoreMenu = false
-                        openURL(url)
-                    }
-                }
-                menuRow(systemImage: "pencil", title: "Edit recipe", destructive: false) {
-                    showMoreMenu = false
-                    showEdit = true
-                }
-                Rectangle()
-                    .fill(Theme.divider)
-                    .frame(height: 1)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                menuRow(systemImage: "trash", title: "Delete recipe", destructive: true) {
-                    showMoreMenu = false
-                    showDeleteConfirm = true
-                }
+        .overlay(alignment: .topTrailing) {
+            if showMoreMenu {
+                moreMenuCard
+                    // 6pt under the 40pt circle (handoff top: 46px, right: 0)
+                    // so the card reads as hanging off the ellipsis, not the screen.
+                    .offset(y: 46)
+                    .fixedSize()
             }
-            .padding(6)
-            .frame(minWidth: 190, alignment: .leading)
-            .background(Theme.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .themeShadow(Theme.shadowLG)
-            .padding(.trailing, Theme.screenPadding)
-            .padding(.top, 52)
         }
     }
 
+    /// Anchored 46pt below the top of the ⋯ control (handoff), trailing-aligned
+    /// with the button row.
+    private var moreMenuCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let url = recipe?.sourceURL {
+                menuRow(icon: .originalPost, title: "Original post", destructive: false) {
+                    showMoreMenu = false
+                    openURL(url)
+                }
+            }
+            menuRow(icon: .edit, title: "Edit recipe", destructive: false) {
+                showMoreMenu = false
+                showEdit = true
+            }
+            Rectangle()
+                .fill(Theme.divider)
+                .frame(height: 1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+            menuRow(icon: .trash, title: "Delete recipe", destructive: true) {
+                showMoreMenu = false
+                showDeleteConfirm = true
+            }
+        }
+        .padding(6)
+        .frame(minWidth: 190, alignment: .leading)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .themeShadow(Theme.shadowLG)
+        .environment(\.font, Theme.body(14))
+    }
+
     private func menuRow(
-        systemImage: String,
+        icon: HandoffMenuIcon.Kind,
         title: String,
         destructive: Bool,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 11) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 17)
+                HandoffMenuIcon(kind: icon, size: 17)
+                    .frame(width: 17, height: 17)
                 Text(title)
                     .font(Theme.body(14))
                 Spacer(minLength: 0)
@@ -191,7 +191,9 @@ struct RecipeDetailView: View {
     private var deleteConfirmOverlay: some View {
         ZStack {
             Theme.neutral900.opacity(0.42)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
                 .onTapGesture { showDeleteConfirm = false }
 
             VStack(alignment: .leading, spacing: 18) {
@@ -209,18 +211,12 @@ struct RecipeDetailView: View {
                     Button("Cancel") {
                         showDeleteConfirm = false
                     }
-                    .font(Theme.body(14.5, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
                     .buttonStyle(OutlinedCapsuleButtonStyle())
 
                     Button(deleting ? "Deleting…" : "Delete") {
                         guard let recipe, !deleting else { return }
                         Task { await delete(recipe) }
                     }
-                    .font(Theme.body(14.5, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
                     .buttonStyle(DestructiveFillButtonStyle())
                     .disabled(deleting)
                 }
@@ -392,6 +388,7 @@ struct RecipeDetailView: View {
 private struct MenuRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .font(Theme.body(14))
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(configuration.isPressed ? Theme.accent100 : Color.clear)

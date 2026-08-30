@@ -1,4 +1,26 @@
+import CoreText
 import SwiftUI
+
+/// Registers Caprasimo and Figtree for this process. Custom fonts also need
+/// to be listed under UIAppFonts in the built Info.plist; that key is injected
+/// in the "Embed URL scheme and ATS" build phase because GENERATE_INFOPLIST_FILE
+/// does not reliably copy array keys from the project file.
+enum BundledFonts {
+    static func register() {
+        let names = [
+            "Caprasimo-Regular",
+            "Figtree-Regular",
+            "Figtree-SemiBold",
+            "Figtree-Bold",
+        ]
+        for name in names {
+            let url = Bundle.main.url(forResource: name, withExtension: "ttf", subdirectory: "Fonts")
+                ?? Bundle.main.url(forResource: name, withExtension: "ttf")
+            guard let url else { continue }
+            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        }
+    }
+}
 
 /// Design tokens for the "Organic" redesign (see design_handoff_recipe_box/).
 /// Replaces the old sage/grey palette and system-font stand-ins wholesale.
@@ -27,6 +49,7 @@ enum Theme {
 
     static let sage500 = Color(hex: 0x8fa073)
     static let sage300 = Color(hex: 0xccdbb2)
+    static let sage200 = Color(hex: 0xe1eecc)           // Organic accent-2-200
     static let sage100 = Color(hex: 0xf0fae1)
     static let sage800 = Color(hex: 0x3d472b)           // sage text
     /// Not in the handoff table (only 100/300/500/800 are) — interpolated
