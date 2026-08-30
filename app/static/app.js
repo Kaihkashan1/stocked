@@ -28,6 +28,7 @@ const INGREDIENT_UNITS = new Set([
 
 const SECRET_KEY = "recipeBox.secret";
 const HAVE_KEY = "recipeBox.have";
+const RECIPES_CACHE_KEY = "recipeBox.recipesCache";
 
 const state = {
   recipes: [],
@@ -59,27 +60,76 @@ const els = {
   addRecipeBtn: document.getElementById("add-recipe-btn"),
   addRecipeMenu: document.getElementById("add-recipe-menu"),
   photoInput: document.getElementById("photo-input"),
+  offlineBanner: document.getElementById("offline-banner"),
 };
 
-async function load() {
-  els.status.textContent = "Loading recipes…";
-  const response = await fetch("/api/recipes");
-  if (!response.ok) {
-    els.status.textContent = "Could not load recipes.";
-    return;
-  }
-  const data = await response.json();
+function setOfflineBanner(show) {
+  if (!els.offlineBanner) return;
+  els.offlineBanner.hidden = !show;
+}
+
+function applyRecipePayload(data) {
   state.recipes = (data.recipes || []).map((recipe) => {
     recipe.searchBlob = computeSearchBlob(recipe);
     return recipe;
   });
   state.pantryGroups = Array.isArray(data.pantry) ? data.pantry : [];
-  renderFilters();
-  renderGrid();
-  maybeOpenFromHash();
-  await fetchHave();
-  renderFilters();
-  renderGrid();
+}
+
+function loadCachedRecipes() {
+  try {
+    const raw = localStorage.getItem(RECIPES_CACHE_KEY);
+    if (!raw) return false;
+    applyRecipePayload(JSON.parse(raw));
+    renderFilters();
+    renderGrid();
+    maybeOpenFromHash();
+    return state.recipes.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function persistRecipesCache(data) {
+  try {
+    localStorage.setItem(RECIPES_CACHE_KEY, JSON.stringify({
+      recipes: data.recipes || [],
+      pantry: Array.isArray(data.pantry) ? data.pantry : [],
+    }));
+  } catch {
+    // quota — browsing still works from memory this session
+  }
+}
+
+async function load({ silent = false } = {}) {
+  const hadCache = state.recipes.length > 0;
+  if (!silent && !hadCache) {
+    els.status.textContent = "Loading recipes…";
+  }
+  try {
+    const response = await fetch("/api/recipes", { cache: "no-store" });
+    if (!response.ok) {
+      if (!hadCache) els.status.textContent = "Could not load recipes.";
+      else setOfflineBanner(true);
+      return;
+    }
+    const data = await response.json();
+    applyRecipePayload(data);
+    persistRecipesCache(data);
+    setOfflineBanner(false);
+    renderFilters();
+    renderGrid();
+    maybeOpenFromHash();
+    await fetchHave();
+    renderFilters();
+    renderGrid();
+  } catch {
+    if (hadCache) {
+      setOfflineBanner(true);
+    } else {
+      els.status.textContent = "Could not load recipes.";
+    }
+  }
 }
 
 // ---------- auth / API ----------
@@ -666,7 +716,7 @@ function recipeHtml(recipe) {
           <div class="recipe-menu" hidden>
             ${originalPostItem}
             <button type="button" data-action="start-edit" data-id="${recipe.id}">Edit</button>
-            <button type="button" class="danger" data-action="delete-recipe" data-id="${recipe.id}">Delete</button>
+            <button type="button" class="danger" data-action="delete-recipe" data-id="${recipe.id}">Delete recipe</button>
           </div>
         </div>
       </div>
@@ -936,7 +986,7 @@ async function deleteRecipe(id) {
   id = Number(id);
   const recipe = state.recipes.find((item) => item.id === id);
   if (!recipe) return;
-  if (!window.confirm(`Delete "${recipe.title}"? This removes it from your Recipe Box.`)) return;
+  if (!window.confirm("Delete this recipe?\n\nThis removes it from your box. This can't be undone.")) return;
   try {
     await deleteRecipeRequest(id);
     state.recipes = state.recipes.filter((item) => item.id !== id);
@@ -1156,7 +1206,23 @@ window.addEventListener("hashchange", maybeOpenFromHash);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeDrawer();
 });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    load({ silent: true }).catch(() => {});
+  }
+});
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) load({ silent: true }).catch(() => {});
+});
+window.addEventListener("online", () => {
+  load({ silent: true }).catch(() => {});
+});
 
+loadCachedRecipes();
 load().catch(() => {
-  els.status.textContent = "Could not load recipes.";
+  if (!state.recipes.length) {
+    els.status.textContent = "Could not load recipes.";
+  } else {
+    setOfflineBanner(true);
+  }
 });

@@ -17,6 +17,9 @@ final class PantryStore {
     private static let secretKey = "recipeBox.serverSecret"
     private static let cacheName = "pantryInventoryCache.json"
     @ObservationIgnored private var toBuySyncTask: Task<Void, Never>?
+    @ObservationIgnored private var refreshTask: Task<Bool, Never>?
+    @ObservationIgnored private var lastSuccessfulRefresh: Date?
+    private static let staleInterval: TimeInterval = 15
 
     init() {
         loadCache()
@@ -51,8 +54,27 @@ final class PantryStore {
     }
 
     @discardableResult
-    func refresh() async -> Bool {
-        isLoading = true
+    func refresh(force: Bool = true) async -> Bool {
+        if !force, let lastSuccessfulRefresh, Date().timeIntervalSince(lastSuccessfulRefresh) < Self.staleInterval {
+            return true
+        }
+        if let refreshTask {
+            return await refreshTask.value
+        }
+        let task = Task { await loadRemote() }
+        refreshTask = task
+        let result = await task.value
+        if refreshTask == task {
+            refreshTask = nil
+        }
+        return result
+    }
+
+    private func loadRemote() async -> Bool {
+        let hadCache = !items.isEmpty || !toBuy.isEmpty
+        if !hadCache {
+            isLoading = true
+        }
         defer { isLoading = false }
         do {
             let client = APIClient(baseURLString: serverURL)
@@ -60,6 +82,7 @@ final class PantryStore {
             async let buyList = client.fetchToBuy()
             items = try await inventory
             toBuy = try await buyList
+            lastSuccessfulRefresh = Date()
             persistCache()
             return true
         } catch {

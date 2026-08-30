@@ -4,12 +4,14 @@ import SwiftUI
 struct RecipeBoxApp: App {
     @State private var store = RecipeStore()
     @State private var pantryStore = PantryStore()
+    @State private var connectivity = Connectivity()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(store)
                 .environment(pantryStore)
+                .environment(connectivity)
                 .onOpenURL { url in
                     store.pendingRoute = Self.route(for: url)
                 }

@@ -38,6 +38,8 @@ private enum AppTab: Hashable {
 struct RootView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(PantryStore.self) private var pantryStore
+    @Environment(Connectivity.self) private var connectivity
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: AppTab = .recipes
     @State private var activeSheet: ActiveSheet?
     @State private var addRecipePrefill: RecipeExtraction?
@@ -70,6 +72,11 @@ struct RootView: View {
         .tint(Theme.accent)
         .toolbarBackground(Theme.surface, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if connectivity.isOffline {
+                OfflineBanner()
+            }
+        }
         .onAppear {
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
@@ -77,6 +84,7 @@ struct RootView: View {
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
             UITabBar.appearance().unselectedItemTintColor = UIColor(Theme.neutral500)
+            handle(store.pendingRoute)
         }
         .sheet(item: $activeSheet, onDismiss: performPendingAddAction) { sheet in
             // Presentation modifiers (detents etc.) are applied ONCE, here,
@@ -136,14 +144,28 @@ struct RootView: View {
             Text(message)
         }
         .task {
-            async let recipes = store.refresh()
-            async let pantry = pantryStore.refresh()
-            _ = await (recipes, pantry)
+            await refreshCatalog(force: true)
         }
-        .onAppear { handle(store.pendingRoute) }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await refreshCatalog(force: false) }
+        }
+        .onChange(of: connectivity.isOnline) { wasOnline, isOnline in
+            guard isOnline, !wasOnline else { return }
+            Task { await refreshCatalog(force: true) }
+        }
         .onChange(of: store.pendingRoute) { _, route in
             handle(route)
         }
+    }
+
+    /// `force` is for first paint and coming back online. Returning from
+    /// the background uses a short freshness window so the launch `.task`
+    /// and the first `.active` scene-phase ping don't fire the API twice.
+    private func refreshCatalog(force: Bool) async {
+        async let recipes = store.refresh(force: force)
+        async let pantry = pantryStore.refresh(force: force)
+        _ = await (recipes, pantry)
     }
 
     private var recipesTab: some View {

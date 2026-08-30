@@ -135,13 +135,7 @@ struct AddRecipeView: View {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(stepLines.indices, id: \.self) { index in
                     HStack(alignment: .top, spacing: 12) {
-                        Text("\(index + 1)")
-                            .font(Theme.display(12))
-                            .foregroundStyle(Theme.accent800)
-                            .frame(width: 22, height: 22)
-                            .background(Theme.accent200)
-                            .clipShape(Circle())
-                            .padding(.top, 2)
+                        StepNumberBadge(number: index + 1, size: 22, fontSize: 12, topOffset: 1)
 
                         TextField("Step \(index + 1)", text: $stepLines[index], axis: .vertical)
                             .font(Theme.body(14))

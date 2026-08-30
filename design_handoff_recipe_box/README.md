@@ -6,8 +6,6 @@ plus a paste-a-link add flow, a course filter (Main course / Appetizers / Desser
 a personal pantry inventory called **Cupboard**, alongside the recipes tab now called **Cookbook**. Backend is
 unchanged except where noted under "API / data".
 
-**Implemented in-repo** against production `https://stocked-cookbook-cupboard.vercel.app`. See the root [`README.md`](../README.md) and [`ios/README.md`](../ios/README.md) for how the shipping app behaves (Cookbook ingredient filter vs Cupboard inventory are separate; Cupboard search filters; to-buy qty; etc.). This file remains the visual/interaction source of truth for the prototype.
-
 ## About the design files
 `Recipe Box.dc.html` and `AppIcon.dc.html` in this bundle are **design references written in HTML** — an
 interactive prototype of the intended look and behavior. They are not production code. The task is to recreate
@@ -97,8 +95,8 @@ header is inline content.
   accent-100 hover. A full-screen transparent tap-catcher behind the menu closes it on outside tap.
 - **Delete confirm — NEW**: a centered dialog over a 42% neutral-900 scrim — "Delete this recipe?" (Caprasimo
   20pt) / "This removes it from your box. This can't be undone." (14pt neutral-700), then Cancel (surface,
-  divider border) and Delete (accent-800 fill, cream text) side by side. Confirming removes the recipe and
-  returns to the list.
+  divider border, bold 14.5pt) and Delete (accent-800 fill, cream text, bold 14.5pt, shadow-sm, darkens on
+  hover) side by side. Confirming removes the recipe and returns to the list.
 - **Edit sheet — NEW**: "Edit recipe" opens a bottom sheet (same shell as the pantry add sheet) prefilled from
   the current recipe, covering Title (pill field), Course (chip row), Tags (comma-separated text field),
   Ingredients (textarea, one per line as "qty | item", blank qty allowed), Steps (textarea, blank line between
@@ -118,7 +116,9 @@ header is inline content.
   chip (min width 62pt, centered) then ingredient text (14.5pt). Quantity-less lines render as plain text.
   **No servings/time line.**
 - **Steps**: heading Caprasimo 23pt; rows 16pt apart — 28pt accent-200 circle with the number in
-  Caprasimo 13pt accent-800, then the step text at 14.5pt / line height 1.55.
+  Figtree Bold 13pt (line-height 1) accent-800, 2pt top margin so the circle lines up with the first line
+  of wrapping text, then the step text at 14.5pt / line height 1.55. Caprasimo is not used in the circle —
+  its baseline sits too low at this size.
 - **Notes**: accent-100 card, 26pt radius, "NOTES" kicker, 14pt body.
 - **End of page, in this order**: tag pills (11.5pt, accent-100/accent-800) then a single quiet line
   "From Instagram" (12pt neutral-600, the source name being the link to the original post). The source is
@@ -174,8 +174,8 @@ Cancel / Save in the header. Title "From a photo" (Caprasimo 30pt) and the line 
 before it goes in the box." **The photo itself is not shown or stored** — go straight to the read-back: a sage-100
 confidence pill ("Read 9 ingredients and 6 steps. Confidence: high."), then Title (pill field, Caprasimo 17pt),
 Ingredients (26pt-radius surface field, one per line, line height 1.9), **Steps — NEW** (same 26pt-radius surface
-card, numbered rows: 22pt accent-200 circle with the step number in 12pt accent-800, then the step text at 14pt;
-this block was missing even though the confidence pill already claimed a step count), the Course pill row, the
+card, numbered rows: 22pt accent-200 circle with the step number in Figtree Bold 12pt accent-800, 1pt top margin,
+then the step text at 14pt; this block was missing even though the confidence pill already claimed a step count), the Course pill row, the
 Tags chip row, and the line "Source is set automatically — this one files under **Photo** in Filters."
 
 ### 6. Type it in (AddRecipeView)
@@ -265,6 +265,12 @@ neutral-500 otherwise. This is the user's own inventory — it is not required t
   button (plus glyph, neutral-100 fill) that adds that ingredient's text to the pantry's To-buy list; it fills
   sage with a checkmark once added, and tapping again removes it. This is the only link between recipes and
   the pantry's to-buy list — everything else in Pantry is independent of recipes.
+
+### Steps numbering — fixed
+The numbered circle before each step (recipe detail and the photo-review screen) previously set the digit in
+Caprasimo, whose baseline sits low and off-center inside a circle at small sizes. Digits now render in the body
+font, bold, line-height 1, which centers correctly; the circle gets a 1-2pt top margin so it lines up with the
+first line of the step text instead of the vertical center of the whole (often 2-line) row.
 
 ## State
 `screen`, `query`, `have: [String]`, `favs: [Int: Bool]`, `tags: Set<String>`, `sources: Set<String>`,

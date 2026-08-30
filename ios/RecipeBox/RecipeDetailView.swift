@@ -209,20 +209,16 @@ struct RecipeDetailView: View {
                     Button("Cancel") {
                         showDeleteConfirm = false
                     }
-                    .font(Theme.body(14, weight: .semibold))
-                    .foregroundStyle(Theme.neutral800)
+                    .font(Theme.body(14.5, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
-                    .background(Theme.surface)
-                    .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
-                    .clipShape(Capsule())
-                    .buttonStyle(.plain)
+                    .buttonStyle(OutlinedCapsuleButtonStyle())
 
                     Button(deleting ? "Deleting…" : "Delete") {
                         guard let recipe, !deleting else { return }
                         Task { await delete(recipe) }
                     }
-                    .font(Theme.body(14, weight: .semibold))
+                    .font(Theme.body(14.5, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
                     .buttonStyle(DestructiveFillButtonStyle())
@@ -362,13 +358,8 @@ struct RecipeDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeading("Steps")
             ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
-                HStack(alignment: .top, spacing: 12) {
-                    Text("\(index + 1)")
-                        .font(Theme.display(13))
-                        .foregroundStyle(Theme.accent800)
-                        .frame(width: 28, height: 28)
-                        .background(Theme.accent200)
-                        .clipShape(Circle())
+                HStack(alignment: .top, spacing: 14) {
+                    StepNumberBadge(number: index + 1)
                     Text(step)
                         .font(Theme.body(14.5))
                         .lineSpacing(14.5 * 0.55)

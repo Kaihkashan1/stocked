@@ -26,14 +26,15 @@ With a free Personal Team, the install lasts about 7 days. Run it again from Xco
 
 ## Cookbook
 
-- Pull down to refresh after you save a new recipe.
+- Pull down to refresh after you save a new recipe. Opening the app again (from the home screen or after it sat in the background) also refreshes Cookbook and Cupboard from the server. Coming back online after a drop does the same.
+- After a successful sync, recipes and cupboard data stay on the phone. You can browse, filter, and cook **offline**. A sage banner reads **Offline — showing recipes saved on this phone**. Adding recipes, favoriting, editing, deleting, and cupboard writes still need the network.
 - **Search recipes** filters the list by title/text as you type. If what you typed also matches an ingredient name, a row under search lets you **filter by ingredient** — tap a suggestion, or **+ Add "…"** for a custom name.
 - Next to search: a **filter** button (fills accent when any list filter is active) and a **grid/list toggle** for recipe cards (remembered on this phone).
 - A **Main course / Appetizers / Desserts** row sits below search — tap one to filter, tap again to clear.
 - Ingredient filters are **AND**: only recipes that use **all** selected ingredients stay visible. Results are ranked by **fit %** (sage **% FIT** pill on each card). Sort (Recent / A–Z / Z–A) is ignored while ingredient filters are active. The sage banner reads **Filtered by …** with **Clear**.
 - **Filters** sheet: **Ingredients** (same filter set), **Source** (Instagram / YouTube / TikTok / Link / Photo / Typed in), **Tags**, **Favorites only**, and **Sort**. **Reset** clears sheet filters; the list banner clears ingredients.
 - **+** offers four ways to add: **Paste a link**, **Take a photo** / **Choose from library**, and **Type it in**.
-- Open a recipe for ingredients (scale ½× / 1× / 2× / 3×), steps, course pill, and **Start cooking**. Each ingredient row has a **+ / ✓** control that adds or removes that line on the Cupboard **To buy** list (quantity prefilled from the chip when present). Ellipsis menu: original post (when linked), edit, delete. Edit covers title, course, tags, ingredients (`qty | item`), steps, and notes.
+- Open a recipe for ingredients (scale ½× / 1× / 2× / 3×), steps, course pill, and **Start cooking**. Each ingredient row has a **+ / ✓** control that adds or removes that line on the Cupboard **To buy** list (quantity prefilled from the chip when present). Ellipsis menu: original post (when linked), edit, delete. Delete asks **Delete this recipe?** before removing it. Edit covers title, course, tags, ingredients (`qty | item`), steps, and notes.
 
 ## Cupboard
 

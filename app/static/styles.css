@@ -254,6 +254,16 @@ button { font-family: inherit; }
   margin: 0 0 1rem;
 }
 
+.offline-banner {
+  margin: 0 0 1rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  background: var(--sage-100, #f0fae1);
+  color: var(--sage-800, #3d472b);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
@@ -551,25 +561,28 @@ ol.steps {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 1rem;
 }
 
 ol.steps li {
   display: flex;
-  gap: 0.7rem;
+  gap: 14px;
+  align-items: flex-start;
   counter-increment: step;
 }
 
 .step-num {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
   border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font-family: "IBM Plex Mono", monospace;
-  font-weight: 600;
-  font-size: 0.7rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: "Public Sans", sans-serif;
+  font-weight: 700;
+  font-size: 0.81rem;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;

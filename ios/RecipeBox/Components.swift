@@ -86,13 +86,50 @@ struct AccentFillButtonStyle: ButtonStyle {
     }
 }
 
-/// Destructive confirm fill (accent-800) with pressed darkening.
+/// Destructive confirm fill (accent-800) with pressed darkening to
+/// accent-900, cream label, and the everyday button shadow.
 struct DestructiveFillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(Color(hex: 0xfff8ec))
             .background(configuration.isPressed ? Theme.accent900 : Theme.accent800)
             .clipShape(Capsule())
+            .themeShadow(Theme.shadowSM)
+    }
+}
+
+/// Cancel / secondary capsule — surface fill, divider border, darkens to
+/// neutral-100 when pressed.
+struct OutlinedCapsuleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Theme.neutral800)
+            .background(configuration.isPressed ? Theme.neutral100 : Theme.surface)
+            .overlay {
+                Capsule().strokeBorder(Theme.divider, lineWidth: 1)
+            }
+            .clipShape(Capsule())
+    }
+}
+
+/// Numbered circle beside a step. Body font (not Caprasimo) so the digit
+/// sits in the optical center; a small top offset lines the circle up with
+/// the first line of wrapping step text rather than the row's vertical
+/// midpoint.
+struct StepNumberBadge: View {
+    let number: Int
+    var size: CGFloat = 28
+    var fontSize: CGFloat = 13
+    var topOffset: CGFloat = 2
+
+    var body: some View {
+        Text("\(number)")
+            .font(Theme.body(fontSize, weight: .bold))
+            .foregroundStyle(Theme.accent800)
+            .frame(width: size, height: size)
+            .background(Theme.accent200)
+            .clipShape(Circle())
+            .padding(.top, topOffset)
     }
 }
 

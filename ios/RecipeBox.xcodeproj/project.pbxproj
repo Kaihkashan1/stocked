@@ -30,6 +30,7 @@
 		A20000000000000000000018 /* PantryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* PantryView.swift */; };
 		A20000000000000000000019 /* PantryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PantryStore.swift */; };
 		A2000000000000000000001A /* PantryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* PantryItemSheet.swift */; };
+		A2000000000000000000001C /* Connectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Connectivity.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -58,6 +59,7 @@
 		A20000000000000000000008 /* PantryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryView.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* PantryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryStore.swift; sourceTree = "<group>"; };
 		A2000000000000000000000A /* PantryItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryItemSheet.swift; sourceTree = "<group>"; };
+		A2000000000000000000000B /* Connectivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connectivity.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +81,7 @@
 				A10000000000000000000032 /* APIClient.swift */,
 				A10000000000000000000033 /* RecipeStore.swift */,
 				A20000000000000000000009 /* PantryStore.swift */,
+				A2000000000000000000000B /* Connectivity.swift */,
 				A10000000000000000000034 /* Theme.swift */,
 				A20000000000000000000006 /* Components.swift */,
 				A10000000000000000000035 /* RootView.swift */,
@@ -217,6 +220,7 @@
 				A20000000000000000000018 /* PantryView.swift in Sources */,
 				A20000000000000000000019 /* PantryStore.swift in Sources */,
 				A2000000000000000000001A /* PantryItemSheet.swift in Sources */,
+				A2000000000000000000001C /* Connectivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

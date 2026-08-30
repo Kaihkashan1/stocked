@@ -118,6 +118,8 @@ final class RecipeStore {
     private var recipesByID: [Int: Recipe] = [:]
     /// Nothing reads this, so there's no reason to pay for tracking it.
     @ObservationIgnored private var refreshTask: Task<Bool, Never>?
+    @ObservationIgnored private var lastSuccessfulRefresh: Date?
+    private static let staleInterval: TimeInterval = 15
 
     init() {
         let stored = UserDefaults.standard.string(forKey: Self.urlKey) ?? ""
@@ -418,11 +420,20 @@ final class RecipeStore {
     }
 
     @discardableResult
-    func refresh() async -> Bool {
-        refreshTask?.cancel()
+    func refresh(force: Bool = true) async -> Bool {
+        if !force, let lastSuccessfulRefresh, Date().timeIntervalSince(lastSuccessfulRefresh) < Self.staleInterval {
+            return true
+        }
+        if let refreshTask {
+            return await refreshTask.value
+        }
         let task = Task { await loadRemote() }
         refreshTask = task
-        return await task.value
+        let result = await task.value
+        if refreshTask == task {
+            refreshTask = nil
+        }
+        return result
     }
 
     private func loadRemote() async -> Bool {
@@ -437,17 +448,16 @@ final class RecipeStore {
             guard !Task.isCancelled else { return false }
             apply(recipes: payload.recipes, pantry: payload.pantry)
             errorMessage = nil
+            lastSuccessfulRefresh = Date()
             persistCache()
             await syncPantryFromServer()
             return true
         } catch {
             guard !Task.isCancelled else { return false }
+            // Keep the on-disk catalog on screen. Writes (favorite, edit,
+            // add) still need the network; browsing and cook mode do not.
             if !hadRecipes {
-                recipes = []
-                pantryGroups = []
-                recipesByID = [:]
                 errorMessage = error.localizedDescription
-                updateDerived()
             }
             return false
         }

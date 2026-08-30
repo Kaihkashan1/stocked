@@ -177,7 +177,7 @@ Create a unique topic name at [ntfy.sh](https://ntfy.sh), subscribe in the ntfy 
 
 ## 8. iPhone app — Stocked (personal, not App Store)
 
-A SwiftUI app lives in `ios/` (Xcode project still named RecipeBox; home-screen name is **Stocked**). Two tabs: **Cookbook** (recipes) and **Cupboard** (inventory + to-buy). Full steps: [`ios/README.md`](ios/README.md).
+A SwiftUI app lives in `ios/` (Xcode project still named RecipeBox; home-screen name is **Stocked**). Two tabs: **Cookbook** (recipes) and **Cupboard** (inventory + to-buy). After a sync, the phone keeps a local copy so you can browse and cook offline; opening the app again refreshes from the server. Full steps: [`ios/README.md`](ios/README.md).
 
 Short version: open `ios/RecipeBox.xcodeproj` in **Xcode.app**, sign with your Personal Team, plug in the iPhone, press Run. The app defaults to `https://stocked-cookbook-cupboard.vercel.app` — the Mac does not need to be running. Older phones still pointing at `kaihkashan-recipe-box.vercel.app` are migrated to the new host on launch.
 
@@ -206,6 +206,7 @@ Browsing the box works well on Vercel. Ingest has a **60 second** function limit
 ## Notes
 
 - **The app.** Production is `https://stocked-cookbook-cupboard.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install **Stocked** — see [`ios/README.md`](ios/README.md). Google Sheets remains the recipe database; Cupboard inventory and to-buy live in App State JSON on the server (not Sheet rows).
+- **Offline and refresh.** Stocked keeps the last successful Cookbook and Cupboard sync on the phone. Browsing, filtering, and cook mode work without a network; adding, favoriting, editing, deleting, and cupboard writes still need the server. The app refreshes when you open it, when you return from the background, when connectivity comes back, or when you pull to refresh.
 - **Duplicates.** The same source URL is not written twice.
 - **Rate limits.** Gemini 429s are retried with backoff; a quota exhausted after retries surfaces the friendly message described above rather than a raw error.
 - **Sources.** Instagram goes through Apify — required, no fallback (see section 4). YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption directly — no login needed for those, since they don't require it the way Instagram does. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. Neither yt-dlp nor the Apify actor is an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If yt-dlp fetches start failing (YouTube/TikTok/blog links, not Instagram), update with `pip install -U yt-dlp`.
