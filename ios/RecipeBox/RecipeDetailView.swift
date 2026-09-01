@@ -94,7 +94,7 @@ struct RecipeDetailView: View {
     private var detailHeader: some View {
         HStack(spacing: 8) {
             CircleIconButton(systemImage: "chevron.left", size: 40, insetRing: true) { dismiss() }
-                .accessibilityLabel("Back")
+                .accessibilityLabel(L("Back"))
             Spacer(minLength: 0)
             if let recipe {
                 favoriteButton(for: recipe)
@@ -114,7 +114,7 @@ struct RecipeDetailView: View {
         ) {
             Task { await store.toggleFavorite(recipe) }
         }
-        .accessibilityLabel(recipe.favorite ? "Remove from favorites" : "Add to favorites")
+        .accessibilityLabel(recipe.favorite ? L("Remove from favorites") : L("Add to favorites"))
     }
 
     private var moreButton: some View {
@@ -122,7 +122,7 @@ struct RecipeDetailView: View {
             showMoreMenu.toggle()
         }
         .disabled(deleting)
-        .accessibilityLabel("More")
+        .accessibilityLabel(L("More"))
         .overlay(alignment: .topTrailing) {
             if showMoreMenu {
                 moreMenuCard
@@ -139,12 +139,12 @@ struct RecipeDetailView: View {
     private var moreMenuCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let url = recipe?.sourceURL {
-                menuRow(icon: .originalPost, title: "Original post", destructive: false) {
+                menuRow(icon: .originalPost, title: L("Original post"), destructive: false) {
                     showMoreMenu = false
                     openURL(url)
                 }
             }
-            menuRow(icon: .edit, title: "Edit recipe", destructive: false) {
+            menuRow(icon: .edit, title: L("Edit recipe"), destructive: false) {
                 showMoreMenu = false
                 showEdit = true
             }
@@ -153,7 +153,7 @@ struct RecipeDetailView: View {
                 .frame(height: 1)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
-            menuRow(icon: .trash, title: "Delete recipe", destructive: true) {
+            menuRow(icon: .trash, title: L("Delete recipe"), destructive: true) {
                 showMoreMenu = false
                 showDeleteConfirm = true
             }
@@ -213,7 +213,7 @@ struct RecipeDetailView: View {
                     }
                     .buttonStyle(OutlinedCapsuleButtonStyle())
 
-                    Button(deleting ? "Deleting…" : "Delete") {
+                    Button(deleting ? L("Deleting…") : L("Delete")) {
                         guard let recipe, !deleting else { return }
                         Task { await delete(recipe) }
                     }
@@ -279,7 +279,7 @@ struct RecipeDetailView: View {
             Text(recipe.title)
                 .font(Theme.display(31))
                 .foregroundStyle(Theme.ink)
-            Text(recipe.course.rawValue)
+            Text(recipe.course.localizedName)
                 .font(Theme.body(11.5, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 13)
@@ -321,7 +321,7 @@ struct RecipeDetailView: View {
                     store.tagFilters = [tag]
                     dismiss()
                 } label: {
-                    Text(tag)
+                    Text(localizedRecipeTag(tag))
                         .font(Theme.body(11.5, weight: .semibold))
                         .padding(.horizontal, 11)
                         .padding(.vertical, 6)
@@ -340,10 +340,10 @@ struct RecipeDetailView: View {
         Group {
             if let url = recipe.sourceURL {
                 Link(destination: url) {
-                    Text("From \(recipe.sourceLabel)")
+                    Text(L("From \(recipe.sourceLabel)"))
                 }
             } else {
-                Text("From \(recipe.sourceLabel)")
+                Text(L("From \(recipe.sourceLabel)"))
             }
         }
         .font(Theme.body(12))
@@ -352,7 +352,7 @@ struct RecipeDetailView: View {
 
     private func stepsSection(for recipe: Recipe) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeading("Steps")
+            sectionHeading(L("Steps"))
             ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
                 HStack(alignment: .top, spacing: 14) {
                     StepNumberBadge(number: index + 1)
@@ -367,7 +367,7 @@ struct RecipeDetailView: View {
 
     private func notesSection(for recipe: Recipe) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Kicker(text: "Notes")
+            Kicker(text: L("Notes"))
             Text(recipe.notes)
                 .font(Theme.body(14))
                 .foregroundStyle(Theme.ink)
@@ -462,7 +462,7 @@ private struct IngredientsCard: View {
         }
     }
 
-    /// Round + / ✓ control — the only link from a recipe into the Pantry
+    /// Round + / ✓ control — the only link from a recipe into the Cupboard
     /// to-buy list. Prefills qty from the ingredient's quantity chip.
     private func toBuyButton(for line: IngredientLine) -> some View {
         let inList = pantry.isInToBuy(line.text)
@@ -477,7 +477,7 @@ private struct IngredientsCard: View {
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(inList ? "Remove \(line.text) from to-buy list" : "Add \(line.text) to to-buy list")
+        .accessibilityLabel(inList ? L("Remove \(line.text) from to-buy list") : L("Add \(line.text) to to-buy list"))
     }
 
     private var scaleControl: some View {

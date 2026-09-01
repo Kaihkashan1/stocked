@@ -174,7 +174,7 @@ struct Kicker: View {
     var color: Color = Theme.accent700
 
     var body: some View {
-        Text(text.uppercased())
+        Text(text.uppercased(with: LanguageStore.shared.language.locale))
             .font(Theme.body(size, weight: .semibold))
             .tracking(size * 0.14)
             .foregroundStyle(color)
@@ -280,7 +280,7 @@ struct HandoffMenuIcon: View {
     }
 }
 
-/// A single labelled row in the Settings "API usage" card — a 6pt capsule
+/// A single labelled row in the Settings Import limits card — a 6pt capsule
 /// track (neutral-200) with an accent fill proportional to `used / limit`.
 struct UsageBar: View {
     let label: String
@@ -300,12 +300,12 @@ struct UsageBar: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Text(label)
-                    .font(Theme.body(13, weight: .semibold))
+                    .font(Theme.body(13.5))
                     .foregroundStyle(Theme.ink)
                 Spacer()
                 Text(valueText)
-                    .font(Theme.body(12.5))
-                    .foregroundStyle(Theme.neutral600)
+                    .font(Theme.body(13.5))
+                    .foregroundStyle(Theme.neutral700)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -336,5 +336,86 @@ extension View {
     /// inside an already-shadowed container.
     func roundedCorners(_ radius: CGFloat) -> some View {
         clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+    }
+}
+
+/// Suggested tag chips plus a field to type a new one. Used on Add and Edit
+/// only — Filters has no create control.
+struct TagPicker: View {
+    @Environment(RecipeStore.self) private var store
+    @Binding var selected: Set<String>
+    var extraTags: [String] = []
+    @State private var draft = ""
+
+    private var offered: [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for tag in recipeTags + extraTags + selected.sorted() {
+            let key = tag.lowercased()
+            if seen.insert(key).inserted {
+                ordered.append(tag)
+            }
+        }
+        return ordered
+    }
+
+    private var canAddDraft: Bool {
+        guard let tag = normalizeRecipeTag(draft) else { return false }
+        return !selected.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame })
+            && selected.count < maxRecipeTags
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            FlowLayout(spacing: 8) {
+                ForEach(offered, id: \.self) { tag in
+                    ChipButton(title: localizedRecipeTag(tag), selected: selected.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame })) {
+                        toggle(tag)
+                    }
+                    .fixedSize()
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField(L("New tag"), text: $draft)
+                    .font(Theme.body(13.5))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .onSubmit { addDraft() }
+                    .padding(.horizontal, 16)
+                    .frame(height: 42)
+                    .background(Theme.surface)
+                    .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                    .clipShape(Capsule())
+
+                Button(action: addDraft) {
+                    Text("Add tag")
+                        .font(Theme.body(13, weight: .semibold))
+                        .foregroundStyle(canAddDraft ? Theme.accent800 : Theme.neutral400)
+                        .padding(.horizontal, 18)
+                        .frame(height: 42)
+                        .background(canAddDraft ? Theme.accent100 : Theme.surface)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canAddDraft)
+            }
+        }
+    }
+
+    private func toggle(_ tag: String) {
+        if let existing = selected.first(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
+            selected.remove(existing)
+        } else if selected.count < maxRecipeTags, let normalized = normalizeRecipeTag(tag) {
+            selected.insert(normalized)
+        }
+    }
+
+    private func addDraft() {
+        guard let tag = normalizeRecipeTag(draft), canAddDraft else { return }
+        selected.insert(tag)
+        store.rememberTag(tag)
+        draft = ""
     }
 }

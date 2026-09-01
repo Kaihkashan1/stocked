@@ -1,19 +1,21 @@
-const MEAL_LABELS = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-  snack: "Snack",
-  dessert: "Dessert",
-  drink: "Drink",
-  other: "Other",
-};
+function mealLabels() {
+  return {
+    breakfast: t("Breakfast"),
+    lunch: t("Lunch"),
+    dinner: t("Dinner"),
+    snack: t("Snack"),
+    dessert: t("Dessert"),
+    drink: t("Drink"),
+    other: t("Other"),
+  };
+}
 
 const STAPLES = new Set(["salt", "water", "oil", "pepper", "black pepper", "sugar"]);
 
-// The whole tag vocabulary, on purpose — kept short and closed rather than
-// letting every recipe accumulate its own free-form set. Filtering and the
-// Add/Edit forms only ever offer these; there's no way to type a new one in.
+// Suggested chips. Gemini still picks from this list; add/edit can type more.
 const RECIPE_TAGS = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"];
+const MAX_RECIPE_TAG_LENGTH = 32;
+const MAX_RECIPE_TAGS = 24;
 
 // Mirrors app/match.py's UNITS and Models.swift's ingredientUnits, so a
 // quantity gets called out the same way on every surface.
@@ -34,6 +36,7 @@ const state = {
   recipes: [],
   pantryGroups: [],
   tags: new Set(),
+  knownTags: [],
   query: "",
   have: loadHave(),
   favoritesOnly: false,
@@ -41,6 +44,8 @@ const state = {
   openRecipeId: null,
   editingId: null,
   addingRecipe: false,
+  usage: null,
+  devSettingsOpen: false,
 };
 
 const els = {
@@ -104,12 +109,12 @@ function persistRecipesCache(data) {
 async function load({ silent = false } = {}) {
   const hadCache = state.recipes.length > 0;
   if (!silent && !hadCache) {
-    els.status.textContent = "Loading recipes…";
+    els.status.textContent = t("loadingRecipes");
   }
   try {
     const response = await fetch("/api/recipes", { cache: "no-store" });
     if (!response.ok) {
-      if (!hadCache) els.status.textContent = "Could not load recipes.";
+      if (!hadCache) els.status.textContent = t("couldNotLoad");
       else setOfflineBanner(true);
       return;
     }
@@ -127,7 +132,7 @@ async function load({ silent = false } = {}) {
     if (hadCache) {
       setOfflineBanner(true);
     } else {
-      els.status.textContent = "Could not load recipes.";
+      els.status.textContent = t("couldNotLoad");
     }
   }
 }
@@ -179,13 +184,158 @@ async function deleteRecipeRequest(id) {
 }
 
 function openSettings() {
-  const current = localStorage.getItem(SECRET_KEY) || "";
-  const value = window.prompt(
-    "Edit key — same value as RECIPE_BOX_SECRET on the server. Needed to favorite, edit, or delete from here. Leave blank against a dev server with no secret set.",
-    current
-  );
-  if (value === null) return;
-  localStorage.setItem(SECRET_KEY, value.trim());
+  state.openRecipeId = null;
+  state.editingId = null;
+  state.addingRecipe = false;
+  state.devSettingsOpen = false;
+  renderSettings();
+  els.drawer.hidden = false;
+  fetchUsage().then((usage) => {
+    state.usage = usage;
+    if (!els.drawer.hidden && state.addingRecipe === false && state.openRecipeId == null && state.editingId == null) {
+      const typed = document.getElementById("settings-secret")?.value;
+      renderSettings();
+      if (typed != null) {
+        const again = document.getElementById("settings-secret");
+        if (again) again.value = typed;
+      }
+    }
+  });
+}
+
+function renderSettings() {
+  els.detail.innerHTML = settingsFormHtml();
+}
+
+function formatUsd(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "$0";
+  return "$" + (n === Math.round(n) ? n.toFixed(0) : n.toFixed(2));
+}
+
+function appDateLocale() {
+  return appLocale() === "de" ? "de-DE" : "en-US";
+}
+
+/// Next Gemini free-tier reset: midnight Pacific, shown as a CET clock time
+/// — same conversion Settings on iOS uses.
+function geminiResetsLabel() {
+  const now = new Date();
+  const pacificNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+  const nextPacific = new Date(pacificNow);
+  nextPacific.setHours(24, 0, 0, 0);
+  const offset = nextPacific.getTime() - pacificNow.getTime();
+  const next = new Date(now.getTime() + offset);
+  const time = next.toLocaleTimeString(appDateLocale(), {
+    timeZone: "Europe/Berlin",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return t("resetsAround", { time });
+}
+
+function apifyResetsLabel(resetsAt) {
+  if (!resetsAt) return "";
+  const date = new Date(resetsAt);
+  if (Number.isNaN(date.getTime())) return "";
+  const formatted = date.toLocaleDateString(appDateLocale(), { month: "short", day: "numeric" });
+  return t("resetsOn", { date: formatted });
+}
+
+async function fetchUsage() {
+  try {
+    const response = await fetch("/api/usage", { headers: authHeaders() });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function settingsFormHtml() {
+  const pref = languagePreference();
+  const options = [
+    ["system", t("matchDevice")],
+    ["en", "English"],
+    ["de", "Deutsch"],
+  ];
+  const chips = options
+    .map(([value, label]) => {
+      const active = pref === value;
+      return `<button class="pill pill-btn-plain${active ? " active" : ""}" type="button" data-action="pick-language" data-lang="${value}">${escapeHtml(label)}</button>`;
+    })
+    .join("");
+  const secret = localStorage.getItem(SECRET_KEY) || "";
+  const usage = state.usage;
+  let limitsHtml = "";
+  if (usage?.gemini) {
+    const geminiPct = usage.gemini.limit ? Math.min(100, (100 * usage.gemini.used) / usage.gemini.limit) : 0;
+    let bars = `
+      <div class="usage-row">
+        <div class="usage-row-head"><span>${escapeHtml(t("importsToday"))}</span><span>${escapeHtml(t("ofCount", { used: usage.gemini.used, limit: usage.gemini.limit }))}</span></div>
+        <div class="usage-track"><div class="usage-fill" style="width:${geminiPct}%"></div></div>
+        <p class="usage-reset">${escapeHtml(geminiResetsLabel())}</p>
+      </div>`;
+    if (usage.apify) {
+      const apifyPct = usage.apify.limit_usd ? Math.min(100, (100 * usage.apify.used_usd) / usage.apify.limit_usd) : 0;
+      const apifyReset = apifyResetsLabel(usage.apify.resets_at);
+      bars += `
+      <div class="usage-row">
+        <div class="usage-row-head"><span>${escapeHtml(t("importCostThisMonth"))}</span><span>${escapeHtml(t("ofCount", { used: formatUsd(usage.apify.used_usd), limit: formatUsd(usage.apify.limit_usd) }))}</span></div>
+        <div class="usage-track"><div class="usage-fill" style="width:${apifyPct}%"></div></div>
+        ${apifyReset ? `<p class="usage-reset">${escapeHtml(apifyReset)}</p>` : ""}
+      </div>`;
+    }
+    limitsHtml = `<div class="import-limits"><div class="eyebrow">${escapeHtml(t("importLimits"))}</div>${bars}</div>`;
+  }
+  const chevron = state.devSettingsOpen ? "180deg" : "0deg";
+  const devBody = state.devSettingsOpen
+    ? `<div class="dev-settings">
+        <label class="field">
+          <span>${escapeHtml(t("editKey"))}</span>
+          <input id="settings-secret" type="password" autocomplete="off" value="${escapeAttr(secret)}" placeholder="${escapeAttr(t("editKey"))}">
+          <p class="field-note">${escapeHtml(t("editKeyFootnote"))}</p>
+        </label>
+        <button class="pill-btn primary" type="button" data-action="save-settings">${escapeHtml(t("saveAndReload"))}</button>
+      </div>`
+    : "";
+  return `
+    <div class="drawer-actions">
+      <button class="icon-btn" type="button" data-action="close-drawer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        ${escapeHtml(t("close"))}
+      </button>
+    </div>
+    <div class="recipe recipe-body">
+      <h2 style="margin-bottom:1.2rem;">${escapeHtml(t("settings"))}</h2>
+      <div class="field">
+        <span>${escapeHtml(t("language"))}</span>
+        <div class="chips">${chips}</div>
+      </div>
+      ${limitsHtml}
+      <button class="dev-toggle" type="button" data-action="toggle-developer">
+        <span class="eyebrow">${escapeHtml(t("developer"))}</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${chevron})"><path d="M6 9l6 6 6-6"></path></svg>
+      </button>
+      ${devBody}
+    </div>`;
+}
+
+function applyLanguage(value) {
+  if (value !== "en" && value !== "de" && value !== "system") return;
+  setLanguagePreference(value);
+  applyStaticI18n();
+  renderFilters();
+  renderGrid();
+  if (!els.drawer.hidden && state.openRecipeId == null && !state.addingRecipe && state.editingId == null) {
+    renderSettings();
+  }
+}
+
+function saveSettings() {
+  const input = document.getElementById("settings-secret");
+  if (input) localStorage.setItem(SECRET_KEY, input.value.trim());
+  location.reload();
 }
 
 // ---------- ingredient quantity emphasis ----------
@@ -275,7 +425,7 @@ async function togglePantry(item) {
     state.have = confirmed;
   } catch (err) {
     state.have = previous;
-    window.alert(`Couldn't save your pantry: ${err.message}`);
+    window.alert(t("couldntSaveHave", { error: err.message }));
   }
   cacheHave();
   renderHaveChips();
@@ -326,7 +476,7 @@ function renderHaveChips() {
   const selected = groupPantry(state.have);
   els.haveChips.innerHTML = selected.length
     ? pantryGroupsHtml(selected, true)
-    : `<span class="status">Nothing marked yet</span>`;
+    : `<span class="status">${escapeHtml(t("nothingMarkedYet"))}</span>`;
 }
 
 // The same box you search recipes with also lets you mark something as
@@ -359,9 +509,9 @@ function renderSearchSuggest() {
     .map((item) => `<button class="chip toggle" type="button" data-pantry="${escapeAttr(item)}">+ ${escapeHtml(item)}</button>`)
     .join("");
   const addChip = canAdd
-    ? `<button class="chip active" type="button" data-action="add-pantry-item" data-item="${escapeAttr(trimmed)}">+ Add "${escapeHtml(trimmed)}"</button>`
+    ? `<button class="chip active" type="button" data-action="add-pantry-item" data-item="${escapeAttr(trimmed)}">${escapeHtml(t("addQuoted", { item: trimmed }))}</button>`
     : "";
-  els.searchSuggest.innerHTML = `<span class="search-suggest-label">Mark as something you have:</span>${matchChips}${addChip}`;
+  els.searchSuggest.innerHTML = `<span class="search-suggest-label">${escapeHtml(t("markAsHave"))}</span>${matchChips}${addChip}`;
   els.searchSuggest.hidden = false;
 }
 
@@ -370,15 +520,12 @@ function renderSearchSuggest() {
 function renderFilters() {
   renderHaveChips();
 
-  // The fixed six are always offered, even before any recipe carries one,
-  // plus whatever else recipes actually carry — tag entry is free text, so
-  // that "whatever else" can grow. Multi-select (AND): a recipe must carry
-  // every selected tag.
-  const tags = unique([...RECIPE_TAGS, ...state.recipes.flatMap((recipe) => recipe.tags || [])]);
+  // Suggested six, tags on recipes, and tags created on add/edit. Select-only.
+  const tags = unique([...RECIPE_TAGS, ...state.knownTags, ...state.recipes.flatMap((recipe) => recipe.tags || [])]);
   els.tagFilters.innerHTML = tags
     .map((tag) => {
       const active = state.tags.has(tag);
-      return `<button class="chip${active ? " active" : ""}" type="button" data-action="toggle-tag-filter" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}${active ? " ×" : ""}</button>`;
+      return `<button class="chip${active ? " active" : ""}" type="button" data-action="toggle-tag-filter" data-tag="${escapeAttr(tag)}">${escapeHtml(tTag(tag))}${active ? " ×" : ""}</button>`;
     })
     .join("");
 
@@ -391,7 +538,7 @@ function renderFilters() {
   const activeCount = [state.tags.size > 0, state.favoritesOnly, state.have.length > 0].filter(Boolean).length;
   els.filtersBtn.classList.toggle("active", activeCount > 0);
   els.filtersBtn.textContent = "";
-  els.filtersBtn.append(filtersIcon(), document.createTextNode(activeCount > 0 ? `Filters (${activeCount})` : "Filters"));
+  els.filtersBtn.append(filtersIcon(), document.createTextNode(activeCount > 0 ? t("filtersCount", { count: activeCount }) : t("filters")));
 }
 
 function filtersIcon() {
@@ -456,7 +603,7 @@ function pantryGroupsHtml(groups, selected) {
             `<button class="chip${selected ? " active" : " toggle"}" type="button" data-pantry="${escapeAttr(item)}">${escapeHtml(item)}${selected ? " ×" : ""}</button>`
         )
         .join("");
-      return `<div class="pantry-group"><h3 class="pantry-heading">${escapeHtml(group.category)}</h3><div class="chips">${chips}</div></div>`;
+      return `<div class="pantry-group"><h3 class="pantry-heading">${escapeHtml(t(group.category))}</h3><div class="chips">${chips}</div></div>`;
     })
     .join("");
 }
@@ -529,13 +676,14 @@ function filtered() {
 
 function renderGrid() {
   const rows = filtered();
+  const countLabel = rows.length === 1 ? t("recipeCountOne", { n: rows.length }) : t("recipeCountOther", { n: rows.length });
   if (state.have.length) {
-    els.status.textContent = `${rows.length} recipe${rows.length === 1 ? "" : "s"} · closest fit to your pantry first`;
+    els.status.textContent = t("closestFit", { count: countLabel });
   } else {
-    els.status.textContent = `${rows.length} recipe${rows.length === 1 ? "" : "s"}`;
+    els.status.textContent = countLabel;
   }
   if (!rows.length) {
-    els.grid.innerHTML = `<div class="empty">No recipes match those filters yet.</div>`;
+    els.grid.innerHTML = `<div class="empty">${escapeHtml(t("noMatch"))}</div>`;
     return;
   }
   els.grid.innerHTML = rows.map(cardHtml).join("");
@@ -545,17 +693,17 @@ function cardHtml({ recipe, match }) {
   const tags = [];
   if (state.have.length) {
     const label = match.fullyCovered
-      ? "Best fit"
+      ? t("bestFit")
       : match.missing
-        ? `${Math.round(match.score * 100)}% fit · ${match.missing} missing`
-        : `${Math.round(match.score * 100)}% fit`;
+        ? t("fitMissing", { pct: Math.round(match.score * 100), n: match.missing })
+        : t("fitPct", { pct: Math.round(match.score * 100) });
     tags.unshift(`<span class="pill match">${escapeHtml(label)}</span>`);
   }
   const favoriteActive = recipe.favorite ? " active" : "";
   return `
     <div class="card" data-id="${recipe.id}">
       <div class="card-actions">
-        <button class="card-icon-btn favorite${favoriteActive}" type="button" data-action="toggle-favorite" data-id="${recipe.id}" aria-label="Favorite">
+        <button class="card-icon-btn favorite${favoriteActive}" type="button" data-action="toggle-favorite" data-id="${recipe.id}" aria-label="${escapeAttr(t("favorite"))}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="${recipe.favorite ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
         </button>
       </div>
@@ -597,12 +745,12 @@ function resizeImageFile(file, maxDimension = 1600, quality = 0.7) {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
         if (blob) resolve(blob);
-        else reject(new Error("Could not process that photo."));
+        else reject(new Error(t("couldNotProcessPhoto")));
       }, "image/jpeg", quality);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Could not read that photo."));
+      reject(new Error(t("couldNotReadPhoto")));
     };
     img.src = url;
   });
@@ -615,7 +763,7 @@ function showPhotoLoading(show) {
     overlay = document.createElement("div");
     overlay.id = "photo-loading-overlay";
     overlay.className = "photo-loading-overlay";
-    overlay.innerHTML = `<div class="photo-loading-box"><div class="spinner"></div><span>Reading the recipe…</span></div>`;
+    overlay.innerHTML = `<div class="photo-loading-box"><div class="spinner"></div><span>${escapeHtml(t("readingRecipe"))}</span></div>`;
     document.body.appendChild(overlay);
   } else if (overlay) {
     overlay.remove();
@@ -639,7 +787,7 @@ async function handlePhotoSelected(event) {
     const extraction = await response.json();
     openAddRecipe(extraction);
   } catch (err) {
-    window.alert(`Couldn't read that photo: ${err.message}`);
+    window.alert(t("couldntReadPhoto", { error: err.message }));
   } finally {
     showPhotoLoading(false);
   }
@@ -666,9 +814,9 @@ function refreshOpenRecipe() {
 function recipeHtml(recipe) {
   if (state.editingId === recipe.id) return editFormHtml(recipe);
 
-  const bits = [recipe.servings ? `${recipe.servings} servings` : null, recipe.time].filter(Boolean);
+  const bits = [recipe.servings ? t("servings", { n: recipe.servings }) : null, recipe.time].filter(Boolean);
   const tags = (recipe.tags || [])
-    .map((tag) => `<button class="pill pill-btn-plain" type="button" data-action="filter-tag" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`)
+    .map((tag) => `<button class="pill pill-btn-plain" type="button" data-action="filter-tag" data-tag="${escapeAttr(tag)}">${escapeHtml(tTag(tag))}</button>`)
     .join("");
   const ingredients = (recipe.ingredients || [])
     .map((item) => {
@@ -683,10 +831,10 @@ function recipeHtml(recipe) {
     .map((item, index) => `<li><span class="step-num">${index + 1}</span><span>${escapeHtml(item)}</span></li>`)
     .join("");
   const originalPostItem = recipe.source
-    ? `<a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">Original post</a>`
+    ? `<a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">${escapeHtml(t("originalPost"))}</a>`
     : "";
   const notesSection = recipe.notes
-    ? `<h3>Notes</h3><p class="notes-box">${escapeHtml(recipe.notes)}</p>`
+    ? `<h3>${escapeHtml(t("notes"))}</h3><p class="notes-box">${escapeHtml(recipe.notes)}</p>`
     : "";
 
   const missing = state.have.length ? missingIngredients(recipe) : [];
@@ -694,20 +842,20 @@ function recipeHtml(recipe) {
     ? ""
     : missing.length
       ? `<div class="pantry-match missing">
-          <span>Missing ${missing.length} ingredient${missing.length === 1 ? "" : "s"} from your pantry: ${escapeHtml(missing.join(", "))}</span>
+          <span>${escapeHtml(missing.length === 1 ? t("missingFromHaveOne", { n: missing.length, list: missing.join(", ") }) : t("missingFromHaveOther", { n: missing.length, list: missing.join(", ") }))}</span>
         </div>`
-      : `<div class="pantry-match covered">You have everything for this.</div>`;
+      : `<div class="pantry-match covered">${escapeHtml(t("haveEverything"))}</div>`;
 
   return `
     <div class="drawer-actions">
       <button class="icon-btn" type="button" data-action="close-drawer">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        Close
+        ${escapeHtml(t("close"))}
       </button>
       <div class="action-group">
         <button class="pill-btn favorite${recipe.favorite ? " active" : ""}" type="button" data-action="toggle-favorite" data-id="${recipe.id}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
-          Favorite
+          ${escapeHtml(t("favorite"))}
         </button>
         <div class="menu-anchor">
           <button class="pill-btn menu-btn" type="button" data-action="toggle-recipe-menu" aria-haspopup="true" aria-expanded="false">
@@ -715,8 +863,8 @@ function recipeHtml(recipe) {
           </button>
           <div class="recipe-menu" hidden>
             ${originalPostItem}
-            <button type="button" data-action="start-edit" data-id="${recipe.id}">Edit</button>
-            <button type="button" class="danger" data-action="delete-recipe" data-id="${recipe.id}">Delete recipe</button>
+            <button type="button" data-action="start-edit" data-id="${recipe.id}">${escapeHtml(t("edit"))}</button>
+            <button type="button" class="danger" data-action="delete-recipe" data-id="${recipe.id}">${escapeHtml(t("deleteRecipe"))}</button>
           </div>
         </div>
       </div>
@@ -727,10 +875,10 @@ function recipeHtml(recipe) {
     </div>
     ${pantryNote}
     <div class="recipe recipe-body">
-      <h3>Ingredients</h3>
-      <ul class="ingredients">${ingredients || "<li>None listed</li>"}</ul>
-      <h3>Steps</h3>
-      <ol class="steps">${steps || "<li>None listed</li>"}</ol>
+      <h3>${escapeHtml(t("ingredients"))}</h3>
+      <ul class="ingredients">${ingredients || `<li>${escapeHtml(t("noneListed"))}</li>`}</ul>
+      <h3>${escapeHtml(t("steps"))}</h3>
+      <ol class="steps">${steps || `<li>${escapeHtml(t("noneListed"))}</li>`}</ol>
       ${notesSection}
       ${tags ? `<div class="meta">${tags}</div>` : ""}
     </div>`;
@@ -739,61 +887,116 @@ function recipeHtml(recipe) {
 function editFormHtml(recipe) {
   return `
     <div class="drawer-actions editing">
-      <button class="icon-btn" type="button" data-action="cancel-edit">Cancel</button>
+      <button class="icon-btn" type="button" data-action="cancel-edit">${escapeHtml(t("cancel"))}</button>
     </div>
     <div class="recipe recipe-body">
-      <h2 style="margin-bottom:1.2rem;">Edit recipe</h2>
+      <h2 style="margin-bottom:1.2rem;">${escapeHtml(t("editRecipe"))}</h2>
       <label class="field">
-        <span>Title</span>
+        <span>${escapeHtml(t("title"))}</span>
         <input id="edit-title" value="${escapeAttr(recipe.title)}">
       </label>
       <label class="field">
-        <span>Servings</span>
+        <span>${escapeHtml(t("servingsLabel"))}</span>
         <input id="edit-servings" value="${escapeAttr(recipe.servings || "")}">
       </label>
       <label class="field">
-        <span>Ingredients — one per line</span>
+        <span>${escapeHtml(t("ingredientsOnePerLine"))}</span>
         <textarea id="edit-ingredients" rows="8">${escapeHtml((recipe.ingredients || []).join("\n"))}</textarea>
       </label>
       <label class="field">
-        <span>Steps — one per line</span>
+        <span>${escapeHtml(t("stepsOnePerLine"))}</span>
         <textarea id="edit-steps" rows="10">${escapeHtml((recipe.steps || []).join("\n"))}</textarea>
       </label>
       <label class="field">
-        <span>Notes</span>
+        <span>${escapeHtml(t("notes"))}</span>
         <textarea id="edit-notes" rows="3">${escapeHtml(recipe.notes || "")}</textarea>
       </label>
       <div class="field">
-        <span>Tags</span>
+        <span>${escapeHtml(t("tags"))}</span>
         <input type="hidden" id="edit-tags" value="${escapeAttr((recipe.tags || []).join(", "))}">
         <div id="edit-tag-chips" class="chips">${existingTagChips("pick-edit-tag", recipe.tags || [])}</div>
+        ${tagDraftRow("edit")}
       </div>
       <p id="edit-error" class="edit-error" hidden></p>
-      <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">Save</button>
+      <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">${escapeHtml(t("save"))}</button>
     </div>`;
 }
 
-// The fixed six as quick-pick chips, when adding or editing a recipe — tap
-// one to toggle it in the tags field. The field itself is still free text,
-// so anything else can be typed in too.
+function normalizeUserTag(raw) {
+  const text = String(raw || "").replaceAll(",", " ").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const clipped = text.slice(0, MAX_RECIPE_TAG_LENGTH).trim();
+  if (!clipped) return "";
+  const known = RECIPE_TAGS.find((tag) => tag.toLowerCase() === clipped.toLowerCase());
+  return known || clipped.toLowerCase();
+}
+
+function offeredFormTags(selectedTags) {
+  const seen = new Set();
+  const ordered = [];
+  for (const tag of [...RECIPE_TAGS, ...state.knownTags, ...state.recipes.flatMap((recipe) => recipe.tags || []), ...selectedTags]) {
+    const key = String(tag || "").toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(tag);
+  }
+  return ordered;
+}
+
 function existingTagChips(action, selectedTags) {
-  return RECIPE_TAGS.map((tag) => {
+  return offeredFormTags(selectedTags).map((tag) => {
     const active = selectedTags.some((selected) => selected.toLowerCase() === tag.toLowerCase());
-    return `<button class="pill pill-btn-plain${active ? " active" : ""}" type="button" data-action="${action}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`;
+    return `<button class="pill pill-btn-plain${active ? " active" : ""}" type="button" data-action="${action}" data-tag="${escapeAttr(tag)}">${escapeHtml(tTag(tag))}</button>`;
   }).join("");
 }
 
+function tagDraftRow(which) {
+  return `<div class="tag-add-row">
+        <input id="${which}-tag-draft" maxlength="${MAX_RECIPE_TAG_LENGTH}" placeholder="${escapeAttr(t("newTag"))}" autocomplete="off">
+        <button class="pill-btn" type="button" data-action="add-custom-tag" data-which="${which}">${escapeHtml(t("addTag"))}</button>
+      </div>`;
+}
+
+function selectedTagsFromInput(inputEl) {
+  return (inputEl.value || "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function refreshTagChips(which) {
+  const action = which === "edit" ? "pick-edit-tag" : "pick-add-tag";
+  const input = document.getElementById(`${which}-tags`);
+  const chipsEl = document.getElementById(`${which}-tag-chips`);
+  if (!input || !chipsEl) return;
+  chipsEl.innerHTML = existingTagChips(action, selectedTagsFromInput(input));
+}
+
 function toggleTagInInput(inputEl, tag) {
-  const current = inputEl.value.split(",").map((item) => item.trim()).filter(Boolean);
+  const current = selectedTagsFromInput(inputEl);
   const index = current.findIndex((item) => item.toLowerCase() === tag.toLowerCase());
   if (index >= 0) current.splice(index, 1);
-  else current.push(tag);
+  else if (current.length < MAX_RECIPE_TAGS) current.push(normalizeUserTag(tag) || tag);
   inputEl.value = current.join(", ");
+}
+
+function addCustomTag(which) {
+  const input = document.getElementById(`${which}-tags`);
+  const draftEl = document.getElementById(`${which}-tag-draft`);
+  if (!input || !draftEl) return;
+  const tag = normalizeUserTag(draftEl.value);
+  if (!tag) return;
+  const current = selectedTagsFromInput(input);
+  if (current.some((item) => item.toLowerCase() === tag) || current.length >= MAX_RECIPE_TAGS) return;
+  current.push(tag);
+  input.value = current.join(", ");
+  draftEl.value = "";
+  if (!state.knownTags.some((item) => item.toLowerCase() === tag.toLowerCase())) {
+    state.knownTags.push(tag);
+  }
+  refreshTagChips(which);
 }
 
 function addRecipeFormHtml(prefill) {
   const mealValue = prefill?.meal || "other";
-  const mealOptions = Object.entries(MEAL_LABELS)
+  const mealOptions = Object.entries(mealLabels())
     .map(([value, label]) => `<option value="${escapeAttr(value)}"${value === mealValue ? " selected" : ""}>${escapeHtml(label)}</option>`)
     .join("");
   const ingredientsValue = prefill ? prefill.ingredients.join("\n") : "";
@@ -804,48 +1007,49 @@ function addRecipeFormHtml(prefill) {
     <div class="drawer-actions">
       <button class="icon-btn" type="button" data-action="close-drawer">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        Cancel
+        ${escapeHtml(t("cancel"))}
       </button>
     </div>
     <div class="recipe recipe-body">
-      <h2 style="margin-bottom:1.2rem;">Add recipe</h2>
-      ${prefill ? `<p style="margin:-0.8rem 0 1.2rem; color:var(--ink-soft); font-size:0.85rem;">Read from your photo — check it over before saving.</p>` : ""}
+      <h2 style="margin-bottom:1.2rem;">${escapeHtml(t("addRecipeTitle"))}</h2>
+      ${prefill ? `<p style="margin:-0.8rem 0 1.2rem; color:var(--ink-soft); font-size:0.85rem;">${escapeHtml(t("photoPrefillHint"))}</p>` : ""}
       <label class="field">
-        <span>Title</span>
-        <input id="add-title" placeholder="Title" value="${escapeAttr(prefill?.title || "")}">
+        <span>${escapeHtml(t("title"))}</span>
+        <input id="add-title" placeholder="${escapeAttr(t("title"))}" value="${escapeAttr(prefill?.title || "")}">
       </label>
       <label class="field">
-        <span>Servings</span>
-        <input id="add-servings" placeholder="e.g. 4" value="${escapeAttr(prefill?.servings || "")}">
+        <span>${escapeHtml(t("servingsLabel"))}</span>
+        <input id="add-servings" placeholder="${escapeAttr(t("exampleFour"))}" value="${escapeAttr(prefill?.servings || "")}">
       </label>
       <label class="field">
-        <span>Ingredients — one per line</span>
+        <span>${escapeHtml(t("ingredientsOnePerLine"))}</span>
         <textarea id="add-ingredients" rows="8">${escapeHtml(ingredientsValue)}</textarea>
       </label>
       <label class="field">
-        <span>Steps — one per line</span>
+        <span>${escapeHtml(t("stepsOnePerLine"))}</span>
         <textarea id="add-steps" rows="10">${escapeHtml(stepsValue)}</textarea>
       </label>
       <label class="field">
-        <span>Meal</span>
+        <span>${escapeHtml(t("meal"))}</span>
         <select id="add-meal">${mealOptions}</select>
       </label>
       <input type="hidden" id="add-cuisine" value="${escapeAttr(prefill?.cuisine || "")}">
       <label class="field">
-        <span>Time</span>
-        <input id="add-time" placeholder="e.g. 20 min" value="${escapeAttr(prefill?.time || "")}">
+        <span>${escapeHtml(t("time"))}</span>
+        <input id="add-time" placeholder="${escapeAttr(t("exampleTime"))}" value="${escapeAttr(prefill?.time || "")}">
       </label>
       <div class="field">
-        <span>Tags</span>
+        <span>${escapeHtml(t("tags"))}</span>
         <input type="hidden" id="add-tags" value="${escapeAttr(prefillTags.join(", "))}">
         <div id="add-tag-chips" class="chips">${existingTagChips("pick-add-tag", prefillTags)}</div>
+        ${tagDraftRow("add")}
       </div>
       <label class="field">
-        <span>Notes</span>
+        <span>${escapeHtml(t("notes"))}</span>
         <textarea id="add-notes" rows="3"></textarea>
       </label>
       <p id="add-error" class="edit-error" hidden></p>
-      <button class="pill-btn primary" type="button" data-action="save-add-recipe">Save</button>
+      <button class="pill-btn primary" type="button" data-action="save-add-recipe">${escapeHtml(t("save"))}</button>
     </div>`;
 }
 
@@ -864,7 +1068,7 @@ async function saveAddRecipe() {
 
   const title = titleInput.value.trim();
   if (!title) {
-    errorEl.textContent = "Title can't be empty.";
+    errorEl.textContent = t("titleEmpty");
     errorEl.hidden = false;
     return;
   }
@@ -882,7 +1086,7 @@ async function saveAddRecipe() {
   };
 
   saveBtn.disabled = true;
-  saveBtn.textContent = "Saving…";
+  saveBtn.textContent = t("saving");
   try {
     const created = await createRecipeRequest(draft);
     created.searchBlob = computeSearchBlob(created);
@@ -892,10 +1096,10 @@ async function saveAddRecipe() {
     renderFilters();
     renderGrid();
   } catch (err) {
-    errorEl.textContent = `Couldn't save: ${err.message}`;
+    errorEl.textContent = t("couldntSave", { error: err.message });
     errorEl.hidden = false;
     saveBtn.disabled = false;
-    saveBtn.textContent = "Save";
+    saveBtn.textContent = t("save");
   }
 }
 
@@ -912,7 +1116,7 @@ async function toggleFavorite(id) {
     Object.assign(recipe, updated);
   } catch (err) {
     recipe.favorite = !optimistic;
-    window.alert(`Couldn't save: ${err.message}`);
+    window.alert(t("couldntSave", { error: err.message }));
   }
   renderGrid();
   refreshOpenRecipe();
@@ -941,7 +1145,7 @@ async function saveEdit(id) {
 
   const title = titleInput.value.trim();
   if (!title) {
-    errorEl.textContent = "Title can't be empty.";
+    errorEl.textContent = t("titleEmpty");
     errorEl.hidden = false;
     return;
   }
@@ -956,7 +1160,7 @@ async function saveEdit(id) {
   };
 
   saveBtn.disabled = true;
-  saveBtn.textContent = "Saving…";
+  saveBtn.textContent = t("saving");
   try {
     const updated = await patchRecipe(id, patch);
     const recipe = state.recipes.find((item) => item.id === id);
@@ -968,10 +1172,10 @@ async function saveEdit(id) {
     renderGrid();
     refreshOpenRecipe();
   } catch (err) {
-    errorEl.textContent = `Couldn't save: ${err.message}`;
+    errorEl.textContent = t("couldntSave", { error: err.message });
     errorEl.hidden = false;
     saveBtn.disabled = false;
-    saveBtn.textContent = "Save";
+    saveBtn.textContent = t("save");
   }
 }
 
@@ -986,7 +1190,7 @@ async function deleteRecipe(id) {
   id = Number(id);
   const recipe = state.recipes.find((item) => item.id === id);
   if (!recipe) return;
-  if (!window.confirm("Delete this recipe?\n\nThis removes it from your box. This can't be undone.")) return;
+  if (!window.confirm(t("deleteConfirm"))) return;
   try {
     await deleteRecipeRequest(id);
     state.recipes = state.recipes.filter((item) => item.id !== id);
@@ -994,7 +1198,7 @@ async function deleteRecipe(id) {
     renderFilters();
     renderGrid();
   } catch (err) {
-    window.alert(`Couldn't delete: ${err.message}`);
+    window.alert(t("couldntDelete", { error: err.message }));
   }
 }
 
@@ -1140,6 +1344,16 @@ document.addEventListener("click", (event) => {
     case "close-drawer":
       closeDrawer();
       break;
+    case "save-settings":
+      saveSettings();
+      break;
+    case "pick-language":
+      applyLanguage(actionEl.dataset.lang);
+      break;
+    case "toggle-developer":
+      state.devSettingsOpen = !state.devSettingsOpen;
+      renderSettings();
+      break;
     case "filter-tag":
       closeDrawer();
       state.tags = new Set([actionEl.dataset.tag]);
@@ -1174,17 +1388,16 @@ document.addEventListener("click", (event) => {
       break;
     case "pick-add-tag":
     case "pick-edit-tag": {
-      const isEdit = action === "pick-edit-tag";
-      const input = document.getElementById(isEdit ? "edit-tags" : "add-tags");
-      const chipsEl = document.getElementById(isEdit ? "edit-tag-chips" : "add-tag-chips");
+      const which = action === "pick-edit-tag" ? "edit" : "add";
+      const input = document.getElementById(`${which}-tags`);
       if (!input) break;
       toggleTagInInput(input, actionEl.dataset.tag);
-      if (chipsEl) {
-        const selected = input.value.split(",").map((item) => item.trim()).filter(Boolean);
-        chipsEl.innerHTML = existingTagChips(action, selected);
-      }
+      refreshTagChips(which);
       break;
     }
+    case "add-custom-tag":
+      addCustomTag(actionEl.dataset.which === "edit" ? "edit" : "add");
+      break;
     case "open-add-recipe":
       els.addRecipeMenu.hidden = true;
       openAddRecipe();
@@ -1205,6 +1418,10 @@ els.drawer.addEventListener("click", (event) => {
 window.addEventListener("hashchange", maybeOpenFromHash);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeDrawer();
+  if (event.key === "Enter" && event.target && (event.target.id === "add-tag-draft" || event.target.id === "edit-tag-draft")) {
+    event.preventDefault();
+    addCustomTag(event.target.id.startsWith("edit") ? "edit" : "add");
+  }
 });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
@@ -1218,10 +1435,11 @@ window.addEventListener("online", () => {
   load({ silent: true }).catch(() => {});
 });
 
+applyStaticI18n();
 loadCachedRecipes();
 load().catch(() => {
   if (!state.recipes.length) {
-    els.status.textContent = "Could not load recipes.";
+    els.status.textContent = t("couldNotLoad");
   } else {
     setOfflineBanner(true);
   }

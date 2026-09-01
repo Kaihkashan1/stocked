@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Bottom sheet for adding or editing a pantry inventory row.
+/// Bottom sheet for adding or editing a cupboard inventory row.
 struct PantryItemSheet: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -41,8 +41,8 @@ struct PantryItemSheet: View {
     }
 
     private var isEditing: Bool { item != nil }
-    private var title: String { isEditing ? "Edit pantry item" : "Add pantry item" }
-    private var saveLabel: String { isEditing ? "Save changes" : "Add to pantry" }
+    private var title: String { isEditing ? L("Edit cupboard item") : L("Add cupboard item") }
+    private var saveLabel: String { isEditing ? L("Save changes") : L("Add to cupboard") }
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -70,10 +70,10 @@ struct PantryItemSheet: View {
                         .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
                         .clipShape(Capsule())
 
-                    field(kicker: "Category") {
+                    field(kicker: L("Category")) {
                         FlowLayout(spacing: 7) {
                             ForEach(PantryCategory.allCases) { option in
-                                compactChip(option.rawValue, selected: category == option) {
+                                compactChip(option.localizedName, selected: category == option) {
                                     category = option
                                 }
                             }
@@ -81,7 +81,7 @@ struct PantryItemSheet: View {
                     }
 
                     HStack(alignment: .top, spacing: 10) {
-                        field(kicker: "Amount") {
+                        field(kicker: L("Amount")) {
                             TextField("e.g. 200", text: $amountText)
                                 .keyboardType(.decimalPad)
                                 .font(Theme.body(14))
@@ -92,13 +92,13 @@ struct PantryItemSheet: View {
                                 .clipShape(Capsule())
                         }
 
-                        field(kicker: "Unit") {
+                        field(kicker: L("Unit")) {
                             HStack(spacing: 6) {
                                 ForEach(PantryUnit.allCases) { option in
                                     Button {
                                         unit = option
                                     } label: {
-                                        Text(option.rawValue)
+                                        Text(option.localizedName)
                                             .font(Theme.body(12.5, weight: .semibold))
                                             .foregroundStyle(unit == option ? .white : Theme.neutral800)
                                             .frame(maxWidth: .infinity)
@@ -117,7 +117,7 @@ struct PantryItemSheet: View {
                         }
                     }
 
-                    field(kicker: "Status") {
+                    field(kicker: L("Status")) {
                         HStack(spacing: 7) {
                             ForEach(PantryItemStatus.allCases) { option in
                                 Button {
@@ -141,10 +141,10 @@ struct PantryItemSheet: View {
                         }
                     }
 
-                    field(kicker: "Expiry date (optional)") {
+                    field(kicker: L("Expiry date (optional)")) {
                         VStack(alignment: .leading, spacing: 10) {
                             Toggle(isOn: $hasExpiry) {
-                                Text(hasExpiry ? "Date set" : "No expiry")
+                                Text(hasExpiry ? L("Date set") : L("No expiry"))
                                     .font(Theme.body(13))
                                     .foregroundStyle(Theme.neutral700)
                             }
@@ -168,7 +168,7 @@ struct PantryItemSheet: View {
                         }
                     }
 
-                    field(kicker: "Notes") {
+                    field(kicker: L("Notes")) {
                         TextField("Optional", text: $notes, axis: .vertical)
                             .font(Theme.body(14))
                             .lineLimit(3...6)
@@ -204,7 +204,7 @@ struct PantryItemSheet: View {
 
     private func field<Content: View>(kicker: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(kicker.uppercased())
+            Text(kicker.uppercased(with: LanguageStore.shared.language.locale))
                 .font(Theme.body(10.5, weight: .semibold))
                 .tracking(1.26)
                 .foregroundStyle(Theme.neutral600)

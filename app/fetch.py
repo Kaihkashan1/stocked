@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -16,7 +17,11 @@ from app.models import FetchedPost
 logger = logging.getLogger(__name__)
 
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
-ARTICLE_MAX_CHARS = 6000
+# Long food blogs put ads/intro/related posts before the recipe card. 6k
+# chars was cutting RecipeTin Eats (and similar) off in the story, so Gemini
+# only saw ingredient *names* and saved a recipe with no amounts.
+ARTICLE_MAX_CHARS = 14000
+_INGREDIENT_HEADING = re.compile(r"\bingredients\b", re.IGNORECASE)
 APIFY_API_BASE = "https://api.apify.com/v2"
 
 
@@ -408,7 +413,8 @@ def fetch_article(url: str) -> FetchedPost:
         raise RuntimeError(f"Could not fetch that page. {exc}") from exc
 
     html = response.text
-    text = extract_article_text(html)
+    structured = extract_jsonld_recipe_text(html)
+    text = structured or clip_article_text(extract_article_text(html), ARTICLE_MAX_CHARS)
     if not text:
         raise RuntimeError("That page didn't have any readable text to extract a recipe from.")
 
@@ -453,6 +459,124 @@ def extract_article_text(html: str) -> str:
         logger.warning("Could not parse page HTML for article text")
         return ""
     return re.sub(r"\s+", " ", " ".join(parser.chunks)).strip()
+
+
+def clip_article_text(text: str, limit: int) -> str:
+    """Keep a window that includes the ingredients list when the page is long."""
+    if not text or len(text) <= limit:
+        return text
+    match = _INGREDIENT_HEADING.search(text)
+    if not match:
+        return text[:limit]
+    start = max(0, match.start() - 400)
+    return text[start : start + limit]
+
+
+def extract_jsonld_recipe_text(html: str) -> str:
+    """schema.org Recipe blocks carry quantities even when the visible page
+    buries the card under thousands of characters of intro."""
+    blocks = re.findall(
+        r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        html,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    recipes: list[dict] = []
+    for raw in blocks:
+        try:
+            data = json.loads(raw.strip())
+        except json.JSONDecodeError:
+            continue
+        _collect_jsonld_recipes(data, recipes)
+    if not recipes:
+        return ""
+    recipe = max(recipes, key=lambda item: len(item.get("recipeIngredient") or []))
+    ingredients = recipe.get("recipeIngredient") or []
+    if not ingredients:
+        return ""
+    lines = [
+        f"Title: {recipe.get('name') or ''}".strip(),
+        f"Servings: {_jsonld_yield(recipe)}".strip(),
+        "Ingredients:",
+        *[f"- {_plain_jsonld_text(item)}" for item in ingredients if _plain_jsonld_text(item)],
+        "Steps:",
+        *_jsonld_instruction_lines(recipe.get("recipeInstructions")),
+    ]
+    text = "\n".join(line for line in lines if line and line not in {"Title:", "Servings:", "Steps:"})
+    logger.info("Using JSON-LD recipe with %s ingredient lines", len(ingredients))
+    return text.strip()
+
+
+def _collect_jsonld_recipes(node, acc: list[dict]) -> None:
+    if isinstance(node, list):
+        for item in node:
+            _collect_jsonld_recipes(item, acc)
+        return
+    if not isinstance(node, dict):
+        return
+    types = node.get("@type")
+    names = _jsonld_type_names(types)
+    if "Recipe" in names:
+        acc.append(node)
+    graph = node.get("@graph")
+    if graph is not None:
+        _collect_jsonld_recipes(graph, acc)
+    for key, value in node.items():
+        if key in {"@graph", "@type", "@context"}:
+            continue
+        if isinstance(value, (dict, list)):
+            _collect_jsonld_recipes(value, acc)
+
+
+def _jsonld_type_names(types) -> list[str]:
+    names = types if isinstance(types, list) else [types]
+    return [str(name).rsplit("/", 1)[-1] for name in names if name]
+
+
+def _jsonld_yield(recipe: dict) -> str:
+    value = recipe.get("recipeYield") or recipe.get("yield") or ""
+    if isinstance(value, list):
+        value = next((item for item in value if item), "")
+    return _plain_jsonld_text(value)
+
+
+def _jsonld_instruction_lines(raw) -> list[str]:
+    texts = _flatten_jsonld_instructions(raw)
+    return [f"{index}. {text}" for index, text in enumerate(texts, start=1)]
+
+
+def _flatten_jsonld_instructions(raw) -> list[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        text = re.sub(r"\s+", " ", raw).strip()
+        return [text] if text else []
+    if isinstance(raw, list):
+        lines: list[str] = []
+        for item in raw:
+            lines.extend(_flatten_jsonld_instructions(item))
+        return lines
+    if isinstance(raw, dict):
+        types = raw.get("@type")
+        names = _jsonld_type_names(types)
+        if "HowToSection" in names:
+            heading = _plain_jsonld_text(raw.get("name"))
+            nested = _flatten_jsonld_instructions(raw.get("itemListElement") or raw.get("itemList"))
+            return ([heading] + nested) if heading else nested
+        text = _plain_jsonld_text(raw.get("text") or raw.get("name"))
+        return [text] if text else []
+    return []
+
+
+def _plain_jsonld_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return re.sub(r"\s+", " ", value).strip()
+    if isinstance(value, dict):
+        return _plain_jsonld_text(value.get("text") or value.get("name") or value.get("@value"))
+    if isinstance(value, list):
+        return ", ".join(part for item in value if (part := _plain_jsonld_text(item)))
+    return str(value).strip()
 
 
 def extract_og_image(html: str, base_url: str) -> str | None:

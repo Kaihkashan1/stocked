@@ -208,7 +208,7 @@ async def api_put_to_buy(body: ToBuyUpdate):
 
 @app.get("/api/usage", dependencies=[Depends(require_secret)])
 async def api_usage():
-    """Backs the Settings screen's "API usage" card. Gemini has no
+    """Backs the Settings Import limits card. Gemini has no
     quota-remaining endpoint for a free-tier key, so that count is
     self-tracked (see app.store.record_gemini_read); Apify's is a live
     account query, so it can't drift from what Apify actually bills.

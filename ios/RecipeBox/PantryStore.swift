@@ -33,8 +33,8 @@ final class PantryStore {
     var toBuyCount: Int { toBuy.count }
 
     var kickerLine: String {
-        let itemPart = itemCount == 1 ? "1 item" : "\(itemCount) items"
-        let buyPart = toBuyCount == 1 ? "1 to buy" : "\(toBuyCount) to buy"
+        let itemPart = L("\(itemCount) items")
+        let buyPart = L("\(toBuyCount) to buy")
         return "\(itemPart) · \(buyPart)"
     }
 

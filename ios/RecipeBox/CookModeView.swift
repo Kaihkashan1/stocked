@@ -78,7 +78,7 @@ struct CookModeView: View {
                     .clipShape(Circle())
             }
             Spacer()
-            Text(recipe.title.uppercased())
+            Text(recipe.title.uppercased(with: LanguageStore.shared.language.locale))
                 .font(Theme.body(12, weight: .semibold))
                 .tracking(1.2)
                 .foregroundStyle(Theme.cookForeground.opacity(0.65))
@@ -109,7 +109,7 @@ struct CookModeView: View {
         GeometryReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
-                    Text("STEP \(index + 1) OF \(steps.count)")
+                    Text(L("Step \(index + 1) of \(steps.count)").uppercased(with: LanguageStore.shared.language.locale))
                         .font(Theme.body(12, weight: .semibold))
                         .tracking(2.4)
                         .foregroundStyle(Theme.accent400)
@@ -178,7 +178,7 @@ struct CookModeView: View {
             Button {
                 advance()
             } label: {
-                Text(index < steps.count - 1 ? "Next step" : "Done cooking")
+                Text(index < steps.count - 1 ? L("Next step") : L("Done cooking"))
                     .font(Theme.display(16))
                     .foregroundStyle(Theme.cookForeground)
                     .frame(maxWidth: .infinity)

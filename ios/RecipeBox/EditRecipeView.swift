@@ -33,7 +33,7 @@ struct EditRecipeView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    field(kicker: "Title") {
+                    field(kicker: L("Title")) {
                         TextField("Title", text: $title)
                             .font(Theme.display(17))
                             .padding(.horizontal, 18)
@@ -42,28 +42,21 @@ struct EditRecipeView: View {
                             .clipShape(Capsule())
                     }
 
-                    field(kicker: "Course") {
+                    field(kicker: L("Course")) {
                         HStack(spacing: 7) {
                             ForEach(Course.allCases) { option in
-                                ChipButton(title: option.rawValue, selected: course == option) {
+                                ChipButton(title: option.localizedName, selected: course == option) {
                                     course = option
                                 }
                             }
                         }
                     }
 
-                    field(kicker: "Tags") {
-                        FlowLayout(spacing: 8) {
-                            ForEach(recipeTags, id: \.self) { tag in
-                                ChipButton(title: tag, selected: selectedTags.contains(tag)) {
-                                    toggleTag(tag)
-                                }
-                                .fixedSize()
-                            }
-                        }
+                    field(kicker: L("Tags")) {
+                        TagPicker(selected: $selectedTags, extraTags: store.tags)
                     }
 
-                    field(kicker: "Ingredients", hint: "one per line as qty | item (blank qty allowed)") {
+                    field(kicker: L("Ingredients"), hint: L("one per line as qty | item (blank qty allowed)")) {
                         TextEditor(text: $ingredientsText)
                             .font(Theme.body(14.5))
                             .lineSpacing(14.5 * 0.9)
@@ -74,7 +67,7 @@ struct EditRecipeView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
 
-                    field(kicker: "Steps", hint: "one per line, in order") {
+                    field(kicker: L("Steps"), hint: L("one per line, in order")) {
                         TextEditor(text: $stepsText)
                             .font(Theme.body(14.5))
                             .lineSpacing(14.5 * 0.55)
@@ -85,7 +78,7 @@ struct EditRecipeView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
 
-                    field(kicker: "Notes") {
+                    field(kicker: L("Notes")) {
                         TextEditor(text: $notes)
                             .font(Theme.body(14))
                             .scrollContentBackground(.hidden)
@@ -118,7 +111,7 @@ struct EditRecipeView: View {
                 .font(Theme.display(22))
                 .foregroundStyle(Theme.ink)
             Spacer()
-            Button(saving ? "Saving…" : "Save") {
+            Button(saving ? L("Saving…") : L("Save")) {
                 Task { await save() }
             }
             .font(Theme.body(14, weight: .bold))
@@ -167,14 +160,6 @@ struct EditRecipeView: View {
             .split(separator: "\n", omittingEmptySubsequences: true)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-    }
-
-    private func toggleTag(_ tag: String) {
-        if selectedTags.contains(tag) {
-            selectedTags.remove(tag)
-        } else {
-            selectedTags.insert(tag)
-        }
     }
 }
 

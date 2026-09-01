@@ -39,6 +39,7 @@ struct RootView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(PantryStore.self) private var pantryStore
     @Environment(Connectivity.self) private var connectivity
+    @Environment(LanguageStore.self) private var languages
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: AppTab = .recipes
     @State private var activeSheet: ActiveSheet?
@@ -69,6 +70,7 @@ struct RootView: View {
                 }
                 .tag(AppTab.pantry)
         }
+        .id(languages.language)
         .tint(Theme.accent)
         .toolbarBackground(Theme.surface, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
@@ -253,7 +255,7 @@ struct RootView: View {
             }.value
             guard let data else {
                 extracting = false
-                extractError = "Could not process that photo."
+                extractError = L("Could not process that photo.")
                 return
             }
             let (extraction, error) = await store.extractRecipePhoto(data)
@@ -262,7 +264,7 @@ struct RootView: View {
                 addRecipePrefill = extraction
                 activeSheet = .addRecipe
             } else {
-                extractError = error ?? "Something went wrong."
+                extractError = error ?? L("Something went wrong.")
             }
         }
     }

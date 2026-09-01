@@ -387,8 +387,16 @@ a:hover{color:var(--color-accent-800)}
                 </div>
               </div>
               <div>
-                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Tags (comma separated)</div>
-                <input value="{{ editTags }}" onChange="{{ onEditTags }}" style="width:100%;height:46px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 16px;font:inherit;font-size:14px;outline:none;color:var(--color-text);box-sizing:border-box">
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Tags</div>
+                <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">
+                  <sc-for list="{{ editTagChips }}" as="t" hint-placeholder-count="4">
+                    <button onClick="{{ t.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid {{ t.bd }};background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+                  </sc-for>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <input value="{{ editNewTag }}" onChange="{{ onEditNewTag }}" placeholder="New tag" style="flex:1;min-width:0;height:42px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 16px;font:inherit;font-size:13.5px;outline:none;color:var(--color-text);box-sizing:border-box">
+                  <button onClick="{{ addEditTag }}" style="flex:none;padding:0 18px;height:42px;border-radius:999px;border:none;background:var(--color-accent-100);color:var(--color-accent-800);cursor:pointer;font:inherit;font-size:13px;font-weight:600" style-hover="background:var(--color-accent-200)">Add tag</button>
+                </div>
               </div>
               <div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
@@ -618,10 +626,14 @@ a:hover{color:var(--color-accent-800)}
             </div>
             <div>
               <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Tags</div>
-              <div style="display:flex;flex-wrap:wrap;gap:7px">
-                <sc-for list="{{ tagChips }}" as="t" hint-placeholder-count="6">
+              <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">
+                <sc-for list="{{ formTagChips }}" as="t" hint-placeholder-count="6">
                   <button onClick="{{ t.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid {{ t.bd }};background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
                 </sc-for>
+              </div>
+              <div style="display:flex;gap:8px">
+                <input value="{{ formNewTag }}" onChange="{{ onFormNewTag }}" placeholder="New tag" style="flex:1;min-width:0;height:42px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 16px;font:inherit;font-size:13.5px;outline:none;color:var(--color-text);box-sizing:border-box">
+                <button onClick="{{ addFormTag }}" style="flex:none;padding:0 18px;height:42px;border-radius:999px;border:none;background:var(--color-accent-100);color:var(--color-accent-800);cursor:pointer;font:inherit;font-size:13px;font-weight:600" style-hover="background:var(--color-accent-200)">Add tag</button>
               </div>
             </div>
             <div style="font-size:12.5px;color:var(--color-neutral-600);line-height:1.5">Source is set automatically — this one files under <strong style="font-weight:600">Photo</strong> in Filters.</div>
@@ -671,10 +683,14 @@ Melt butter with chili crisp" style="width:100%;height:130px;border-radius:26px;
             </div>
             <div>
               <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Tags</div>
-              <div style="display:flex;flex-wrap:wrap;gap:7px">
-                <sc-for list="{{ tagChips }}" as="t" hint-placeholder-count="6">
+              <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">
+                <sc-for list="{{ formTagChips }}" as="t" hint-placeholder-count="6">
                   <button onClick="{{ t.on }}" style="cursor:pointer;font:inherit;font-size:12.5px;padding:7px 14px;border-radius:999px;border:1px solid {{ t.bd }};background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
                 </sc-for>
+              </div>
+              <div style="display:flex;gap:8px">
+                <input value="{{ formNewTag }}" onChange="{{ onFormNewTag }}" placeholder="New tag" style="flex:1;min-width:0;height:42px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);padding:0 16px;font:inherit;font-size:13.5px;outline:none;color:var(--color-text);box-sizing:border-box">
+                <button onClick="{{ addFormTag }}" style="flex:none;padding:0 18px;height:42px;border-radius:999px;border:none;background:var(--color-accent-100);color:var(--color-accent-800);cursor:pointer;font:inherit;font-size:13px;font-weight:600" style-hover="background:var(--color-accent-200)">Add tag</button>
               </div>
             </div>
             <div style="font-size:12.5px;color:var(--color-neutral-600);line-height:1.5">Source is set automatically — this one files under <strong style="font-weight:600">Typed in</strong> in Filters.</div>
@@ -746,18 +762,16 @@ Melt butter with chili crisp" style="width:100%;height:130px;border-radius:26px;
         </div>
         <div class="rb-scroll" style="flex:1;padding:16px 22px 60px">
           <h2 style="font-size:30px;margin:0 0 22px;line-height:1.1">Settings</h2>
-          <div style="margin-bottom:20px">
-            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Server</div>
-            <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:14px 18px;font-size:13.5px;color:var(--color-neutral-800);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">kaihkashan-recipe-box.vercel.app</div>
-            <div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:9px;line-height:1.5">Recipes load from the hosted server. Your Mac does not need to be running.</div>
+          <div style="margin-bottom:24px">
+            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:10px">Language</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ languageChips }}" as="l" hint-placeholder-count="3">
+                <button onClick="{{ l.on }}" style="cursor:pointer;font:inherit;font-size:13px;padding:9px 16px;border-radius:999px;border:1px solid {{ l.bd }};background:{{ l.bg }};color:{{ l.fg }}">{{ l.label }}</button>
+              </sc-for>
+            </div>
           </div>
-          <div style="margin-bottom:20px">
-            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Edit key</div>
-            <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:14px 18px;font-size:15px;letter-spacing:.22em;color:var(--color-neutral-700)">••••••••••••</div>
-            <div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:9px;line-height:1.5">Only needed to favorite or edit. Same value the Shortcut sends.</div>
-          </div>
-          <div style="border-radius:28px;background:var(--color-surface);padding:18px 20px;margin-bottom:20px">
-            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:12px">API usage</div>
+          <div style="border-radius:28px;background:var(--color-surface);padding:18px 20px;margin-bottom:24px">
+            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:12px">Import limits</div>
             <div style="display:flex;flex-direction:column;gap:10px">
               <sc-for list="{{ quotaRows }}" as="q" hint-placeholder-count="2">
                 <div>
@@ -767,7 +781,25 @@ Melt butter with chili crisp" style="width:100%;height:130px;border-radius:26px;
               </sc-for>
             </div>
           </div>
-          <button onClick="{{ goList }}" style="width:100%;border:none;border-radius:999px;padding:15px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:15px;background:var(--color-accent);color:var(--color-bg)" style-hover="background:var(--color-accent-600)">Save and reload</button>
+          <button onClick="{{ toggleDevSettings }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font:inherit;background:transparent;border:none;border-top:1px solid var(--color-divider);padding:16px 0;color:var(--color-neutral-800)">
+            <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600)">Developer</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate({{ devChevronRotate }});transition:transform .15s ease"><path d="M6 9l6 6 6-6"></path></svg>
+          </button>
+          <sc-if value="{{ devSettingsOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="padding-top:4px">
+              <div style="margin-bottom:20px">
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Server</div>
+                <input value="{{ settingsServer }}" onChange="{{ onSettingsServer }}" style="width:100%;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:14px 18px;font:inherit;font-size:13.5px;color:var(--color-neutral-800);outline:none;box-sizing:border-box">
+                <div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:9px;line-height:1.5">Recipes load from the hosted server. Your Mac does not need to be running.</div>
+              </div>
+              <div style="margin-bottom:20px">
+                <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:7px">Edit key</div>
+                <input type="password" value="{{ settingsKey }}" onChange="{{ onSettingsKey }}" style="width:100%;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:14px 18px;font:inherit;font-size:15px;letter-spacing:.22em;color:var(--color-neutral-700);outline:none;box-sizing:border-box">
+                <div style="font-size:12.5px;color:var(--color-neutral-600);margin-top:9px;line-height:1.5">Only needed to favorite or edit. Same value the Shortcut sends.</div>
+              </div>
+              <button onClick="{{ saveSettings }}" style="width:100%;border:none;border-radius:999px;padding:15px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:15px;background:var(--color-accent);color:var(--color-bg)" style-hover="background:var(--color-accent-600)">Save and reload</button>
+            </div>
+          </sc-if>
         </div>
       </div>
     </sc-if>
@@ -1079,6 +1111,7 @@ class Component extends DCLogic {
   state = {
     screen: 'list', query: '', have: [], favs: {2:true}, tags: [], favOnly: false, viewMode: 'list',
     sort: 'Recent', currentId: 1, step: 0, scale: 1, addSheet: false, sources: [], course: null, formCourse: 'Main course',
+    language: 'System', settingsServer: 'kaihkashan-recipe-box.vercel.app', settingsKey: '••••••••••••',
     link: '', linkPhase: 'idle', fetchIndex: 0, meal: 'Dinner',
     pantry: this.PANTRY_SEED, toBuy: this.TOBUY_SEED, pantryTab: 'items', pantryMatchMode: false, pantryMatchSelected: [], pantryAddSheet: false,
   };
@@ -1110,7 +1143,8 @@ class Component extends DCLogic {
   MEALS = ['Breakfast','Lunch','Dinner','Snack','Dessert'];
   FETCH_LABELS = ['Fetching the post','Reading the recipe','Saving to your box'];
 
-  go = (screen) => () => this.setState({ screen, addSheet: false });
+  go = (screen) => () => this.setState(Object.assign({ screen, addSheet: false },
+    (screen === 'type' || screen === 'photo') ? { formTags: [], formNewTag: '' } : {}));
 
   fitFor(r) {
     if (!this.state.have.length) return null;
@@ -1283,6 +1317,14 @@ class Component extends DCLogic {
         };
       }),
 
+      languageChips: ['System', 'English', 'Deutsch'].map(l => Object.assign(
+        { label: l, on: () => this.setState({ language: l }) }, chip((s.language || 'System') === l)
+      )),
+      devSettingsOpen: !!s.devSettingsOpen, devChevronRotate: s.devSettingsOpen ? '180deg' : '0deg',
+      toggleDevSettings: () => this.setState({ devSettingsOpen: !s.devSettingsOpen }),
+      settingsServer: s.settingsServer || '', onSettingsServer: (e) => this.setState({ settingsServer: e.target.value }),
+      settingsKey: s.settingsKey || '', onSettingsKey: (e) => this.setState({ settingsKey: e.target.value }),
+      saveSettings: this.go('list'),
       openSettings: this.go('settings'), openFilters: this.go('filters'), goList: this.go('list'),
       openLink: this.go('link'),
       openAddSheet: () => this.setState({ addSheet: true }),
@@ -1316,7 +1358,7 @@ class Component extends DCLogic {
       hasSourceLink: ['Instagram', 'YouTube', 'TikTok', 'Link'].includes(current.source),
       openOriginalPost: () => { this.setState({ moreMenuOpen: false }); window.open('https://example.com', '_blank'); },
       openEditRecipe: () => this.setState({ moreMenuOpen: false, editSheetOpen: true,
-        editTitle: current.title, editCourse: current.course, editTags: current.tags.join(', '),
+        editTitle: current.title, editCourse: current.course, editTagsList: current.tags.slice(), editNewTag: '',
         editIngredients: current.ingredients.map(([qty, text]) => (qty ? qty + ' | ' + text : text)).join('\n'),
         editSteps: current.steps.join('\n\n'), editNotes: current.notes || '' }),
       closeEditRecipe: () => this.setState({ editSheetOpen: false }),
@@ -1325,7 +1367,17 @@ class Component extends DCLogic {
       editCourseChips: ['Appetizers', 'Main course', 'Desserts', 'Drinks'].map(c => Object.assign(
         { label: c, on: () => this.setState({ editCourse: c }) }, chip((s.editCourse || current.course) === c)
       )),
-      editTags: s.editTags || '', onEditTags: (e) => this.setState({ editTags: e.target.value }),
+      editTagChips: this.ALL_TAGS.map(t => Object.assign(
+        { label: t, on: () => this.setState({ editTagsList: (s.editTagsList || []).includes(t) ? (s.editTagsList || []).filter(x => x !== t) : (s.editTagsList || []).concat(t) }) },
+        chip((s.editTagsList || []).includes(t))
+      )),
+      editNewTag: s.editNewTag || '', onEditNewTag: (e) => this.setState({ editNewTag: e.target.value }),
+      addEditTag: () => {
+        const t = (s.editNewTag || '').trim(); if (!t) return;
+        if (!this.ALL_TAGS.some(x => x.toLowerCase() === t.toLowerCase())) this.ALL_TAGS.push(t);
+        const cur = s.editTagsList || [];
+        this.setState({ editTagsList: cur.includes(t) ? cur : cur.concat(t), editNewTag: '' });
+      },
       editIngredients: s.editIngredients || '', onEditIngredients: (e) => this.setState({ editIngredients: e.target.value }),
       editSteps: s.editSteps || '', onEditSteps: (e) => this.setState({ editSteps: e.target.value }),
       editNotes: s.editNotes || '', onEditNotes: (e) => this.setState({ editNotes: e.target.value }),
@@ -1336,7 +1388,7 @@ class Component extends DCLogic {
           return parts.length > 1 ? [parts[0].trim(), parts.slice(1).join('|').trim()] : [null, line];
         });
         const steps = (s.editSteps || '').split(/\n\s*\n/).map(t => t.trim()).filter(Boolean);
-        const tags = (s.editTags || '').split(',').map(t => t.trim()).filter(Boolean);
+        const tags = (s.editTagsList && s.editTagsList.length) ? s.editTagsList : current.tags;
         Object.assign(current, { title, course: s.editCourse || current.course, tags,
           ingredients: ingredients.length ? ingredients : current.ingredients,
           steps: steps.length ? steps : current.steps, notes: s.editNotes || '' });
@@ -1426,6 +1478,17 @@ class Component extends DCLogic {
         { label: t, on: () => this.setState({ tags: s.tags.includes(t) ? s.tags.filter(x => x !== t) : s.tags.concat(t) }) },
         chip(s.tags.includes(t))
       )),
+      formTagChips: this.ALL_TAGS.map(t => Object.assign(
+        { label: t, on: () => this.setState({ formTags: (s.formTags || []).includes(t) ? (s.formTags || []).filter(x => x !== t) : (s.formTags || []).concat(t) }) },
+        chip((s.formTags || []).includes(t))
+      )),
+      formNewTag: s.formNewTag || '', onFormNewTag: (e) => this.setState({ formNewTag: e.target.value }),
+      addFormTag: () => {
+        const t = (s.formNewTag || '').trim(); if (!t) return;
+        if (!this.ALL_TAGS.some(x => x.toLowerCase() === t.toLowerCase())) this.ALL_TAGS.push(t);
+        const cur = s.formTags || [];
+        this.setState({ formTags: cur.includes(t) ? cur : cur.concat(t), formNewTag: '' });
+      },
       formCourseChips: ['Main course','Appetizers','Desserts'].map(c => Object.assign(
         { label: c, on: () => this.setState({ formCourse: c }) }, chip(s.formCourse === c)
       )),
@@ -1500,8 +1563,8 @@ class Component extends DCLogic {
         if (text) this.setState({ toBuy: (s.toBuy || []).concat({ id: Date.now(), text, qty: '', checked: false }), newToBuy: '' }); } },
 
       quotaRows: [
-        { label: 'Gemini reads today', value: '6 of 20', pct: '30%' },
-        { label: 'Instagram credit', value: '$1.20 of $5', pct: '24%' },
+        { label: 'Imports today', value: '6 of 20', pct: '30%' },
+        { label: 'Import cost this month', value: '$1.20 of $5', pct: '24%' },
       ],
       skeletons: [{ w: '78%' }, { w: '62%' }, { w: '84%' }, { w: '55%' }],
     };

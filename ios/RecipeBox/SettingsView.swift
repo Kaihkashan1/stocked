@@ -3,36 +3,94 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(PantryStore.self) private var pantryStore
+    @Environment(LanguageStore.self) private var languages
     @Environment(\.dismiss) private var dismiss
     @State private var draftURL = ""
     @State private var saving = false
     @State private var saveError: String?
+    @State private var developerOpen = false
     /// nil while loading or if the fetch failed — the card just doesn't
     /// appear rather than showing a stale/fake number (same rule the
     /// backend follows for a missing Apify token, see GET /api/usage).
     @State private var usage: UsageStats?
 
     var body: some View {
-        // @Bindable is how an @Observable object in the environment still
-        // hands out a two-way Binding ($store.serverSecret below).
         @Bindable var store = store
         return VStack(spacing: 0) {
             HStack {
-                Text("Settings")
-                    .font(Theme.display(20))
-                    .foregroundStyle(Theme.ink)
                 Spacer()
-                CircleIconButton(systemImage: "xmark", size: 36) { dismiss() }
-                    .accessibilityLabel("Close")
+                Button("Close") { dismiss() }
+                    .font(Theme.body(14, weight: .bold))
+                    .foregroundStyle(Theme.accent700)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L("Close"))
             }
             .padding(.horizontal, Theme.screenPadding)
-            .padding(.vertical, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
 
             ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    Text("Settings")
+                        .font(Theme.display(30))
+                        .foregroundStyle(Theme.ink)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Kicker(text: L("Language"), color: Theme.neutral600)
+                        FlowLayout(spacing: 7) {
+                            ForEach(AppLanguage.allCases) { option in
+                                ChipButton(title: option.localizedName, selected: languages.language == option) {
+                                    languages.language = option
+                                }
+                                .fixedSize()
+                            }
+                        }
+                    }
+
+                    if let usage {
+                        importLimitsCard(usage)
+                    }
+
+                    developerSection(secret: $store.serverSecret)
+                }
+                .padding(.horizontal, Theme.screenPadding)
+                .padding(.bottom, 32)
+            }
+        }
+        .background(Theme.bg.ignoresSafeArea())
+        .onAppear { draftURL = store.serverURL }
+        .task { usage = await store.fetchUsage() }
+    }
+
+    private func developerSection(secret: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    developerOpen.toggle()
+                }
+            } label: {
+                HStack {
+                    Kicker(text: L("Developer"), color: Theme.neutral600)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.neutral800)
+                        .rotationEffect(.degrees(developerOpen ? 180 : 0))
+                }
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Theme.divider)
+                    .frame(height: 1)
+            }
+
+            if developerOpen {
                 VStack(alignment: .leading, spacing: Theme.sectionGap) {
                     field(
-                        kicker: "Server",
-                        footnote: "Recipes load from the hosted Stocked server. You do not need your Mac running. Only change this if you are testing a local backend."
+                        kicker: L("Server"),
+                        footnote: L("Recipes load from the hosted server. Your Mac does not need to be running.")
                     ) {
                         TextField(RecipeStore.hostedURL, text: $draftURL)
                             .textInputAutocapitalization(.never)
@@ -41,31 +99,26 @@ struct SettingsView: View {
                     }
 
                     field(
-                        kicker: "Edit key",
-                        footnote: "Same value as RECIPE_BOX_SECRET on the server — the Shortcut already sends this. Leave blank against a dev server with no secret set."
+                        kicker: L("Edit key"),
+                        footnote: L("Only needed to favorite or edit. Same value the Shortcut sends.")
                     ) {
-                        SecureField("Only needed to favorite/edit", text: $store.serverSecret)
+                        SecureField("Only needed to favorite/edit", text: secret)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .tracking(2)
-                    }
-
-                    if let usage {
-                        usageCard(usage)
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
                         Button {
                             Task { await save() }
                         } label: {
-                            Text(saving ? "Saving…" : "Save and reload")
-                                .font(Theme.display(16))
-                                .foregroundStyle(.white)
+                            Text(saving ? L("Saving…") : L("Save and reload"))
+                                .font(Theme.display(15))
+                                .foregroundStyle(Theme.bg)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
+                                .padding(.vertical, 15)
                                 .background(Theme.accent)
                                 .clipShape(Capsule())
-                                .themeShadow(Theme.shadowSM)
                         }
                         .buttonStyle(.plain)
                         .disabled(draftURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
@@ -78,40 +131,38 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .padding(.horizontal, Theme.screenPadding)
-                .padding(.bottom, 32)
+                .padding(.top, 4)
             }
         }
-        .background(Theme.bg.ignoresSafeArea())
-        .onAppear { draftURL = store.serverURL }
-        .task { usage = await store.fetchUsage() }
     }
 
-    private func usageCard(_ usage: UsageStats) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Kicker(text: "API usage", color: Theme.neutral600)
-            VStack(alignment: .leading, spacing: 16) {
+    private func importLimitsCard(_ usage: UsageStats) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Kicker(text: L("Import limits"), color: Theme.neutral600)
+            VStack(alignment: .leading, spacing: 10) {
                 UsageBar(
-                    label: "Gemini reads today",
-                    valueText: "\(usage.gemini.used) of \(usage.gemini.limit)",
+                    label: L("Imports today"),
+                    valueText: L("\(usage.gemini.used) of \(usage.gemini.limit)"),
                     used: Double(usage.gemini.used),
                     limit: Double(usage.gemini.limit),
                     resetText: UsageStats.GeminiUsage.resetsLabel
                 )
                 if let apify = usage.apify {
                     UsageBar(
-                        label: "Instagram credit",
-                        valueText: "\(formatUsd(apify.usedUsd)) of \(formatUsd(apify.limitUsd))",
+                        label: L("Import cost this month"),
+                        valueText: L("\(formatUsd(apify.usedUsd)) of \(formatUsd(apify.limitUsd))"),
                         used: apify.usedUsd,
                         limit: apify.limitUsd,
                         resetText: apify.resetsLabel
                     )
                 }
             }
-            .padding(18)
-            .background(Theme.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
     private func formatUsd(_ value: Double) -> String {
@@ -130,7 +181,7 @@ struct SettingsView: View {
                 .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
                 .clipShape(Capsule())
             Text(footnote)
-                .font(Theme.body(12))
+                .font(Theme.body(12.5))
                 .foregroundStyle(Theme.neutral600)
         }
     }
@@ -147,7 +198,7 @@ struct SettingsView: View {
         if ok {
             dismiss()
         } else {
-            saveError = "Could not reach that server. Check the address and your internet connection."
+            saveError = L("Could not reach that server. Check the address and your internet connection.")
         }
     }
 }

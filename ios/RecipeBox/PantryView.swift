@@ -24,6 +24,9 @@ struct PantryView: View {
         case items = "Items"
         case toBuy = "To buy"
         var id: String { rawValue }
+        var localizedName: String {
+            L(String.LocalizationValue(rawValue))
+        }
     }
 
     var body: some View {
@@ -110,11 +113,11 @@ struct PantryView: View {
     }
 
     private var stockSearchField: some View {
-        cupboardSearchField(placeholder: "Search what's in stock", text: $stockQuery)
+        cupboardSearchField(placeholder: L("Search what's in stock"), text: $stockQuery)
     }
 
     private var buySearchField: some View {
-        cupboardSearchField(placeholder: "Search items to buy", text: $buyQuery)
+        cupboardSearchField(placeholder: L("Search items to buy"), text: $buyQuery)
     }
 
     private func cupboardSearchField(placeholder: String, text: Binding<String>) -> some View {
@@ -167,7 +170,7 @@ struct PantryView: View {
                 Button {
                     segment = option
                 } label: {
-                    Text(option.rawValue)
+                    Text(option.localizedName)
                         .font(Theme.body(13, weight: .semibold))
                         .foregroundStyle(segment == option ? .white : Theme.neutral800)
                         .frame(maxWidth: .infinity)
@@ -192,7 +195,7 @@ struct PantryView: View {
             Button {
                 matchMode.toggle()
             } label: {
-                Text(matchMode ? "Done matching" : "Select items to match")
+                Text(matchMode ? L("Done matching") : L("Select items to match"))
                     .font(Theme.body(13, weight: .semibold))
                     .foregroundStyle(matchMode ? .white : Theme.neutral800)
                     .frame(maxWidth: .infinity)
@@ -218,7 +221,7 @@ struct PantryView: View {
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Add pantry item")
+            .accessibilityLabel(L("Add cupboard item"))
         }
     }
 
@@ -236,7 +239,7 @@ struct PantryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 44)
         } else if filteredGroupedItems.isEmpty {
-            Text(stockFilterActive ? "Nothing matches that yet." : "Nothing in your cupboard yet.")
+            Text(stockFilterActive ? L("Nothing matches that yet.") : L("Nothing in your cupboard yet."))
                 .font(Theme.body(14))
                 .foregroundStyle(Theme.neutral600)
                 .frame(maxWidth: .infinity)
@@ -244,7 +247,7 @@ struct PantryView: View {
         } else {
             ForEach(filteredGroupedItems, id: \.category) { group in
                 VStack(alignment: .leading, spacing: 9) {
-                    Text(group.category.rawValue.uppercased())
+                    Text(group.category.localizedName.uppercased(with: LanguageStore.shared.language.locale))
                         .font(Theme.body(10.5, weight: .semibold))
                         .tracking(1.26)
                         .foregroundStyle(Theme.neutral600)
@@ -302,7 +305,7 @@ struct PantryView: View {
                         .frame(width: 30, height: 30)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(item.name)")
+                .accessibilityLabel(L("Remove \(item.name)"))
             }
         }
         .padding(.horizontal, 16)
@@ -351,7 +354,7 @@ struct PantryView: View {
         let results = matchingRecipes(from: recipes.recipes, selectedNames: names)
 
         return VStack(alignment: .leading, spacing: 10) {
-            Text("\(names.count) selected · matching recipes")
+            Text(L("\(names.count) selected · matching recipes"))
                 .font(Theme.body(10.5, weight: .semibold))
                 .tracking(1.26)
                 .textCase(.uppercase)
@@ -413,7 +416,7 @@ struct PantryView: View {
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Add to buy")
+            .accessibilityLabel(L("Add to buy"))
         }
     }
 
@@ -431,7 +434,7 @@ struct PantryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 44)
         } else if filteredToBuy.isEmpty {
-            Text(buyFilterActive ? "Nothing matches that yet." : "Your to-buy list is empty.")
+            Text(buyFilterActive ? L("Nothing matches that yet.") : L("Your to-buy list is empty."))
                 .font(Theme.body(14))
                 .foregroundStyle(Theme.neutral600)
                 .frame(maxWidth: .infinity)
@@ -448,7 +451,7 @@ struct PantryView: View {
                             .frame(width: 24, height: 24)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(item.checked ? "Uncheck \(item.text)" : "Check \(item.text)")
+                    .accessibilityLabel(item.checked ? L("Uncheck \(item.text)") : L("Check \(item.text)"))
 
                     Text(item.text)
                         .font(Theme.body(14.5))
@@ -466,7 +469,7 @@ struct PantryView: View {
                     .background(Theme.bg)
                     .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
                     .clipShape(Capsule())
-                    .accessibilityLabel("Quantity for \(item.text)")
+                    .accessibilityLabel(L("Quantity for \(item.text)"))
 
                     Button {
                         pantry.removeToBuy(id: item.id)
@@ -477,7 +480,7 @@ struct PantryView: View {
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Remove \(item.text)")
+                    .accessibilityLabel(L("Remove \(item.text)"))
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 13)
@@ -499,7 +502,7 @@ extension PantryItem {
         } else {
             formatted = String(format: "%g", amount)
         }
-        return "\(formatted) \(unit.rawValue)"
+        return "\(formatted) \(unit.localizedName)"
     }
 
     struct ExpiryBadge {
@@ -518,22 +521,23 @@ extension PantryItem {
         let day = Calendar.current.startOfDay(for: date)
         let diff = Calendar.current.dateComponents([.day], from: today, to: day).day ?? 0
         if diff < 0 {
-            return ExpiryBadge(label: "Expired", fill: Theme.accent800, foreground: Self.expiryCream, border: nil)
+            return ExpiryBadge(label: L("Expired"), fill: Theme.accent800, foreground: Self.expiryCream, border: nil)
         }
         if diff <= 3 {
-            let label = diff == 0 ? "Expires today" : "Expires in \(diff)d"
+            let label = diff == 0 ? L("Expires today") : L("Expires in \(diff) days")
             return ExpiryBadge(label: label, fill: Theme.accent500, foreground: Self.expiryCream, border: nil)
         }
         if diff <= 7 {
             return ExpiryBadge(
-                label: "Expires in \(diff)d",
+                label: L("Expires in \(diff) days"),
                 fill: Theme.sage200,
                 foreground: Theme.sage800,
                 border: nil
             )
         }
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
+        formatter.locale = LanguageStore.shared.language.locale
+        formatter.setLocalizedDateFormatFromTemplate("MMMd")
         return ExpiryBadge(
             label: formatter.string(from: date),
             fill: .clear,
@@ -569,7 +573,7 @@ struct PantryRecipeMatch: Identifiable {
     let hits: Int
     let total: Int
 
-    var line: String { "\(hits) of \(total) ingredients" }
+    var line: String { L("\(hits) of \(total) ingredients") }
 }
 
 /// Partial, best-effort match of selected pantry names against recipe

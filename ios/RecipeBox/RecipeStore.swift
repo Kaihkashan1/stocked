@@ -71,13 +71,11 @@ final class RecipeStore {
 
     private(set) var visibleRecipes: [Recipe] = []
     private(set) var matchesByID: [Int: RecipeMatch] = [:]
-    /// The fixed six (see recipeTags in Models.swift), always offered, plus
-    /// whatever else recipes actually carry — tag entry is free text, so
-    /// that "whatever else" can grow. Recomputed once per updateDerived()
-    /// call (i.e. whenever `recipes` actually changes) rather than
-    /// re-unioning and re-sorting every recipe's tags on every access — the
-    /// Filters sheet reads this twice per render.
+    /// The suggested six (see recipeTags), plus tags on recipes, plus any
+    /// tag created from Add/Edit before that recipe is saved — Filters is
+    /// select-only, so new names have to land here immediately.
     private(set) var tags: [String] = []
+    private var rememberedTags: [String] = []
     private(set) var selectedPantryGroups: [PantryGroup] = []
     private(set) var visiblePantryGroups: [PantryGroup] = []
     private(set) var haveSet: Set<String> = []
@@ -320,12 +318,12 @@ final class RecipeStore {
             return .error(error.localizedDescription)
         }
         if result.status == "error" {
-            return .error(result.error ?? result.message ?? "Something went wrong.")
+            return .error(result.error ?? result.message ?? L("Something went wrong."))
         }
         if let recipe = await findRecipe(afterIngest: result, fallbackURL: urlString) {
             return .saved(recipe)
         }
-        return .error("Saved, but it hasn't shown up in your box yet — pull to refresh in a moment.")
+        return .error(L("Saved, but it hasn't shown up in your box yet — pull to refresh in a moment."))
     }
 
     /// Polls for the row /ingest just produced. Fetches directly via
@@ -568,9 +566,22 @@ final class RecipeStore {
         }
     }
 
+    /// Adds a user-created tag to the global list used by Filters. Does not
+    /// select it there — form selection stays on the add/edit picker.
+    func rememberTag(_ tag: String) {
+        guard let tag = normalizeRecipeTag(tag) else { return }
+        if rememberedTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) { return }
+        rememberedTags.append(tag)
+        rebuildTags()
+    }
+
     private func updateDerived() {
-        tags = Array(Set(recipeTags).union(recipes.flatMap(\.tags))).sorted()
+        rebuildTags()
         updateVisible()
+    }
+
+    private func rebuildTags() {
+        tags = Array(Set(recipeTags).union(recipes.flatMap(\.tags)).union(rememberedTags)).sorted()
     }
 
     private var resolvedPantryGroups: [PantryGroup] {

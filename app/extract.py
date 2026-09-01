@@ -30,7 +30,7 @@ If nothing is attached, the text below is the full source (a caption, or the
 text of a recipe blog page): read it directly.
 
 Rules:
-- Quantities and units should be as specific as the content allows. Use "" if unknown.
+- Quantities and units should be as specific as the content allows. Copy them exactly when they appear (for example "1.5 lb / 750 g", "2 tbsp"). Use "" only if the source truly has no amount. Do not replace a measured line with a bare ingredient name.
 - Steps should be a cook-along list, one action per item, in order.
 - cuisine: a short regional label such as Indian, Italian, Mexican, East Asian, Middle Eastern, or American. Use Other only if it truly has no regional identity.
 - meal: breakfast, lunch, dinner, snack, dessert, drink, or other.

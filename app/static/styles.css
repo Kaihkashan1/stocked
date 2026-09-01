@@ -208,6 +208,76 @@ button { font-family: inherit; }
   gap: 0.55rem;
 }
 
+.import-limits {
+  background: var(--bg);
+  border-radius: 22px;
+  padding: 1rem 1.1rem;
+  margin: 0 0 1.2rem;
+}
+
+.import-limits .eyebrow { margin-bottom: 0.75rem; }
+
+.usage-row { margin-bottom: 0.65rem; }
+.usage-row:last-child { margin-bottom: 0; }
+
+.usage-row-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.usage-row-head span:last-child { color: var(--ink-soft); }
+
+.usage-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.usage-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.usage-reset {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+
+.dev-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  padding: 1rem 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+}
+
+.dev-toggle .eyebrow { margin: 0; }
+
+.dev-settings { padding-top: 0.25rem; }
+
+.field-note {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: inherit;
+}
+
 .pantry-heading {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.65rem;
@@ -603,6 +673,29 @@ ol.steps li {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
+}
+
+.tag-add-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.tag-add-row input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  border-radius: 999px;
+  padding: 0 16px;
+}
+
+.tag-add-row .pill-btn {
+  flex-shrink: 0;
+  margin: 0;
+  height: 42px;
+  padding: 0 18px;
+  background: var(--accent-soft);
+  color: var(--warm);
 }
 
 .field input, .field textarea, .field select {

@@ -42,7 +42,7 @@ struct AddRecipeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(isFromPhoto ? "From a photo" : "Type it in")
+                        Text(isFromPhoto ? L("From a photo") : L("Type it in"))
                             .font(Theme.display(30))
                             .foregroundStyle(Theme.ink)
                         if isFromPhoto {
@@ -56,7 +56,7 @@ struct AddRecipeView: View {
                         confidencePill(prefill)
                     }
 
-                    field(kicker: "Title") {
+                    field(kicker: L("Title")) {
                         TextField("Title", text: $title)
                             .font(Theme.display(17))
                             .padding(.horizontal, 18)
@@ -65,7 +65,7 @@ struct AddRecipeView: View {
                             .clipShape(Capsule())
                     }
 
-                    field(kicker: "Ingredients", hint: isFromPhoto ? nil : "one per line") {
+                    field(kicker: L("Ingredients"), hint: isFromPhoto ? nil : L("one per line")) {
                         TextEditor(text: $ingredientsText)
                             .font(Theme.body(14.5))
                             .lineSpacing(14.5 * 0.9)
@@ -79,7 +79,7 @@ struct AddRecipeView: View {
                     if isFromPhoto {
                         photoStepsField
                     } else {
-                        field(kicker: "Steps", hint: "one per line, in order") {
+                        field(kicker: L("Steps"), hint: L("one per line, in order")) {
                             TextEditor(text: $stepsText)
                                 .font(Theme.body(14.5))
                                 .lineSpacing(14.5 * 0.55)
@@ -91,28 +91,21 @@ struct AddRecipeView: View {
                         }
                     }
 
-                    field(kicker: "Course") {
+                    field(kicker: L("Course")) {
                         HStack(spacing: 7) {
                             ForEach(Course.allCases) { option in
-                                ChipButton(title: option.rawValue, selected: course == option) {
+                                ChipButton(title: option.localizedName, selected: course == option) {
                                     course = option
                                 }
                             }
                         }
                     }
 
-                    field(kicker: "Tags") {
-                        FlowLayout(spacing: 8) {
-                            ForEach(recipeTags, id: \.self) { tag in
-                                ChipButton(title: tag, selected: selectedTags.contains(tag)) {
-                                    toggleTag(tag)
-                                }
-                                .fixedSize()
-                            }
-                        }
+                    field(kicker: L("Tags")) {
+                        TagPicker(selected: $selectedTags, extraTags: store.tags)
                     }
 
-                    Text("Source is set automatically — this one files under **\(isFromPhoto ? "Photo" : "Typed in")** in Filters.")
+                    Text(L("Source is set automatically — this one files under **\(isFromPhoto ? L("Photo") : L("Typed in"))** in Filters."))
                         .font(Theme.body(12))
                         .foregroundStyle(Theme.neutral600)
 
@@ -131,13 +124,13 @@ struct AddRecipeView: View {
 
     /// Numbered, editable step rows for photo review (handoff §5).
     private var photoStepsField: some View {
-        field(kicker: "Steps") {
+        field(kicker: L("Steps")) {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(stepLines.indices, id: \.self) { index in
                     HStack(alignment: .top, spacing: 12) {
                         StepNumberBadge(number: index + 1, size: 22, fontSize: 12, topOffset: 1)
 
-                        TextField("Step \(index + 1)", text: $stepLines[index], axis: .vertical)
+                        TextField(L("Step \(index + 1)"), text: $stepLines[index], axis: .vertical)
                             .font(Theme.body(14))
                             .lineLimit(2...8)
                     }
@@ -156,7 +149,7 @@ struct AddRecipeView: View {
                 .font(Theme.body(14, weight: .semibold))
                 .foregroundStyle(Theme.neutral700)
             Spacer()
-            Button(saving ? "Saving…" : "Save") {
+            Button(saving ? L("Saving…") : L("Save")) {
                 Task { await save() }
             }
             .font(Theme.body(14, weight: .bold))
@@ -168,7 +161,7 @@ struct AddRecipeView: View {
     }
 
     private func confidencePill(_ prefill: RecipeExtraction) -> some View {
-        Text("Read \(prefill.ingredients.count) ingredients and \(prefill.steps.count) steps. Confidence: \(prefill.confidence).")
+        Text(L("Read \(prefill.ingredients.count) ingredients and \(prefill.steps.count) steps. Confidence: \(L(String.LocalizationValue(prefill.confidence)))."))
             .font(Theme.body(13))
             .foregroundStyle(Theme.sage800)
             .padding(.horizontal, 16)
@@ -224,13 +217,5 @@ struct AddRecipeView: View {
             .split(separator: "\n", omittingEmptySubsequences: true)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-    }
-
-    private func toggleTag(_ tag: String) {
-        if selectedTags.contains(tag) {
-            selectedTags.remove(tag)
-        } else {
-            selectedTags.insert(tag)
-        }
     }
 }

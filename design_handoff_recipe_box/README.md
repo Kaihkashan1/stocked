@@ -98,10 +98,19 @@ header is inline content.
   divider border, bold 14.5pt) and Delete (accent-800 fill, cream text, bold 14.5pt, shadow-sm, darkens on
   hover) side by side. Confirming removes the recipe and returns to the list.
 - **Edit sheet — NEW**: "Edit recipe" opens a bottom sheet (same shell as the pantry add sheet) prefilled from
-  the current recipe, covering Title (pill field), Course (chip row), Tags (comma-separated text field),
+  the current recipe, covering Title (pill field), Course (chip row), **Tags** (see tag-creation pattern below),
   Ingredients (textarea, one per line as "qty | item", blank qty allowed), Steps (textarea, blank line between
   steps), and Notes (textarea). No time or servings fields — this app doesn't track either. Saving parses the
   textareas back into the ingredient/step arrays and updates the recipe in place.
+
+**Tag creation pattern — NEW, used identically in Edit recipe, From a photo, and Type it in:** a wrapping row
+of existing-tag chips (capsule, 12.5pt, 7/14 padding; selected accent/cream, unselected surface/neutral-800
+with a divider border — tap to toggle) followed by a "New tag" text field (42pt pill) plus an "Add tag"
+button (accent-100 fill, accent-800 text, 42pt pill). Add tag trims the input, adds it case-insensitively to
+the app's global tag list if new, selects it for the current recipe, and clears the field. Tags are created
+only from these three add/edit surfaces — **Filters only ever lets the user filter by tags that already
+exist**; it has no add-tag control. A recipe saved by pasting a link is tagged automatically by the import
+model same as before; the user adds their own tags afterward via Edit recipe.
 - **Hero card**: surface fill, 32pt radius, 24/22 padding, with an accent-200 circle 170pt at right -46 /
   bottom -58, clipped. Kicker "SAVED 2 DAYS AGO" (10.5pt uppercase, accent-700). Title Caprasimo 31pt, max
   ~16 characters per line. Below it, 14pt down, the **course pill — NEW**: accent fill, cream text, 11.5pt,
@@ -173,13 +182,15 @@ before it goes in the box." **The photo itself is not shown or stored** — go s
 confidence pill ("Read 9 ingredients and 6 steps. Confidence: high."), then Title (pill field, Caprasimo 17pt),
 Ingredients (26pt-radius surface field, one per line, line height 1.9), **Steps — NEW** (same 26pt-radius surface
 card, numbered rows: 22pt accent-200 circle with the step number in 12pt accent-800, then the step text at 14pt;
-this block was missing even though the confidence pill already claimed a step count), the Course pill row, the
-Tags chip row, and the line "Source is set automatically — this one files under **Photo** in Filters."
+this block was missing even though the confidence pill already claimed a step count), the Course pill row, **Tags**
+(the tag-creation pattern described under screen 2's edit sheet — existing chips plus New tag / Add tag), and the
+line "Source is set automatically — this one files under **Photo** in Filters."
 
 ### 6. Type it in (AddRecipeView)
 Cancel / Save header, title "Type it in". Fields, 18pt apart, all labelled with 10.5pt uppercase neutral-600
 kickers: Title (50pt pill), Ingredients (textarea 120pt, hint "one per line"), Steps (textarea 130pt, hint "one
-per line, in order"), Course (three equal pills: Main course / Appetizers / Desserts) and Tags (chip row), then the line
+per line, in order"), Course (three equal pills: Main course / Appetizers / Desserts) and **Tags** (the same
+tag-creation pattern — existing chips plus New tag field / Add tag button), then the line
 "Source is set automatically — this one files under **Typed in** in Filters."
 **Servings, Time and the Meal chip row are all removed** — the model keeps those fields, the form no longer
 asks for them. Course and Tags are the only classifications either add form collects, so that anything created
@@ -191,18 +202,31 @@ Reset / Done header, title "Filters" (Caprasimo 30pt), then in order:
   marked yet.", plus the line "Sorts recipes by closest fit. Type an ingredient in search to add one."
 - **Source — NEW** chip row: Instagram, YouTube, TikTok, Link, Photo, Typed in. Multi-select, matched against
   the recipe's source column; composes with the other filters and is cleared by Reset.
-- **Tags** chip row: mom's recipes, veg, non-veg, dessert, high protein, airfryer (the existing fixed set).
+- **Tags** chip row: mom's recipes, veg, non-veg, dessert, high protein, airfryer, plus any tag the user has
+  since created from Edit recipe / From a photo / Type it in. Select-only — Filters has no way to create a tag.
 - **Favorites only** — full-width surface row, 26pt radius, star glyph; accent text when on.
 - **Sort** — three equal pills: Recent, A–Z, Z–A (ignored while the pantry is active, as today).
 Chip style everywhere: 12.5pt, 7/14 padding, capsule; selected accent/cream, unselected surface/neutral-800
 with a divider border.
 
 ### 8. Settings (SettingsView)
-Close button; title "Settings". Server field (pill, showing the hosted URL) with the existing explanatory
-footnote; Edit key field (masked, 0.22em tracking) with its footnote; **new "API usage" card** (surface, 28pt
-radius) with two 6pt progress bars on neutral-200 tracks, accent fill: "Gemini reads today — 6 of 20" and
-"Instagram credit — $1.20 of $5". Primary "Save and reload" button. The quota numbers need a small
-backend addition; if that is not wanted, drop this card rather than faking it.
+Close button; title "Settings". Reordered so the settings a normal user cares about are visible by default, and
+the ones only useful for debugging are tucked away:
+- **Language** chip row, first on the page: System, English, Deutsch. Selecting one applies immediately —
+  no save step, no "reload" — since it's a live app preference, not a value round-tripping to the server.
+- **Import limits** card (surface, 28pt radius), directly below Language, always visible: two 6pt progress
+  bars on neutral-200 tracks, accent fill — "Imports today — 6 of 20" (a count) and "Import cost this
+  month — $1.20 of $5" (a dollar figure; keep it as cost, not a count — these are two different kinds of
+  limit). User-facing because the user needs to know how many recipe imports they have left before hitting
+  the daily/monthly cap; the labels intentionally say nothing about which backend/model serves the import.
+- **"Developer" disclosure row** below that: an uppercase label with a chevron that rotates 180° when open,
+  collapsed by default. Expanding it reveals: Server field (pill, showing the hosted URL) with its
+  explanatory footnote; Edit key field (masked, 0.22em tracking) with its footnote; and a "Save and reload"
+  primary button, scoped only to those two fields (Import limits is display-only and sits outside this
+  section; Language applies instantly and also sits outside it).
+The quota numbers backing Import limits need a small backend addition; if that is not wanted, drop the card
+rather than faking it, but keep it visible (not inside Developer) once real — recipe-import cadence is
+something end users plan around.
 
 ### 9. Empty state
 Two soft circles (accent-200 top-right, sage-200 bottom-left, 240/200pt, 60% opacity), a 78pt accent circle with
@@ -275,6 +299,14 @@ first line of the step text instead of the vertical center of the whole (often 2
 `screen`, `query`, `have: [String]`, `favs: [Int: Bool]`, `tags: Set<String>`, `sources: Set<String>`,
 `course: String?`, `favOnly: Bool`, `sort`, `currentId`, `step`, `scale`, `addSheet: Bool`,
 `link`, `linkPhase: idle|fetching|done`. `course` and `sources` are new; everything else exists in RecipeStore.
+
+Per-form tag selection is separate state from the Filters `tags` set — `formTags` (Type it in / From a photo)
+and `editTagsList` (Edit recipe) each hold their own selected-tags array so picking tags on a recipe never
+touches the Filters selection. The app's global tag list (`ALL_TAGS`) grows whenever "Add tag" is used from
+any of the three add/edit surfaces.
+
+`language: String` ("System" | "English" | "Deutsch") and the Server/Edit key fields are Settings-only state;
+Import limits values come from the backend, not local state.
 
 `pantry: [PantryItem]` (id, name, category, amount, unit, status: open|unopened, expiry: Date?, notes) and
 `toBuy: [{id, text, checked}]` are new, independent top-level stores — no foreign key to `RecipeStore`.

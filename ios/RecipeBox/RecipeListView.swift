@@ -112,7 +112,7 @@ private struct ListHeader: View {
     var body: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
-                Kicker(text: "\(store.recipes.count) RECIPE\(store.recipes.count == 1 ? "" : "S") · \(favoriteCount) FAVORITE\(favoriteCount == 1 ? "" : "S")")
+                Kicker(text: "\(L("\(store.recipes.count) recipes")) · \(L("\(favoriteCount) favorites"))")
                 Text("Stocked")
                     .font(Theme.display(36))
                     .foregroundStyle(Theme.ink)
@@ -120,7 +120,7 @@ private struct ListHeader: View {
             Spacer()
             HStack(spacing: 8) {
                 CircleIconButton(systemImage: "gearshape", action: onSettings)
-                    .accessibilityLabel("Settings")
+                    .accessibilityLabel(L("Settings"))
                 CircleIconButton(
                     systemImage: "plus",
                     background: Theme.accent,
@@ -129,7 +129,7 @@ private struct ListHeader: View {
                     action: onAdd
                 )
                 .themeShadow(Theme.shadowSM)
-                .accessibilityLabel("Add recipe")
+                .accessibilityLabel(L("Add recipe"))
             }
         }
         .padding(.top, 66)
@@ -172,7 +172,7 @@ private struct SearchBlock: View {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(Theme.neutral600)
-                    DebouncedTextField(placeholder: "Search recipes", text: $store.query)
+                    DebouncedTextField(placeholder: L("Search recipes"), text: $store.query)
                         .font(Theme.body(14.5))
                 }
                 .padding(.horizontal, 16)
@@ -197,7 +197,7 @@ private struct SearchBlock: View {
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Filters")
+                .accessibilityLabel(L("Filters"))
 
                 Button {
                     store.viewMode = store.viewMode == .grid ? .list : .grid
@@ -214,7 +214,7 @@ private struct SearchBlock: View {
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Toggle grid or list view")
+                .accessibilityLabel(L("Toggle grid or list view"))
             }
 
             let trimmed = store.query.trimmingCharacters(in: .whitespaces)
@@ -228,7 +228,7 @@ private struct SearchBlock: View {
 
     private func pantrySuggestionRow(_ trimmed: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Kicker(text: "Filter by ingredient", size: 10, color: Theme.neutral600)
+            Kicker(text: L("Filter by ingredient"), size: 10, color: Theme.neutral600)
             FlowLayout(spacing: 8) {
                 ForEach(store.visiblePantryGroups.flatMap(\.items), id: \.self) { item in
                     Button {
@@ -252,7 +252,7 @@ private struct SearchBlock: View {
                     Button {
                         store.addHaveItem(trimmed)
                     } label: {
-                        Text("+ Add “\(trimmed)”")
+                        Text(L("+ Add “\(trimmed)”"))
                             .font(Theme.body(12.5, weight: .semibold))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
@@ -276,7 +276,7 @@ private struct CourseFilterRow: View {
     var body: some View {
         HStack(spacing: 7) {
             ForEach(Course.allCases) { course in
-                ChipButton(title: course.rawValue, selected: store.courseFilter == course) {
+                ChipButton(title: course.localizedName, selected: store.courseFilter == course) {
                     store.courseFilter = (store.courseFilter == course) ? nil : course
                 }
             }
@@ -304,7 +304,7 @@ private struct PantryBanner: View {
     private var banner: some View {
         HStack(spacing: 8) {
             Circle().fill(Theme.sage500).frame(width: 8, height: 8)
-            Text("Filtered by \(store.have.joined(separator: ", "))")
+            Text(L("Filtered by \(store.have.joined(separator: ", "))"))
                 .font(Theme.body(12.5, weight: .semibold))
                 .foregroundStyle(Theme.sage800)
                 .lineLimit(1)
@@ -482,13 +482,13 @@ struct RecipeCard: View, Equatable {
         VStack(alignment: .leading, spacing: isGrid ? 8 : 10) {
             HStack(spacing: 8) {
                 if !isGrid {
-                    Text(recipe.sourceLabel.uppercased())
+                    Text(recipe.sourceLabel.uppercased(with: LanguageStore.shared.language.locale))
                         .font(Theme.body(10, weight: .semibold))
                         .tracking(1.2)
                         .foregroundStyle(Theme.neutral600)
                 }
                 if let match {
-                    Text("\(Int((match.score * 100).rounded()))% FIT")
+                    Text("\(Int((match.score * 100).rounded()))% \(L("FIT"))")
                         .font(Theme.body(10, weight: .semibold))
                         .tracking(0.4)
                         .padding(.horizontal, 8)
@@ -606,10 +606,10 @@ struct FiltersSheet: View {
                     .buttonStyle(.plain)
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Kicker(text: "Sort", color: Theme.neutral600)
+                        Kicker(text: L("Sort"), color: Theme.neutral600)
                         HStack(spacing: 7) {
                             ForEach(SortOption.allCases, id: \.self) { option in
-                                ChipButton(title: option.rawValue, selected: store.sortOption == option) {
+                                ChipButton(title: option.localizedName, selected: store.sortOption == option) {
                                     store.sortOption = option
                                 }
                             }
@@ -622,10 +622,10 @@ struct FiltersSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Kicker(text: "Source", color: Theme.neutral600)
+                        Kicker(text: L("Source"), color: Theme.neutral600)
                         FlowLayout(spacing: 8) {
                             ForEach(SourceCategory.allCases) { category in
-                                ChipButton(title: category.rawValue, selected: store.sourceFilters.contains(category)) {
+                                ChipButton(title: category.localizedName, selected: store.sourceFilters.contains(category)) {
                                     if store.sourceFilters.contains(category) {
                                         store.sourceFilters.remove(category)
                                     } else {
@@ -639,10 +639,10 @@ struct FiltersSheet: View {
 
                     if !store.tags.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            Kicker(text: "Tags", color: Theme.neutral600)
+                            Kicker(text: L("Tags"), color: Theme.neutral600)
                             FlowLayout(spacing: 8) {
                                 ForEach(store.tags, id: \.self) { tag in
-                                    ChipButton(title: tag, selected: store.tagFilters.contains(tag)) {
+                                    ChipButton(title: localizedRecipeTag(tag), selected: store.tagFilters.contains(tag)) {
                                         if store.tagFilters.contains(tag) {
                                             store.tagFilters.remove(tag)
                                         } else {
@@ -664,7 +664,7 @@ struct FiltersSheet: View {
 
     private var whatIHaveCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker(text: "Ingredients", color: Theme.sage800)
+            Kicker(text: L("Ingredients"), color: Theme.sage800)
             if store.selectedPantryGroups.isEmpty {
                 Text("No ingredients selected.")
                     .font(Theme.body(13))
@@ -720,12 +720,12 @@ struct AddOptionsSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(spacing: 12) {
-                row(icon: "link", title: "Paste a link", subtitle: "Reel, video, or recipe page", action: onLink)
+                row(icon: "link", title: L("Paste a link"), subtitle: L("Reel, video, or recipe page"), action: onLink)
                 if CameraPicker.isAvailable {
-                    row(icon: "camera", title: "Take a photo", subtitle: "Cookbook page or recipe card", action: onPhoto)
+                    row(icon: "camera", title: L("Take a photo"), subtitle: L("Cookbook page or recipe card"), action: onPhoto)
                 }
-                row(icon: "photo.on.rectangle", title: "Choose from library", subtitle: "A screenshot you already saved", action: onLibrary)
-                row(icon: "keyboard", title: "Type it in", subtitle: "Write it down yourself", action: onTyped)
+                row(icon: "photo.on.rectangle", title: L("Choose from library"), subtitle: L("A screenshot you already saved"), action: onLibrary)
+                row(icon: "keyboard", title: L("Type it in"), subtitle: L("Write it down yourself"), action: onTyped)
             }
         }
         .padding(EdgeInsets(top: 0, leading: 22, bottom: 40, trailing: 22))

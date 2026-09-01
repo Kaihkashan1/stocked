@@ -12,11 +12,11 @@ enum APIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .badURL:
-            return "The server address is not a valid URL."
+            return L("The server address is not a valid URL.")
         case .unreachable(let host):
-            return "Could not reach \(host). Check your internet connection, or update the server address in Settings."
+            return L("Could not reach \(host). Check your internet connection, or update the server address in Settings.")
         case .badResponse(let code):
-            return "The server returned HTTP \(code)."
+            return L("The server returned HTTP \(code).")
         case .serverMessage(let message):
             return message
         }

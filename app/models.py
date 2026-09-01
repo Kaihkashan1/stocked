@@ -1,26 +1,23 @@
+from __future__ import annotations
+
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 Meal = Literal["breakfast", "lunch", "dinner", "snack", "dessert", "drink", "other"]
 
-# The whole tag vocabulary, on purpose — kept short and closed rather than
-# letting every recipe accumulate its own free-form set (Gemini extraction
-# used to invent up to 5 tags per recipe with no connection to this list at
-# all, which is exactly how that sprawl happened). Enforced here at the
-# model layer, not just suggested in the Gemini prompt or hinted at in the
-# UI, so nothing — not Gemini, not a stray API call, not a UI bug — can add
-# a new tag. Mirror this list exactly in app/static/app.js's RECIPE_TAGS and
-# ios/RecipeBox's RecipeTags if it ever changes.
+# Suggested chips in the apps. Gemini still picks only from this list;
+# people can add their own tags when creating or editing a recipe.
 RECIPE_TAGS = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"]
 _RECIPE_TAGS_LOWER = {tag.lower(): tag for tag in RECIPE_TAGS}
+_MAX_TAG_LEN = 32
+_MAX_TAGS = 24
 
 
 def _clean_tags(tags: list[str] | None) -> list[str]:
-    """Keeps only tags within the fixed vocabulary (case-insensitive,
-    normalized to the canonical casing), preserving order and dropping
-    duplicates. Anything else — a Gemini invention, a stray value from
-    somewhere else — is silently dropped rather than saved."""
+    """Gemini / ingest: keep only the suggested vocabulary so extraction
+    cannot invent a new tag on every save."""
     if not tags:
         return []
     seen: set[str] = set()
@@ -30,6 +27,29 @@ def _clean_tags(tags: list[str] | None) -> list[str]:
         if canonical and canonical not in seen:
             seen.add(canonical)
             cleaned.append(canonical)
+    return cleaned
+
+
+def _clean_user_tags(tags: list[str] | None) -> list[str]:
+    """Add / edit from the apps: suggested tags plus free-text names.
+    Commas are stripped because the sheet stores tags as a CSV cell."""
+    if not tags:
+        return []
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for tag in tags:
+        text = re.sub(r"\s+", " ", str(tag or "").replace(",", " ").strip())
+        if not text:
+            continue
+        if len(text) > _MAX_TAG_LEN:
+            text = text[:_MAX_TAG_LEN].rstrip()
+        canonical = _RECIPE_TAGS_LOWER.get(text.lower()) or text.lower()
+        if not canonical or canonical in seen:
+            continue
+        seen.add(canonical)
+        cleaned.append(canonical)
+        if len(cleaned) >= _MAX_TAGS:
+            break
     return cleaned
 
 
@@ -67,7 +87,7 @@ class RecipeCreate(BaseModel):
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
 
-    _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_tags(v))
+    _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_user_tags(v))
 
 
 class RecipeUpdate(BaseModel):
@@ -81,20 +101,20 @@ class RecipeUpdate(BaseModel):
     tags: list[str] | None = None
     course: str | None = None
 
-    _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_tags(v) if v is not None else v)
+    _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_user_tags(v) if v is not None else v)
 
 
 class PantryUpdate(BaseModel):
     items: list[str] = Field(default_factory=list)
 
 
-# Inventory on the Pantry tab — distinct from PantryUpdate/`have`, which is
+# Inventory on the Cupboard tab — distinct from PantryUpdate/`have`, which is
 # still the list-screen "What I have" fit filter (a flat string list).
 PANTRY_CATEGORIES = (
     "Produce",
     "Dairy & eggs",
     "Meat & seafood",
-    "Grains & pantry",
+    "Grains & cupboard",
     "Condiments & spices",
     "Other",
 )

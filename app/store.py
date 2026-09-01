@@ -144,6 +144,8 @@ def _normalize_pantry_item(raw: dict) -> dict | None:
         return None
     item_id = str(raw.get("id") or "").strip() or str(uuid.uuid4())
     category = str(raw.get("category") or "Other").strip()
+    if category == "Grains & pantry":
+        category = "Grains & cupboard"
     if category not in PANTRY_CATEGORIES:
         category = "Other"
     unit = str(raw.get("unit") or "pcs").strip().lower()
@@ -513,7 +515,7 @@ def _clean_tag(value: str) -> str:
     # the fixed tags ("high protein", "mom's recipes") are multi-word on
     # purpose, and mangling them into kebab-case broke exact-match chip
     # highlighting and filtering against those exact strings.
-    return re.sub(r"\s+", " ", (value or "").strip().lower())
+    return re.sub(r"\s+", " ", (value or "").replace(",", " ").strip().lower())
 
 
 def _format_ingredient(item) -> str:

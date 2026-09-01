@@ -18,7 +18,13 @@ struct PasteALinkView: View {
     @State private var fetchStep = 0
     @State private var fetchStepTask: Task<Void, Never>?
 
-    private static let fetchingMessages = ["Fetching the post", "Reading the recipe", "Saving to your box"]
+    private var fetchingMessages: [String] {
+        [
+            L("Fetching the post"),
+            L("Reading the recipe…"),
+            L("Saving to your box"),
+        ]
+    }
 
     private enum LinkPhase: Equatable {
         case idle
@@ -144,7 +150,7 @@ struct PasteALinkView: View {
 
     private var fetchingCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(Self.fetchingMessages.enumerated()), id: \.offset) { index, message in
+            ForEach(Array(fetchingMessages.enumerated()), id: \.offset) { index, message in
                 HStack(spacing: 12) {
                     RingSpinner(state: index < fetchStep ? .done : (index == fetchStep ? .active : .pending))
                     Text(message)
@@ -155,7 +161,7 @@ struct PasteALinkView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(.vertical, 12)
-                if index < Self.fetchingMessages.count - 1 {
+                if index < fetchingMessages.count - 1 {
                     Rectangle().fill(Theme.divider).frame(height: 1)
                 }
             }
@@ -166,7 +172,7 @@ struct PasteALinkView: View {
 
     private func doneCard(for recipe: Recipe) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Kicker(text: "Saved to your box", color: Theme.sage800)
+            Kicker(text: L("Saved to your box"), color: Theme.sage800)
             Text(recipe.title)
                 .font(Theme.display(21))
                 .foregroundStyle(Theme.ink)
@@ -184,8 +190,8 @@ struct PasteALinkView: View {
     /// segment is gone along with the sheet's Time column.
     private func statsLine(for recipe: Recipe) -> String {
         [
-            "\(recipe.ingredients.count) ingredient\(recipe.ingredients.count == 1 ? "" : "s")",
-            "\(recipe.steps.count) step\(recipe.steps.count == 1 ? "" : "s")",
+            L("\(recipe.ingredients.count) ingredients"),
+            L("\(recipe.steps.count) steps"),
         ].joined(separator: " · ")
     }
 
@@ -215,9 +221,9 @@ struct PasteALinkView: View {
 
     private var primaryLabel: String {
         switch phase {
-        case .idle, .error: "Save recipe"
-        case .fetching: "Reading…"
-        case .done: "Open the recipe"
+        case .idle, .error: L("Save recipe")
+        case .fetching: L("Reading…")
+        case .done: L("Open the recipe")
         }
     }
 
@@ -240,7 +246,7 @@ struct PasteALinkView: View {
         fetchStep = 0
         fetchStepTask?.cancel()
         fetchStepTask = Task {
-            for step in 1...(Self.fetchingMessages.count - 1) {
+            for step in 1...(fetchingMessages.count - 1) {
                 try? await Task.sleep(for: .seconds(1.8))
                 guard !Task.isCancelled else { return }
                 fetchStep = step

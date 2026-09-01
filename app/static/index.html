@@ -13,58 +13,58 @@
   <header class="topbar">
     <div class="topbar-row">
       <div class="brand">
-        <p class="eyebrow">Personal collection</p>
-        <h1>Recipe Box</h1>
+        <p class="eyebrow" data-i18n="personalCollection">Personal collection</p>
+        <h1 data-i18n="recipeBox">Recipe Box</h1>
       </div>
       <div class="menu-anchor">
-        <button id="add-recipe-btn" class="icon-round" type="button" aria-label="Add recipe" aria-haspopup="true" aria-expanded="false">
+        <button id="add-recipe-btn" class="icon-round" type="button" data-i18n-aria="addRecipe" aria-label="Add recipe" aria-haspopup="true" aria-expanded="false">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
         </button>
         <div id="add-recipe-menu" class="dropdown-menu" hidden>
-          <button type="button" data-action="open-add-recipe">Type it in</button>
-          <button type="button" data-action="open-add-photo">From a photo</button>
+          <button type="button" data-action="open-add-recipe" data-i18n="typeItIn">Type it in</button>
+          <button type="button" data-action="open-add-photo" data-i18n="fromAPhoto">From a photo</button>
         </div>
       </div>
       <input id="photo-input" type="file" accept="image/*" hidden>
-      <button id="settings-btn" class="icon-round" type="button" aria-label="Settings">
+      <button id="settings-btn" class="icon-round" type="button" data-i18n-aria="settings" aria-label="Settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a1.8 1.8 0 0 0 .36 1.98l.06.06a2.16 2.16 0 1 1-3.06 3.06l-.06-.06a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.09 1.65v.17a2.16 2.16 0 1 1-4.32 0v-.09a1.8 1.8 0 0 0-1.18-1.65 1.8 1.8 0 0 0-1.98.36l-.06.06a2.16 2.16 0 1 1-3.06-3.06l.06-.06a1.8 1.8 0 0 0 .36-1.98 1.8 1.8 0 0 0-1.65-1.09h-.17a2.16 2.16 0 1 1 0-4.32h.09a1.8 1.8 0 0 0 1.65-1.18 1.8 1.8 0 0 0-.36-1.98l-.06-.06a2.16 2.16 0 1 1 3.06-3.06l.06.06a1.8 1.8 0 0 0 1.98.36h.08a1.8 1.8 0 0 0 1.09-1.65v-.17a2.16 2.16 0 1 1 4.32 0v.09a1.8 1.8 0 0 0 1.09 1.65h.08a1.8 1.8 0 0 0 1.98-.36l.06-.06a2.16 2.16 0 1 1 3.06 3.06l-.06.06a1.8 1.8 0 0 0-.36 1.98v.08a1.8 1.8 0 0 0 1.65 1.09h.17a2.16 2.16 0 1 1 0 4.32h-.09a1.8 1.8 0 0 0-1.65 1.09z"/></svg>
       </button>
     </div>
     <div class="search-row">
       <label class="search">
-        <span class="visually-hidden">Search recipes, or mark something you have</span>
-        <input id="search" type="search" placeholder="Search title, ingredient, tag… or mark what you have">
+        <span class="visually-hidden" data-i18n="searchAria">Search recipes, or mark something you have</span>
+        <input id="search" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="Search title, ingredient, tag… or mark what you have">
       </label>
       <div class="filters-anchor">
         <button id="filters-btn" class="filters-btn" type="button" aria-haspopup="true" aria-expanded="false">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
-          Filters
+          <span data-i18n="filters">Filters</span>
         </button>
         <div id="filters-panel" class="filters-panel" hidden>
           <section>
-            <h2 class="eyebrow">What I have</h2>
-            <p class="eyebrow" style="margin-bottom:0.6rem; text-transform:none; letter-spacing:normal;">Sorts recipes by closest fit. Type an ingredient in the search box above to add one.</p>
+            <h2 class="eyebrow" data-i18n="whatIHave">What I have</h2>
+            <p class="eyebrow" style="margin-bottom:0.6rem; text-transform:none; letter-spacing:normal;" data-i18n="whatIHaveHint">Sorts recipes by closest fit. Type an ingredient in the search box above to add one.</p>
             <div id="have-chips"></div>
           </section>
           <section>
-            <h2 class="eyebrow">Tag</h2>
+            <h2 class="eyebrow" data-i18n="tag">Tag</h2>
             <div id="tag-filters" class="chips"></div>
           </section>
           <section>
             <button id="favorites-toggle" class="favorites-toggle" type="button">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
-              Favorites only
+              <span data-i18n="favoritesOnly">Favorites only</span>
             </button>
           </section>
           <section>
-            <h2 class="eyebrow">Sort</h2>
+            <h2 class="eyebrow" data-i18n="sort">Sort</h2>
             <div id="sort-options" class="chips">
-              <button class="chip active" type="button" data-sort="recent">Recent</button>
-              <button class="chip" type="button" data-sort="az">A–Z</button>
-              <button class="chip" type="button" data-sort="za">Z–A</button>
+              <button class="chip active" type="button" data-sort="recent" data-i18n="recent">Recent</button>
+              <button class="chip" type="button" data-sort="az" data-i18n="az">A–Z</button>
+              <button class="chip" type="button" data-sort="za" data-i18n="za">Z–A</button>
             </div>
           </section>
-          <button id="filters-reset" class="link-btn" type="button">Reset filters</button>
+          <button id="filters-reset" class="link-btn" type="button" data-i18n="resetFilters">Reset filters</button>
         </div>
       </div>
     </div>
@@ -73,7 +73,7 @@
 
   <div class="shell" id="recipes-view">
     <main>
-      <p id="offline-banner" class="offline-banner" hidden>Offline — showing recipes saved on this device</p>
+      <p id="offline-banner" class="offline-banner" hidden data-i18n="offlineBanner">Offline — showing recipes saved on this device</p>
       <p id="status" class="status"></p>
       <div id="grid" class="grid"></div>
     </main>
@@ -85,6 +85,7 @@
     </div>
   </div>
 
+  <script src="/static/i18n.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -62,7 +62,8 @@ Default server URL is `https://stocked-cookbook-cupboard.vercel.app`. Older inst
 | Link | What it does |
 | --- | --- |
 | `recipebox://surprise` | Opens a random saved recipe |
-| `recipebox://pantry` | Opens the **Cupboard** tab |
+| `recipebox://cupboard` | Opens the **Cupboard** tab |
+| `recipebox://pantry` | Same as cupboard (older shortcuts) |
 | `recipebox://have?items=chicken,rice` | Replaces the Cookbook ingredient filter with that list |
 
 For "what can I make with ___":

@@ -27,20 +27,28 @@ enum PantryCategory: String, CaseIterable, Identifiable, Codable {
     case produce = "Produce"
     case dairyEggs = "Dairy & eggs"
     case meatSeafood = "Meat & seafood"
-    case grainsPantry = "Grains & pantry"
+    case grainsPantry = "Grains & cupboard"
     case condimentsSpices = "Condiments & spices"
     case other = "Other"
 
     var id: String { rawValue }
 
+    var localizedName: String {
+        L(String.LocalizationValue(rawValue))
+    }
+
     static func resolve(_ raw: String) -> PantryCategory {
-        Self(rawValue: raw) ?? .other
+        if raw == "Grains & pantry" { return .grainsPantry }
+        return Self(rawValue: raw) ?? .other
     }
 }
 
 enum PantryUnit: String, CaseIterable, Identifiable, Codable {
     case pcs, g, kg
     var id: String { rawValue }
+    var localizedName: String {
+        L(String.LocalizationValue(rawValue))
+    }
 }
 
 enum PantryItemStatus: String, CaseIterable, Identifiable, Codable {
@@ -50,8 +58,8 @@ enum PantryItemStatus: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .unopened: "Unopened"
-        case .open: "Open"
+        case .unopened: L("Unopened")
+        case .open: L("Open")
         }
     }
 }
@@ -237,18 +245,16 @@ struct Recipe: Codable, Identifiable, Hashable {
         return formatter
     }()
 
-    private static let savedAtRelativeFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter
-    }()
-
     /// "SAVED 2 DAYS AGO" — the hero kicker on the detail screen. Falls back
     /// to nil (kicker just isn't shown) if `saved_at` is missing or in a
     /// shape the store hasn't written before.
     var savedAtRelativeLabel: String? {
         guard let savedAt, let date = Self.savedAtFormatter.date(from: savedAt) else { return nil }
-        return "Saved " + Self.savedAtRelativeFormatter.localizedString(for: date, relativeTo: Date())
+        let relativeFormatter = RelativeDateTimeFormatter()
+        relativeFormatter.unitsStyle = .full
+        relativeFormatter.locale = LanguageStore.shared.language.locale
+        let relative = relativeFormatter.localizedString(for: date, relativeTo: Date())
+        return L("Saved \(relative)")
     }
 
     /// Short, human label for the meta row / detail footer — "INSTAGRAM",
@@ -256,11 +262,11 @@ struct Recipe: Codable, Identifiable, Hashable {
     /// for a hand-entered recipe (source is "" for those — see store.py).
     var sourceLabel: String {
         guard let host = sourceURL?.host?.lowercased(), !host.isEmpty else {
-            return "Typed in"
+            return L("Typed in")
         }
-        if host.contains("instagram.com") { return "Instagram" }
-        if host.contains("youtube.com") || host.contains("youtu.be") { return "YouTube" }
-        if host.contains("tiktok.com") { return "TikTok" }
+        if host.contains("instagram.com") { return L("Instagram") }
+        if host.contains("youtube.com") || host.contains("youtu.be") { return L("YouTube") }
+        if host.contains("tiktok.com") { return L("TikTok") }
         return host.replacingOccurrences(of: "www.", with: "")
     }
 
@@ -307,6 +313,10 @@ enum Course: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var localizedName: String {
+        L(String.LocalizationValue(rawValue))
+    }
+
     /// Only used to seed an initial guess from a photo extraction's Gemini
     /// `meal` classification (see RecipeExtraction) before the user picks a
     /// course explicitly in the Add-recipe form — extraction still reasons
@@ -330,6 +340,10 @@ enum SourceCategory: String, CaseIterable, Identifiable {
     case typedIn = "Typed in"
 
     var id: String { rawValue }
+
+    var localizedName: String {
+        L(String.LocalizationValue(rawValue))
+    }
 }
 
 /// Partial edit sent to PATCH /api/recipes/{id}. Optional properties are
@@ -398,7 +412,8 @@ struct UsageStats: Decodable {
         private static let cet = TimeZone(identifier: "CET")!
         private static let display: DateFormatter = {
             let formatter = DateFormatter()
-            formatter.dateFormat = "h a"
+            formatter.locale = .current
+            formatter.timeStyle = .short
             formatter.timeZone = cet
             return formatter
         }()
@@ -415,7 +430,8 @@ struct UsageStats: Decodable {
             calendar.timeZone = pacific
             let startOfToday = calendar.startOfDay(for: Date())
             let nextMidnightPacific = calendar.date(byAdding: .day, value: 1, to: startOfToday) ?? Date()
-            return "Resets around \(display.string(from: nextMidnightPacific)) CET"
+            display.locale = LanguageStore.shared.language.locale
+            return L("Resets around \(display.string(from: nextMidnightPacific)) CET")
         }
     }
 
@@ -441,7 +457,8 @@ struct UsageStats: Decodable {
         private static let fallbackParser = ISO8601DateFormatter()
         private static let display: DateFormatter = {
             let formatter = DateFormatter()
-            formatter.dateFormat = "MMM d"
+            formatter.locale = .current
+            formatter.setLocalizedDateFormatFromTemplate("MMMd")
             return formatter
         }()
 
@@ -451,7 +468,8 @@ struct UsageStats: Decodable {
             guard let resetsAt else { return nil }
             let date = Self.parser.date(from: resetsAt) ?? Self.fallbackParser.date(from: resetsAt)
             guard let date else { return nil }
-            return "Resets \(Self.display.string(from: date))"
+            Self.display.locale = LanguageStore.shared.language.locale
+            return L("Resets \(Self.display.string(from: date))")
         }
     }
 }
@@ -477,15 +495,15 @@ func urlsRoughlyMatch(_ a: String, _ b: String) -> Bool {
 /// host — mirrors Recipe.sourceLabel but for a URL that isn't saved yet.
 func detectedSourceLine(for url: URL) -> String {
     guard let host = url.host?.lowercased(), !host.isEmpty else {
-        return "Page — the text will be read"
+        return L("Page — the text will be read")
     }
     if host.contains("instagram.com") {
-        return "Instagram reel — caption and owner comment will be read"
+        return L("Instagram reel — caption and owner comment will be read")
     }
     if host.contains("youtube.com") || host.contains("youtu.be") || host.contains("tiktok.com") {
-        return "Video — audio and description will be read"
+        return L("Video — audio and description will be read")
     }
-    return "Page — the text will be read"
+    return L("Page — the text will be read")
 }
 
 /// A recipe typed straight into the app, sent to POST /api/recipes.
@@ -507,10 +525,32 @@ enum DeepLinkRoute: Equatable {
     case have([String])
 }
 
-/// The whole tag vocabulary, on purpose — kept short and closed rather than
-/// letting every recipe accumulate its own free-form set. Filtering and the
-/// Add/Edit forms only ever offer these; there's no way to type a new one in.
+/// Suggested chips on Add/Edit. People can type extra tags; those join the
+/// Filters list once a recipe actually carries them.
 let recipeTags = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"]
+
+let maxRecipeTagLength = 32
+let maxRecipeTags = 24
+
+func localizedRecipeTag(_ tag: String) -> String {
+    L(String.LocalizationValue(tag))
+}
+
+func normalizeRecipeTag(_ raw: String) -> String? {
+    let collapsed = raw
+        .replacingOccurrences(of: ",", with: " ")
+        .split(separator: " ")
+        .joined(separator: " ")
+    guard !collapsed.isEmpty else { return nil }
+    let clipped = collapsed.count > maxRecipeTagLength
+        ? String(collapsed.prefix(maxRecipeTagLength)).trimmingCharacters(in: .whitespaces)
+        : collapsed
+    guard !clipped.isEmpty else { return nil }
+    if let known = recipeTags.first(where: { $0.caseInsensitiveCompare(clipped) == .orderedSame }) {
+        return known
+    }
+    return clipped.lowercased()
+}
 
 /// Recent / A–Z / Z–A ordering for the recipe list. Ignored while
 /// ingredient filters are active — fit % ranking takes over then.
@@ -518,6 +558,10 @@ enum SortOption: String, CaseIterable {
     case recent = "Recent"
     case az = "A–Z"
     case za = "Z–A"
+
+    var localizedName: String {
+        L(String.LocalizationValue(rawValue))
+    }
 }
 
 /// The list screen's grid/list toggle. Persisted locally (not synced to the
