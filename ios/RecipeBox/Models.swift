@@ -532,10 +532,20 @@ let recipeTags = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", 
 let maxRecipeTagLength = 32
 let maxRecipeTags = 24
 
+/// Only the six fixed suggested tags (recipeTags) have real translations —
+/// a free-text custom tag must never be looked up against the whole app's
+/// localization catalog, or a tag that happens to match an unrelated key
+/// (e.g. "high", "notes", "close") would silently render as that unrelated
+/// translated string instead of the user's own tag.
 func localizedRecipeTag(_ tag: String) -> String {
-    L(String.LocalizationValue(tag))
+    guard recipeTags.contains(tag) else { return tag }
+    return L(String.LocalizationValue(tag))
 }
 
+/// Mirrors app/models.py's `_clean_user_tags` (the canonical spec — see its
+/// docstring) and app/static/app.js's `normalizeUserTag`. Keep the three in
+/// sync: strip commas, collapse whitespace, clip to `maxRecipeTagLength`,
+/// case-fold against `recipeTags` else lowercase.
 func normalizeRecipeTag(_ raw: String) -> String? {
     let collapsed = raw
         .replacingOccurrences(of: ",", with: " ")

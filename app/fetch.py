@@ -22,6 +22,11 @@ URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 # only saw ingredient *names* and saved a recipe with no amounts.
 ARTICLE_MAX_CHARS = 14000
 _INGREDIENT_HEADING = re.compile(r"\bingredients\b", re.IGNORECASE)
+# A real heading is reliably followed by a colon ("Ingredients:") once the
+# page's whitespace has been flattened to a single line; a stray mid-sentence
+# mention almost never is. Preferred over the bare _INGREDIENT_HEADING match
+# when it exists — see _find_ingredient_heading.
+_INGREDIENT_HEADING_COLON = re.compile(r"\bingredients\s*:", re.IGNORECASE)
 APIFY_API_BASE = "https://api.apify.com/v2"
 
 
@@ -465,11 +470,29 @@ def clip_article_text(text: str, limit: int) -> str:
     """Keep a window that includes the ingredients list when the page is long."""
     if not text or len(text) <= limit:
         return text
-    match = _INGREDIENT_HEADING.search(text)
+    match = _find_ingredient_heading(text)
     if not match:
         return text[:limit]
     start = max(0, match.start() - 400)
     return text[start : start + limit]
+
+
+def _find_ingredient_heading(text: str) -> re.Match | None:
+    """Distinguishing an actual "Ingredients" heading from a stray
+    mid-sentence mention (e.g. "packed with wholesome ingredients...")
+    matters: taking the first match unconditionally meant a blog that
+    mentions the word once in its intro would anchor the extraction window
+    right back near the top of the page, defeating the point of this
+    function. Prefer a match followed by a colon — a real heading reads
+    "Ingredients:" once whitespace is flattened, a passing mention doesn't.
+    Failing that, the LAST bare mention is a better bet than the first:
+    recipe blogs put their story/SEO padding before the actual card, so the
+    final occurrence is far more likely to be the real heading."""
+    colon_match = _INGREDIENT_HEADING_COLON.search(text)
+    if colon_match:
+        return colon_match
+    matches = list(_INGREDIENT_HEADING.finditer(text))
+    return matches[-1] if matches else None
 
 
 def extract_jsonld_recipe_text(html: str) -> str:
@@ -489,9 +512,19 @@ def extract_jsonld_recipe_text(html: str) -> str:
         _collect_jsonld_recipes(data, recipes)
     if not recipes:
         return ""
-    recipe = max(recipes, key=lambda item: len(item.get("recipeIngredient") or []))
+    recipe = _select_primary_jsonld_recipe(recipes, html)
     ingredients = recipe.get("recipeIngredient") or []
     if not ingredients:
+        return ""
+    instruction_lines = _jsonld_instruction_lines(recipe.get("recipeInstructions"))
+    if not instruction_lines:
+        # Ingredients-only JSON-LD is worse than no JSON-LD at all: it wins
+        # outright over the full-page fallback (see fetch_article's
+        # `structured or clip_article_text(...)`), so returning it here would
+        # leave a recipe saved with a complete ingredient list and silently
+        # zero steps, no error surfaced. Falling through to the full-page
+        # text at least gives the steps — likely written in prose — a
+        # chance of being read.
         return ""
     lines = [
         f"Title: {recipe.get('name') or ''}".strip(),
@@ -499,11 +532,37 @@ def extract_jsonld_recipe_text(html: str) -> str:
         "Ingredients:",
         *[f"- {_plain_jsonld_text(item)}" for item in ingredients if _plain_jsonld_text(item)],
         "Steps:",
-        *_jsonld_instruction_lines(recipe.get("recipeInstructions")),
+        *instruction_lines,
     ]
     text = "\n".join(line for line in lines if line and line not in {"Title:", "Servings:", "Steps:"})
-    logger.info("Using JSON-LD recipe with %s ingredient lines", len(ingredients))
+    logger.info("Using JSON-LD recipe with %s ingredient lines and %s steps", len(ingredients), len(instruction_lines))
     return text.strip()
+
+
+def _select_primary_jsonld_recipe(recipes: list[dict], html: str) -> dict:
+    """Multiple schema.org Recipe blocks on one page — a "3 ways to make X"
+    roundup, or embedded widget recipes from an ad network — shouldn't be
+    resolved by "whichever has the most ingredients" alone: that can
+    silently pick a minor variation over the page's actual subject. Prefer
+    whichever recipe's name matches the page's <title>; only fall back to
+    the ingredient-count heuristic when there's no clear match (or there's
+    just one recipe, where the question doesn't arise)."""
+    if len(recipes) == 1:
+        return recipes[0]
+    page_title = _extract_page_title(html)
+    if page_title:
+        for recipe in recipes:
+            name = str(recipe.get("name") or "").strip().lower()
+            if name and (name in page_title or page_title in name):
+                return recipe
+    return max(recipes, key=lambda item: len(item.get("recipeIngredient") or []))
+
+
+def _extract_page_title(html: str) -> str:
+    match = re.search(r"<title[^>]*>(.*?)</title>", html, flags=re.IGNORECASE | re.DOTALL)
+    if not match:
+        return ""
+    return re.sub(r"\s+", " ", match.group(1)).strip().lower()
 
 
 def _collect_jsonld_recipes(node, acc: list[dict]) -> None:

@@ -32,7 +32,16 @@ def _clean_tags(tags: list[str] | None) -> list[str]:
 
 def _clean_user_tags(tags: list[str] | None) -> list[str]:
     """Add / edit from the apps: suggested tags plus free-text names.
-    Commas are stripped because the sheet stores tags as a CSV cell."""
+    Commas are stripped because the sheet stores tags as a CSV cell.
+
+    This server-side function is the canonical spec for what a "clean" user
+    tag is. It's mirrored — not shared, there's no code-sharing path across
+    Python/JS/Swift for this — by app/static/app.js's normalizeUserTag() and
+    ios/RecipeBox/Models.swift's normalizeRecipeTag(). All three must agree
+    on: strip commas → collapse whitespace → clip to _MAX_TAG_LEN chars →
+    case-fold against the known vocabulary, else lowercase; and the caller
+    enforces the _MAX_TAGS cap and case-insensitive dedup. If you change any
+    of that here, change it in both mirrors too."""
     if not tags:
         return []
     seen: set[str] = set()

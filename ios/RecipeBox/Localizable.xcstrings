@@ -1000,13 +1000,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Expires in %lldd"
+                  "value" : "Expires in %lld days"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Expires in %lldd"
+                  "value" : "Expires in %lld days"
                 }
               }
             }

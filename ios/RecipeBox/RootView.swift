@@ -60,17 +60,25 @@ struct RootView: View {
         TabView(selection: $selectedTab) {
             recipesTab
                 .tabItem {
+                    // Tab bar items are bridged to UIKit and don't reliably
+                    // redraw on their own when the locale environment
+                    // changes — scoping the identity reset to just the
+                    // label (rather than the whole TabView, as before) is
+                    // what actually needs it, without discarding
+                    // recipesTab/pantryTab's own state (scroll position, an
+                    // open sheet, in-flight tasks) on every language switch.
                     Label("Cookbook", systemImage: "book")
+                        .id(languages.language)
                 }
                 .tag(AppTab.recipes)
 
             pantryTab
                 .tabItem {
                     Label("Cupboard", systemImage: "cabinet")
+                        .id(languages.language)
                 }
                 .tag(AppTab.pantry)
         }
-        .id(languages.language)
         .tint(Theme.accent)
         .toolbarBackground(Theme.surface, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)

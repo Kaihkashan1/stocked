@@ -71,11 +71,11 @@ final class RecipeStore {
 
     private(set) var visibleRecipes: [Recipe] = []
     private(set) var matchesByID: [Int: RecipeMatch] = [:]
-    /// The suggested six (see recipeTags), plus tags on recipes, plus any
-    /// tag created from Add/Edit before that recipe is saved — Filters is
-    /// select-only, so new names have to land here immediately.
+    /// The suggested six (see recipeTags) plus whatever tags actually
+    /// appear on a saved recipe. A tag typed into Add/Edit before that
+    /// recipe is saved deliberately isn't in here yet — it shows up as soon
+    /// as the save succeeds, via `recipes` — see TagPicker.addDraft.
     private(set) var tags: [String] = []
-    private var rememberedTags: [String] = []
     private(set) var selectedPantryGroups: [PantryGroup] = []
     private(set) var visiblePantryGroups: [PantryGroup] = []
     private(set) var haveSet: Set<String> = []
@@ -566,22 +566,13 @@ final class RecipeStore {
         }
     }
 
-    /// Adds a user-created tag to the global list used by Filters. Does not
-    /// select it there — form selection stays on the add/edit picker.
-    func rememberTag(_ tag: String) {
-        guard let tag = normalizeRecipeTag(tag) else { return }
-        if rememberedTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) { return }
-        rememberedTags.append(tag)
-        rebuildTags()
-    }
-
     private func updateDerived() {
         rebuildTags()
         updateVisible()
     }
 
     private func rebuildTags() {
-        tags = Array(Set(recipeTags).union(recipes.flatMap(\.tags)).union(rememberedTags)).sorted()
+        tags = Array(Set(recipeTags).union(recipes.flatMap(\.tags))).sorted()
     }
 
     private var resolvedPantryGroups: [PantryGroup] {
