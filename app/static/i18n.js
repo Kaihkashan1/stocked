@@ -273,9 +273,16 @@ function t(key, vars) {
   return text;
 }
 
+// Only the six fixed suggested tags (RECIPE_TAGS, defined in app.js) have
+// real translations — a free-text custom tag must never be looked up
+// against the whole app-wide string table, or a tag that happens to match
+// an unrelated UI key (e.g. "high", "notes", "close") would silently
+// render as that unrelated translated string instead of the user's tag.
 function tTag(tag) {
-  const translated = t(tag);
-  return translated === tag && !(I18N.de && I18N.de[tag]) ? tag : translated;
+  if (typeof RECIPE_TAGS !== "undefined" && RECIPE_TAGS.includes(tag)) {
+    return t(tag);
+  }
+  return tag;
 }
 
 function applyStaticI18n() {

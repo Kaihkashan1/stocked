@@ -922,6 +922,10 @@ function editFormHtml(recipe) {
     </div>`;
 }
 
+// Mirrors app/models.py's _clean_user_tags (the canonical spec — see its
+// docstring) and ios/RecipeBox/Models.swift's normalizeRecipeTag. Keep the
+// three in sync: strip commas, collapse whitespace, clip to
+// MAX_RECIPE_TAG_LENGTH, case-fold against RECIPE_TAGS else lowercase.
 function normalizeUserTag(raw) {
   const text = String(raw || "").replaceAll(",", " ").replace(/\s+/g, " ").trim();
   if (!text) return "";

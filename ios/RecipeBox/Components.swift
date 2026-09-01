@@ -342,7 +342,6 @@ extension View {
 /// Suggested tag chips plus a field to type a new one. Used on Add and Edit
 /// only — Filters has no create control.
 struct TagPicker: View {
-    @Environment(RecipeStore.self) private var store
     @Binding var selected: Set<String>
     var extraTags: [String] = []
     @State private var draft = ""
@@ -390,7 +389,7 @@ struct TagPicker: View {
                     .clipShape(Capsule())
 
                 Button(action: addDraft) {
-                    Text("Add tag")
+                    Text(L("Add tag"))
                         .font(Theme.body(13, weight: .semibold))
                         .foregroundStyle(canAddDraft ? Theme.accent800 : Theme.neutral400)
                         .padding(.horizontal, 18)
@@ -414,8 +413,14 @@ struct TagPicker: View {
 
     private func addDraft() {
         guard let tag = normalizeRecipeTag(draft), canAddDraft else { return }
+        // `offered` already includes every entry in `selected`, so this chip
+        // shows up immediately without needing to tell RecipeStore about it —
+        // it becomes visible everywhere else (Filters, other Add/Edit
+        // sheets) once the recipe carrying it is actually saved, not before.
+        // Remembering it globally the moment it's typed used to leave a
+        // permanent, matches-nothing chip in Filters if the sheet was
+        // cancelled instead of saved.
         selected.insert(tag)
-        store.rememberTag(tag)
         draft = ""
     }
 }

@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A10000000000000000000060"
-               BuildableName = "RecipeBox.app"
-               BlueprintName = "RecipeBox"
-               ReferencedContainer = "container:RecipeBox.xcodeproj">
+               BuildableName = "Stocked.app"
+               BlueprintName = "Stocked"
+               ReferencedContainer = "container:Stocked.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -44,9 +44,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A10000000000000000000060"
-            BuildableName = "RecipeBox.app"
-            BlueprintName = "RecipeBox"
-            ReferencedContainer = "container:RecipeBox.xcodeproj">
+            BuildableName = "Stocked.app"
+            BlueprintName = "Stocked"
+            ReferencedContainer = "container:Stocked.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -61,9 +61,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A10000000000000000000060"
-            BuildableName = "RecipeBox.app"
-            BlueprintName = "RecipeBox"
-            ReferencedContainer = "container:RecipeBox.xcodeproj">
+            BuildableName = "Stocked.app"
+            BlueprintName = "Stocked"
+            ReferencedContainer = "container:Stocked.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

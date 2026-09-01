@@ -9,6 +9,12 @@
             "state" : "translated",
             "value" : "Stocked"
           }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stocked"
+          }
         }
       }
     },
@@ -19,7 +25,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "RecipeBox"
+            "value" : "Stocked"
           }
         }
       }

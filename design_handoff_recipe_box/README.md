@@ -214,11 +214,12 @@ Close button; title "Settings". Reordered so the settings a normal user cares ab
 the ones only useful for debugging are tucked away:
 - **Language** chip row, first on the page: System, English, Deutsch. Selecting one applies immediately —
   no save step, no "reload" — since it's a live app preference, not a value round-tripping to the server.
-- **Import limits** card (surface, 28pt radius), directly below Language, always visible: two 6pt progress
-  bars on neutral-200 tracks, accent fill — "Imports today — 6 of 20" (a count) and "Import cost this
-  month — $1.20 of $5" (a dollar figure; keep it as cost, not a count — these are two different kinds of
-  limit). User-facing because the user needs to know how many recipe imports they have left before hitting
-  the daily/monthly cap; the labels intentionally say nothing about which backend/model serves the import.
+- Divider, then **Import limits** as its own labeled section (no card/background — plain label + two 6pt
+  progress bars on neutral-200 tracks, accent fill), separate from Language rather than nested under it:
+  "Imports today — 6 of 20" (a count) and "Import cost this month — $1.20 of $5" (a dollar figure; keep it
+  as cost, not a count — these are two different kinds of limit). User-facing because the user needs to know
+  how many recipe imports they have left before hitting the daily/monthly cap; the labels intentionally say
+  nothing about which backend/model serves the import.
 - **"Developer" disclosure row** below that: an uppercase label with a chevron that rotates 180° when open,
   collapsed by default. Expanding it reveals: Server field (pill, showing the hosted URL) with its
   explanatory footnote; Edit key field (masked, 0.22em tracking) with its footnote; and a "Save and reload"

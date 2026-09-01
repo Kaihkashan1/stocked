@@ -36,7 +36,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A10000000000000000000020 /* RecipeBox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RecipeBox.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000020 /* Stocked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Stocked.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000030 /* RecipeBoxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeBoxApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000031 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		A10000000000000000000032 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
@@ -117,7 +117,7 @@
 		A10000000000000000000052 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000020 /* RecipeBox.app */,
+				A10000000000000000000020 /* Stocked.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -136,9 +136,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A10000000000000000000060 /* RecipeBox */ = {
+		A10000000000000000000060 /* Stocked */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A10000000000000000000080 /* Build configuration list for PBXNativeTarget "RecipeBox" */;
+			buildConfigurationList = A10000000000000000000080 /* Build configuration list for PBXNativeTarget "Stocked" */;
 			buildPhases = (
 				A10000000000000000000070 /* Sources */,
 				A10000000000000000000040 /* Frameworks */,
@@ -149,9 +149,9 @@
 			);
 			dependencies = (
 			);
-			name = RecipeBox;
+			name = Stocked;
 			productName = RecipeBox;
-			productReference = A10000000000000000000020 /* RecipeBox.app */;
+			productReference = A10000000000000000000020 /* Stocked.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -169,7 +169,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A10000000000000000000081 /* Build configuration list for PBXProject "RecipeBox" */;
+			buildConfigurationList = A10000000000000000000081 /* Build configuration list for PBXProject "Stocked" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -183,7 +183,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A10000000000000000000060 /* RecipeBox */,
+				A10000000000000000000060 /* Stocked */,
 			);
 		};
 /* End PBXProject section */
@@ -366,12 +366,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Stocked uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Stocked can load recipes from a server on your local network when you are testing.";
-				INFOPLIST_KEY_UIAppFonts = (
-					"Caprasimo-Regular.ttf",
-					"Figtree-Regular.ttf",
-					"Figtree-SemiBold.ttf",
-					"Figtree-Bold.ttf",
-				);
+				INFOPLIST_KEY_UIAppFonts = "Caprasimo-Regular.ttf Figtree-Regular.ttf Figtree-SemiBold.ttf Figtree-Bold.ttf";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -404,12 +399,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Stocked uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Stocked can load recipes from a server on your local network when you are testing.";
-				INFOPLIST_KEY_UIAppFonts = (
-					"Caprasimo-Regular.ttf",
-					"Figtree-Regular.ttf",
-					"Figtree-SemiBold.ttf",
-					"Figtree-Bold.ttf",
-				);
+				INFOPLIST_KEY_UIAppFonts = "Caprasimo-Regular.ttf Figtree-Regular.ttf Figtree-SemiBold.ttf Figtree-Bold.ttf";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -431,7 +421,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A10000000000000000000080 /* Build configuration list for PBXNativeTarget "RecipeBox" */ = {
+		A10000000000000000000080 /* Build configuration list for PBXNativeTarget "Stocked" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A10000000000000000000092 /* Debug */,
@@ -440,7 +430,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A10000000000000000000081 /* Build configuration list for PBXProject "RecipeBox" */ = {
+		A10000000000000000000081 /* Build configuration list for PBXProject "Stocked" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A10000000000000000000090 /* Debug */,
