@@ -9,9 +9,9 @@ struct SettingsView: View {
     @State private var saving = false
     @State private var saveError: String?
     @State private var developerOpen = false
-    /// nil while loading or if the fetch failed — the card just doesn't
-    /// appear rather than showing a stale/fake number (same rule the
-    /// backend follows for a missing Apify token, see GET /api/usage).
+    /// nil while loading or if the fetch failed — the section is omitted
+    /// rather than showing a stale/fake number (same rule the backend
+    /// follows for a missing Apify token, see GET /api/usage).
     @State private var usage: UsageStats?
 
     var body: some View {
@@ -48,7 +48,7 @@ struct SettingsView: View {
                     }
 
                     if let usage {
-                        importLimitsCard(usage)
+                        importLimitsSection(usage)
                     }
 
                     developerSection(secret: $store.serverSecret)
@@ -136,7 +136,7 @@ struct SettingsView: View {
         }
     }
 
-    private func importLimitsCard(_ usage: UsageStats) -> some View {
+    private func importLimitsSection(_ usage: UsageStats) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Kicker(text: L("Import limits"), color: Theme.neutral600)
             VStack(alignment: .leading, spacing: 10) {
@@ -158,11 +158,13 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .padding(.top, 16)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Theme.divider)
+                .frame(height: 1)
+        }
     }
 
     private func formatUsd(_ value: Double) -> String {

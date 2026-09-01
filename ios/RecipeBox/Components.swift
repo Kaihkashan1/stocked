@@ -280,7 +280,7 @@ struct HandoffMenuIcon: View {
     }
 }
 
-/// A single labelled row in the Settings Import limits card — a 6pt capsule
+/// A single labelled row in the Settings Import limits section — a 6pt capsule
 /// track (neutral-200) with an accent fill proportional to `used / limit`.
 struct UsageBar: View {
     let label: String
