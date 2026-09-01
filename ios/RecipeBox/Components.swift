@@ -264,7 +264,7 @@ struct HandoffMenuIcon: View {
                 path.addQuadCurve(to: CGPoint(x: 7.8, y: 19), control: CGPoint(x: 7.8, y: 20.9))
                 path.addLine(to: CGPoint(x: 7, y: 6))
             }
-            var t = CGAffineTransform(scaleX: scale, y: scale)
+            let t = CGAffineTransform(scaleX: scale, y: scale)
             let scaled = path.applying(t)
             context.stroke(
                 scaled,

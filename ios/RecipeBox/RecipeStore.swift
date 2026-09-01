@@ -97,10 +97,6 @@ final class RecipeStore {
     private static let haveKey = "recipeBox.have"
     private static let viewModeKey = "recipeBox.viewMode"
     private static let legacyLANDefault = "http://192.168.0.54:8000"
-    private static let legacyHostedHosts: Set<String> = [
-        "recipe-box-ashen-alpha.vercel.app",
-        "kaihkashan-recipe-box.vercel.app",
-    ]
     // nonisolated: encode/decode need to run from persistCache()'s background
     // task (see below), not hop back to the main actor just to reach these.
     // Plain JSONEncoder/JSONDecoder instances hold no actor-isolated state,
@@ -139,7 +135,6 @@ final class RecipeStore {
         let value = stored.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.isEmpty || value == legacyLANDefault { return hostedURL }
         guard let host = URL(string: value)?.host?.lowercased() else { return hostedURL }
-        if legacyHostedHosts.contains(host) { return hostedURL }
         if host == "localhost" || host == "127.0.0.1" { return hostedURL }
         if host.hasPrefix("192.168.") || host.hasPrefix("10.") { return hostedURL }
         if host.hasPrefix("172.") {
