@@ -589,8 +589,23 @@ func matchingRecipes(from recipes: [Recipe], selectedNames: [String], limit: Int
             if selectedWordSets.contains(where: { !$0.isDisjoint(with: words) }) {
                 return true
             }
-            return selectedNames.contains { namesMatch(collapsePantryName($0), collapsePantryName(line)) }
-                || selectedNames.contains { name in recipe.pantry.contains { namesMatch($0, collapsePantryName(name)) } }
+            if selectedNames.contains(where: { namesMatch(collapsePantryName($0), collapsePantryName(line)) }) {
+                return true
+            }
+            // A line's own text might not literally mention the pantry name
+            // (e.g. "2 tbsp EVOO" vs. a selected "olive oil"), but the
+            // recipe's own derived pantry entry for *this specific line*
+            // might. The pantry entry has to match both this line's
+            // collapsed name and a selected name — matching just *some*
+            // pantry entry anywhere in the recipe (the old check) credited
+            // every ingredient line as a hit the moment any one of them
+            // matched, which is how a recipe could show "32 of 32" off a
+            // single real overlap.
+            let lineName = collapsePantryName(line)
+            return recipe.pantry.contains { pantryEntry in
+                namesMatch(pantryEntry, lineName)
+                    && selectedNames.contains { namesMatch(pantryEntry, collapsePantryName($0)) }
+            }
         }.count
         guard hits > 0 else { return nil }
         return PantryRecipeMatch(id: recipe.id, title: recipe.title, hits: hits, total: total)
