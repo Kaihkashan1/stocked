@@ -28,7 +28,7 @@ The Home Screen icon is the book-over-shelf mark in `Assets.xcassets`. If an ins
 
 ## Cookbook
 
-- Pull down to refresh after you save a new recipe. Opening the app again (from the home screen or after it sat in the background) also refreshes Cookbook and Cupboard from the server. Coming back online after a drop does the same.
+- Opening the app again (from the home screen or after it sat in the background) refreshes Cookbook and Cupboard from the server, so a recipe saved via the Shortcut or the website shows up without a manual pull. Coming back online after a drop does the same. Pull down to refresh if you added something while Stocked stayed in the foreground.
 - After a successful sync, recipes and cupboard data stay on the phone. You can browse, filter, and cook **offline**. A sage banner reads **Offline — showing recipes saved on this phone**. Adding recipes, favoriting, editing, deleting, and cupboard writes still need the network.
 - **Search recipes** filters the list by title/text as you type. If what you typed also matches an ingredient name, a row under search lets you **filter by ingredient** — tap a suggestion, or **+ Add "…"** for a custom name.
 - Next to search: a **filter** button (fills accent when any list filter is active) and a **grid/list toggle** for recipe cards (remembered on this phone).

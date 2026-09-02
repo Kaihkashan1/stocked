@@ -158,7 +158,11 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            Task { await refreshCatalog(force: false) }
+            // Always hit the server when coming back — a Shortcut or web
+            // save while this app was in the background is otherwise easy
+            // to miss. In-flight work is coalesced in RecipeStore.refresh
+            // (so this does not double the launch `.task`).
+            Task { await refreshCatalog(force: true) }
         }
         .onChange(of: connectivity.isOnline) { wasOnline, isOnline in
             guard isOnline, !wasOnline else { return }
@@ -169,9 +173,9 @@ struct RootView: View {
         }
     }
 
-    /// `force` is for first paint and coming back online. Returning from
-    /// the background uses a short freshness window so the launch `.task`
-    /// and the first `.active` scene-phase ping don't fire the API twice.
+    /// First paint, returning from the background, and coming back online
+    /// all fetch. `refresh` coalesces overlapping calls so launch `.task`
+    /// plus the first `.active` ping share one request.
     private func refreshCatalog(force: Bool) async {
         async let recipes = store.refresh(force: force)
         async let pantry = pantryStore.refresh(force: force)
