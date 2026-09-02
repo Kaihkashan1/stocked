@@ -35,6 +35,8 @@ Free-tier content may be used to improve Google’s models. Fine for recipe vide
 
 Rate limits live at [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit). A handful of recipes a day stays under typical free-tier caps.
 
+**Optional: a second key to double the daily cap.** The free tier's 20/day limit is per key/project, not per person — a second Google account gets its own independent 20/day. Repeat steps 1–2 with a different Google account and paste the result into `.env` as `GEMINI_API_KEY_2`. Once the first key hits its daily quota, the app automatically falls back to the second for the rest of the day instead of failing; Settings' "Imports today" cap updates to 40 to match. Leave it unset if one key is enough.
+
 ## 3. Google Sheet + service account (free)
 
 The backend writes as a bot, so it needs a Google Cloud *service account* that you’ve shared the Sheet with.
@@ -135,7 +137,7 @@ On the iPhone:
        - Inside: **Show Notification** — Title: `Stocked`, Body: **Get Dictionary Value**, key `error`, dictionary **Contents of URL**. This is where the Gemini-quota and Apify-limit messages actually show up — each has distinct wording (see section below), so the notification itself tells you which one it was.
        - Leave that inner **Otherwise** empty — a successful save or a duplicate stays silent.
    - **In the outer If's Otherwise (no "status" — the request never got a real response):**
-     - Add **Show Notification** — Title: `Stocked`, Body: `Request timed out or failed before the server could respond (Vercel's ingest limit is 60s). The recipe probably wasn't saved — try again in a bit.`
+     - Add **Show Notification** — Title: `Stocked`, Body: `Request timed out or failed before the server could respond. The recipe probably wasn't saved. Try again in a bit.`
 5. Tap **i** on the shortcut and turn **off Show When Run**.
 6. In Instagram: Reel → Share → **More** → enable **Save Recipe**.
 
@@ -168,7 +170,7 @@ If you skip both the Shortcut's notification step and ntfy, a failed save is sil
 
 Two specific messages worth knowing about, since both are common on a personal/free setup:
 
-- **"Gemini's free daily quota (20 requests/day) is used up."** — Gemini's free tier caps at 20 requests/day across every save method except manual typing (photos, Instagram, YouTube/TikTok, and blog links all call Gemini; typing a recipe in by hand doesn't). Resets at midnight Pacific.
+- **"Gemini's daily quota (20 requests/day) is used up."** — Gemini's free tier caps at 20 requests/day per API key/project, across every save method except manual typing (photos, Instagram, YouTube/TikTok, and blog links all call Gemini; typing a recipe in by hand doesn't). Resets at midnight Pacific — around 9 am CET. If `GEMINI_API_KEY_2` is set (see section 2), this message means *both* keys are used up — the app already tried the second one automatically, and the cap/message both say 40 instead of 20.
 - **"Apify's monthly usage limit has been reached."** — your Apify account's $5/month credit is used up. This resets on your personal Apify **billing-cycle anniversary** (visible in Apify Console → Billing → Current period) — not the 1st of the calendar month, which is a common mix-up since Apify's own usage charts default to calendar-month view. Or upgrade your Apify plan to raise it sooner.
 
 ## 7. Optional: failure pushes
@@ -192,6 +194,7 @@ The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in 
    | Name | Value |
    | --- | --- |
    | `GEMINI_API_KEY` | same as `.env` |
+   | `GEMINI_API_KEY_2` | optional — same as `.env`, doubles the daily cap |
    | `GEMINI_MODEL` | `gemini-3.6-flash` |
    | `GOOGLE_SHEET_ID` | same as `.env` |
    | `GOOGLE_SERVICE_ACCOUNT_JSON` | full contents of `service_account.json` |
@@ -208,7 +211,7 @@ Browsing the box works well on Vercel. Ingest has a **60 second** function limit
 - **The app.** Production is `https://stocked-cookbook-cupboard.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install **Stocked** — see [`ios/README.md`](ios/README.md). Google Sheets remains the recipe database; Cupboard inventory and to-buy live in App State JSON on the server (not Sheet rows).
 - **Offline and refresh.** Stocked keeps the last successful Cookbook and Cupboard sync on the phone. Browsing, filtering, and cook mode work without a network; adding, favoriting, editing, deleting, and cupboard writes still need the server. The app refreshes when you open it, when you return from the background (so a Shortcut/web save while it was away is picked up), when connectivity comes back, or when you pull to refresh. iOS does not let it poll the server while it is fully suspended.
 - **Duplicates.** The same source URL is not written twice.
-- **Rate limits and busy responses.** Gemini 429s (daily quota) and 503/504 "busy"/deadline-exceeded responses are both retried with backoff — a quota exhausted after retries surfaces the quota message above; a Gemini capacity blip surfaces "Gemini is busy right now. Wait a few seconds and try again." instead of a raw error either way. The Gemini call itself has an explicit timeout (25s on Vercel) rather than waiting on the SDK's default of none, so a slow response fails cleanly well inside Vercel's 60s function limit instead of running out the clock as an opaque platform timeout.
+- **Rate limits and busy responses.** Gemini 429s (daily quota) and 503/504 "busy"/deadline-exceeded responses are both retried with backoff — a quota exhausted after retries surfaces the quota message above; a Gemini capacity blip surfaces "Gemini is busy right now. Wait a few seconds and try again." instead of a raw error either way. The Gemini call itself has an explicit timeout (25s on Vercel) rather than waiting on the SDK's default of none, so a slow response fails cleanly well inside Vercel's 60s function limit instead of running out the clock as an opaque platform timeout. If a 429 really is the daily quota (not a transient blip) and `GEMINI_API_KEY_2` is set, the app falls back to the second key automatically before surfacing anything to the user — see section 2.
 - **Sources.** Instagram goes through Apify — required, no fallback (see section 4). On Vercel, only the caption and a still thumbnail are sent to Gemini for Instagram (downloading and uploading the full reel video regularly blew the 60s budget); locally, the video itself is used too. YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption directly — no login needed for those, since they don't require it the way Instagram does. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. Neither yt-dlp nor the Apify actor is an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If yt-dlp fetches start failing (YouTube/TikTok/blog links, not Instagram), update with `pip install -U yt-dlp`.
 - **Photos** (a card, cookbook page, or screenshot) are added via the app's photo add flow — reviewed and saved manually, not auto-ingested like a link. Sent to Gemini inline (not uploaded via the Files API first) so a still photo doesn't risk the upload+poll wait alone exceeding Vercel's 60s limit.
 - **Cookbook ingredient filter** (`GET`/`PUT /api/pantry`). Flat string list used only on the Cookbook tab: type in search to mark ingredients, **AND**-filter recipes that use all of them, rank by **fit %**, sage banner **Filtered by …**. Synced across devices. This is **not** kitchen inventory.

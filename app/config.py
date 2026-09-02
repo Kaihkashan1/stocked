@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     )
 
     gemini_api_key: str = ""
+    # Optional — a second Google account's own API key. The free tier's
+    # 20/day cap is per key/project, so once the first is exhausted,
+    # app.extract falls back to this one instead of failing for the rest
+    # of the day. Leave unset to keep using just one key.
+    gemini_api_key_2: str = ""
     gemini_model: str = "gemini-3.6-flash"
     google_sheet_id: str = ""
     google_service_account_file: Path = ROOT / "service_account.json"

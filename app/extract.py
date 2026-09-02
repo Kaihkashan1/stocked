@@ -10,7 +10,7 @@ from google import genai
 from google.genai import types
 
 from app.config import settings
-from app.errors import gemini_is_retryable
+from app.errors import gemini_is_quota_exhausted, gemini_is_retryable
 from app.models import RECIPE_TAGS, FetchedPost, Recipe, RecipeCategory
 from app.store import record_gemini_read
 
@@ -63,8 +63,19 @@ CAPTION:
 """
 
 
+def _gemini_api_keys() -> list[str]:
+    """GEMINI_API_KEY, plus the optional GEMINI_API_KEY_2 (a second Google
+    account's own free-tier key) if set — see app.config. The free tier's
+    daily cap is per key/project, so once the first is exhausted for the
+    day, extract_recipe falls back to the second instead of failing for
+    the rest of the day."""
+    keys = [settings.gemini_api_key, settings.gemini_api_key_2]
+    return [key.strip() for key in keys if key.strip()]
+
+
 def extract_recipe(post: FetchedPost) -> Recipe:
-    if not settings.gemini_api_key:
+    keys = _gemini_api_keys()
+    if not keys:
         raise RuntimeError("GEMINI_API_KEY is missing. Add it to .env (see README).")
 
     # The SDK's default client has no per-call timeout at all (it waits on
@@ -75,31 +86,42 @@ def extract_recipe(post: FetchedPost) -> Recipe:
     # A shorter, explicit timeout turns that into a normal (retryable, or at
     # least cleanly reported) exception well before the platform gives up.
     call_timeout_ms = 25_000 if os.environ.get("VERCEL") else 170_000
-    client = genai.Client(
-        api_key=settings.gemini_api_key,
-        http_options=types.HttpOptions(timeout=call_timeout_ms),
-    )
     media_path = post.video_path or post.thumbnail_path
-    uploaded = None
-    try:
-        contents: list = []
-        if media_path:
-            path = Path(media_path)
-            inline = _inline_image_part(path)
-            if inline is not None:
-                contents.append(inline)
-            else:
-                uploaded = _upload_and_wait(client, path)
-                contents.append(uploaded)
-        contents.append(PROMPT.format(caption=post.caption or "(no caption)"))
-        text = _generate_with_retry(client, contents)
-        return _parse_recipe(text)
-    finally:
-        if uploaded is not None:
-            try:
-                client.files.delete(name=uploaded.name)
-            except Exception:
-                logger.debug("Could not delete Gemini file %s", uploaded.name)
+    caption_part = PROMPT.format(caption=post.caption or "(no caption)")
+
+    last_error: Exception | None = None
+    for index, api_key in enumerate(keys):
+        # A fresh client (and, for the upload path, a fresh upload) per
+        # key: an uploaded file is scoped to the project that uploaded it,
+        # so a fallback key can't reuse the first key's upload.
+        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=call_timeout_ms))
+        uploaded = None
+        try:
+            contents: list = []
+            if media_path:
+                path = Path(media_path)
+                inline = _inline_image_part(path)
+                if inline is not None:
+                    contents.append(inline)
+                else:
+                    uploaded = _upload_and_wait(client, path)
+                    contents.append(uploaded)
+            contents.append(caption_part)
+            text = _generate_with_retry(client, contents)
+            return _parse_recipe(text)
+        except Exception as exc:
+            last_error = exc
+            if gemini_is_quota_exhausted(exc) and index < len(keys) - 1:
+                logger.warning("Gemini key %d/%d hit its daily quota; trying the next key", index + 1, len(keys))
+                continue
+            raise
+        finally:
+            if uploaded is not None:
+                try:
+                    client.files.delete(name=uploaded.name)
+                except Exception:
+                    logger.debug("Could not delete Gemini file %s", uploaded.name)
+    raise RuntimeError("Gemini call failed") from last_error
 
 
 _IMAGE_MIME = {

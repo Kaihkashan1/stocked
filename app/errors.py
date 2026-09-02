@@ -10,16 +10,25 @@ from __future__ import annotations
 import httpx
 from google.genai.errors import APIError as GeminiAPIError
 
+from app.config import settings
 from app.fetch import ApifyLimitError
 
-# The free tier's actual daily cap. Kept as one constant so the wording
-# below and the Settings "API usage" card (see app.store.get_gemini_reads_today)
-# can never drift apart.
-GEMINI_DAILY_QUOTA = 20
+# The free tier's actual daily cap, per API key/project. Kept as one
+# constant so the wording below and the Settings "API usage" card (see
+# app.store.get_gemini_reads_today) can never drift apart. Doubles
+# automatically when GEMINI_API_KEY_2 is set — see app.extract's per-key
+# fallback, which is what actually makes the higher number true.
+_GEMINI_KEYS_CONFIGURED = 2 if settings.gemini_api_key_2.strip() else 1
+GEMINI_DAILY_QUOTA = 20 * _GEMINI_KEYS_CONFIGURED
 
+_quota_note = (
+    f"{GEMINI_DAILY_QUOTA} requests/day across 2 keys"
+    if _GEMINI_KEYS_CONFIGURED > 1
+    else f"{GEMINI_DAILY_QUOTA} requests/day"
+)
 GEMINI_QUOTA_MESSAGE = (
-    f"Gemini's free daily quota ({GEMINI_DAILY_QUOTA} requests/day) is used up. "
-    "Try again after it resets — usually around midnight Pacific time."
+    f"Gemini's daily quota ({_quota_note}) is used up. "
+    "Try again after it resets around 9 am CET."
 )
 
 GEMINI_BUSY_MESSAGE = (
@@ -56,6 +65,13 @@ def gemini_is_busy(exc: Exception) -> bool:
         or "deadline_exceeded" in message
         or "deadline expired" in message
     )
+
+
+def gemini_is_quota_exhausted(exc: Exception) -> bool:
+    """A real daily-cap 429 (RESOURCE_EXHAUSTED) — distinct from
+    gemini_is_busy's capacity blips, which a fresh key wouldn't fix but a
+    fresh day (or a second key, see app.extract) would."""
+    return isinstance(exc, GeminiAPIError) and exc.code == 429 and not gemini_is_busy(exc)
 
 
 def gemini_is_retryable(exc: Exception) -> bool:
