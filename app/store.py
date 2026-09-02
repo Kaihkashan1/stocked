@@ -307,10 +307,11 @@ _PACIFIC = ZoneInfo("America/Los_Angeles")
 
 
 def record_gemini_read() -> None:
-    """Ticks the daily Gemini call counter, kept in AppState alongside the
-    pantry. There's no Gemini-side endpoint that reports free-tier quota
-    usage, so this is the only way the Settings "API usage" card can show a
-    real number instead of a guess."""
+    """Ticks Settings "Imports today" once per Gemini API call we actually
+    make — success or failure. Failed photo/Instagram reads still count
+    toward the free-tier 20/day cap when Google accepted the request, so
+    the remaining number has to include them. There is no quota-remaining
+    endpoint; this is a local tally of those calls."""
     today = datetime.now(_PACIFIC).date().isoformat()
     usage = _read_app_state().get("gemini_usage") or {}
     count = usage.get("count", 0) + 1 if usage.get("date") == today else 1

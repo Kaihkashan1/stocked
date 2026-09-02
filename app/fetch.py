@@ -317,12 +317,17 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
     "latestComments": [{"text": str, "ownerUsername": str, ...}]}.
     """
     token = settings.apify_api_token.strip()
+    on_vercel = bool(os.environ.get("VERCEL"))
+    # Leave Gemini ~20s on Vercel (60s function cap). A 60s Apify wait
+    # plus a video download plus a Files upload is why Instagram saves
+    # time out there even when the post is public.
+    apify_timeout = 35 if on_vercel else 60
     try:
         response = httpx.post(
             f"{APIFY_API_BASE}/acts/{settings.apify_instagram_actor}/run-sync-get-dataset-items",
             headers={"Authorization": f"Bearer {token}"},
             json={"username": [url], "resultsLimit": 1},
-            timeout=60,
+            timeout=apify_timeout,
         )
         response.raise_for_status()
         items = response.json()
@@ -359,15 +364,23 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
         caption = f"{caption}\n\n{comments_text}".strip()
 
     video_url = item.get("videoUrl")
+    images = item.get("images")
     image_url = None
-    if not video_url:
-        images = item.get("images")
-        if isinstance(images, list) and images:
-            image_url = images[0]
-        image_url = image_url or item.get("displayUrl")
+    if isinstance(images, list) and images:
+        image_url = images[0]
+    image_url = image_url or item.get("displayUrl")
 
-    video_path = _download_apify_media(video_url, out_dir, media_id, video=True) if video_url else None
-    thumbnail_path = _download_apify_media(image_url, out_dir, media_id, video=False) if image_url else None
+    # Reels always have a videoUrl. Downloading and uploading that file to
+    # Gemini on Vercel regularly blows the 60s cap; caption + still is
+    # enough for recipe extraction and matches the photo-import path.
+    video_path = None
+    if video_url and not on_vercel:
+        video_path = _download_apify_media(video_url, out_dir, media_id, video=True)
+    thumbnail_path = (
+        _download_apify_media(image_url, out_dir, media_id, video=False, timeout=15 if on_vercel else 60)
+        if image_url
+        else None
+    )
 
     if video_path is None and thumbnail_path is None and not caption:
         logger.warning("Apify result for %s had no caption or media", url)
@@ -383,10 +396,10 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
     )
 
 
-def _download_apify_media(url: str, out_dir: Path, media_id: str, video: bool) -> Path | None:
+def _download_apify_media(url: str, out_dir: Path, media_id: str, video: bool, timeout: int = 60) -> Path | None:
     dest = out_dir / f"{media_id or 'apify'}{'.mp4' if video else '.jpg'}"
     try:
-        with httpx.stream("GET", url, timeout=60, follow_redirects=True) as response:
+        with httpx.stream("GET", url, timeout=timeout, follow_redirects=True) as response:
             response.raise_for_status()
             with dest.open("wb") as f:
                 for chunk in response.iter_bytes():

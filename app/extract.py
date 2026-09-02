@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from google import genai
 from google.genai import types
 
 from app.config import settings
+from app.errors import gemini_is_retryable
 from app.models import RECIPE_TAGS, FetchedPost, Recipe, RecipeCategory
 from app.store import record_gemini_read
 
@@ -71,8 +73,13 @@ def extract_recipe(post: FetchedPost) -> Recipe:
     try:
         contents: list = []
         if media_path:
-            uploaded = _upload_and_wait(client, Path(media_path))
-            contents.append(uploaded)
+            path = Path(media_path)
+            inline = _inline_image_part(path)
+            if inline is not None:
+                contents.append(inline)
+            else:
+                uploaded = _upload_and_wait(client, path)
+                contents.append(uploaded)
         contents.append(PROMPT.format(caption=post.caption or "(no caption)"))
         text = _generate_with_retry(client, contents)
         return _parse_recipe(text)
@@ -82,6 +89,25 @@ def extract_recipe(post: FetchedPost) -> Recipe:
                 client.files.delete(name=uploaded.name)
             except Exception:
                 logger.debug("Could not delete Gemini file %s", uploaded.name)
+
+
+_IMAGE_MIME = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
+
+
+def _inline_image_part(path: Path) -> types.Part | None:
+    """Stills go inline so we skip Gemini's Files upload+poll — that wait
+    alone can blow Vercel's 60s budget (and the phone's request timer)
+    before generate_content even starts."""
+    mime = _IMAGE_MIME.get(path.suffix.lower())
+    if not mime:
+        return None
+    return types.Part.from_bytes(data=path.read_bytes(), mime_type=mime)
 
 
 def _upload_and_wait(client: genai.Client, path: Path, timeout: int = 180):
@@ -99,8 +125,14 @@ def _upload_and_wait(client: genai.Client, path: Path, timeout: int = 180):
     raise TimeoutError("Timed out waiting for Gemini to process the video.")
 
 
-def _generate_with_retry(client: genai.Client, contents: list, attempts: int = 5) -> str:
+def _generate_with_retry(client: genai.Client, contents: list, attempts: int = 3) -> str:
+    """A couple of short retries for 429 / high-demand blips. Kept brief so
+    the whole photo-extract still fits inside Vercel's 60s function cap.
+    Each attempt is a real Gemini request and is counted, including ones
+    that fail — that's what the free-tier daily cap bills."""
     last_error: Exception | None = None
+    if os.environ.get("VERCEL"):
+        attempts = min(attempts, 2)
     for i in range(attempts):
         try:
             record_gemini_read()
@@ -121,11 +153,9 @@ def _generate_with_retry(client: genai.Client, contents: list, attempts: int = 5
             return text
         except Exception as exc:
             last_error = exc
-            message = str(exc)
-            rate_limited = "429" in message or "RESOURCE_EXHAUSTED" in message
-            if rate_limited and i < attempts - 1:
-                delay = 2 ** (i + 1)
-                logger.warning("Gemini rate-limited; retrying in %ss", delay)
+            if gemini_is_retryable(exc) and i < attempts - 1:
+                delay = 2 * (i + 1)
+                logger.warning("Gemini busy or rate-limited; retrying in %ss", delay)
                 time.sleep(delay)
                 continue
             raise
