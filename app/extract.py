@@ -67,7 +67,18 @@ def extract_recipe(post: FetchedPost) -> Recipe:
     if not settings.gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY is missing. Add it to .env (see README).")
 
-    client = genai.Client(api_key=settings.gemini_api_key)
+    # The SDK's default client has no per-call timeout at all (it waits on
+    # the underlying HTTP request indefinitely) — so a single slow Gemini
+    # response doesn't fail, it just runs out the clock until Vercel's hard
+    # 60s kill, which surfaces as an opaque FUNCTION_INVOCATION_TIMEOUT with
+    # no friendly message and no chance for _generate_with_retry to react.
+    # A shorter, explicit timeout turns that into a normal (retryable, or at
+    # least cleanly reported) exception well before the platform gives up.
+    call_timeout_ms = 25_000 if os.environ.get("VERCEL") else 170_000
+    client = genai.Client(
+        api_key=settings.gemini_api_key,
+        http_options=types.HttpOptions(timeout=call_timeout_ms),
+    )
     media_path = post.video_path or post.thumbnail_path
     uploaded = None
     try:
