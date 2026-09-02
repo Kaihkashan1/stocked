@@ -16,7 +16,7 @@ Those are separate on purpose. Marking ingredients on the Cookbook list does **n
 ## Install on your iPhone
 
 1. Open **Xcode.app** (the full app, not only Command Line Tools).
-2. Open `ios/RecipeBox.xcodeproj` (or the `RecipeBox.xcworkspace` in this repo). The Xcode project name is still RecipeBox; the home-screen name is Stocked. In the toolbar scheme menu, choose **RecipeBox**. If that menu is empty: **Product → Scheme → Manage Schemes…** → tick **RecipeBox** (shared) → Close.
+2. Open `ios/Stocked.xcodeproj`. The Xcode project, scheme, and home-screen name are all **Stocked**. In the toolbar scheme menu, choose **Stocked**. If that menu is empty: **Product → Scheme → Manage Schemes…** → tick **Stocked** (shared) → Close.
 3. In the project editor → **Signing & Capabilities** → **Team**, choose **Add Account…** and sign in with your Apple ID. Use your Personal Team. You do not need a paid developer program for this.
 4. Plug in the iPhone, unlock it, and tap **Trust** if asked. On the phone: **Settings → Privacy & Security → Developer Mode** (iOS 16+) if Xcode asks you to enable it.
 5. In the Xcode toolbar, pick your iPhone as the run destination, then press **Run**.
@@ -42,7 +42,7 @@ The Home Screen icon is the book-over-shelf mark in `Assets.xcassets`. If an ins
 ## Cupboard
 
 - Header kicker: `N items · M to buy`. Segments: **Items** / **To buy**.
-- **Items**: search with **Search what's in stock** (name or category). **Select items to match** finds recipes that use selected stock (best-effort, independent of Cookbook fit %). Add/edit sheet: name, category, amount + unit, open/unopened, optional expiry, notes. Expiry badges: outline date when far out; sage **Expires in Nd** at 4–7 days; terracotta **Expires in 2d** / **Expires today** inside 3 days; **Expired** once past.
+- **Items**: search with **Search what's in stock** (name or category). **Select items to match** finds recipes that use selected stock (best-effort, independent of Cookbook fit %). Add/edit sheet: name, category, amount + unit, open/unopened, optional expiry, notes. Expiry badges: outline date when far out; sage **Expires in N days** at 4–7 days; terracotta **Expires in 2 days** / **Expires today** inside 3 days; **Expired** once past.
 - **To buy**: search with **Search items to buy**, then add field + checklist. Each row has a **qty** pill (editable; recipe adds prefill it). Stock and to-buy searches are independent — switching segments does not clear the other.
 
 ## Settings
@@ -51,7 +51,7 @@ Favoriting, editing, and Cupboard writes need the server secret when `RECIPE_BOX
 
 Settings also shows **API usage** — today's Gemini reads vs the free daily cap, and this month's Apify spend vs credit (Apify half only when `APIFY_API_TOKEN` is set on the server).
 
-Default server URL is `https://stocked-cookbook-cupboard.vercel.app`. Older installs pointed at `kaihkashan-recipe-box.vercel.app` migrate automatically on launch.
+Default server URL is `https://stocked-cookbook-cupboard.vercel.app`.
 
 ## Shortcuts
 
