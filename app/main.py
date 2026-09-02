@@ -15,7 +15,7 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.auth import require_secret
 from app.config import ROOT, settings
-from app.errors import GEMINI_DAILY_QUOTA, GEMINI_QUOTA_MESSAGE
+from app.errors import GEMINI_DAILY_QUOTA, friendly_message, gemini_is_busy
 from app.extract import extract_recipe
 from app.fetch import get_apify_usage
 from app.match import STAPLES, grouped_pantry
@@ -136,8 +136,12 @@ async def api_extract_photo(photo: UploadFile = File(...)):
             recipe = extract_recipe(post)
         except GeminiAPIError as exc:
             if exc.code == 429:
-                raise HTTPException(status_code=429, detail=GEMINI_QUOTA_MESSAGE) from exc
-            raise HTTPException(status_code=502, detail=f"Gemini error: {exc.message or exc}") from exc
+                status = 429
+            elif gemini_is_busy(exc):
+                status = 503
+            else:
+                status = 502
+            raise HTTPException(status_code=status, detail=friendly_message(exc)) from exc
     finally:
         tmp_path.unlink(missing_ok=True)
 

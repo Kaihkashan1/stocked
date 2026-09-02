@@ -21,10 +21,40 @@ GEMINI_QUOTA_MESSAGE = (
     "Try again after it resets — usually around midnight Pacific time."
 )
 
+GEMINI_BUSY_MESSAGE = (
+    "Gemini is busy right now. Wait a few seconds and try again."
+)
+
+
+def gemini_is_busy(exc: Exception) -> bool:
+    """Capacity blips (503 / 'high demand'), not the daily free-tier cap."""
+    code = getattr(exc, "code", None)
+    if code in (500, 503):
+        return True
+    message = str(getattr(exc, "message", None) or exc).lower()
+    return (
+        "high demand" in message
+        or "unavailable" in message
+        or "overloaded" in message
+        or "try again later" in message
+    )
+
+
+def gemini_is_retryable(exc: Exception) -> bool:
+    if gemini_is_busy(exc):
+        return True
+    code = getattr(exc, "code", None)
+    if code == 429:
+        return True
+    message = str(exc).lower()
+    return "429" in message or "resource_exhausted" in message
+
 
 def friendly_message(exc: Exception) -> str:
     if isinstance(exc, GeminiAPIError) and exc.code == 429:
         return GEMINI_QUOTA_MESSAGE
+    if gemini_is_busy(exc):
+        return GEMINI_BUSY_MESSAGE
     if isinstance(exc, ApifyLimitError):
         return str(exc)
     return str(exc)

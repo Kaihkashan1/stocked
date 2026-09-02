@@ -178,7 +178,7 @@ struct Kicker: View {
     var color: Color = Theme.accent700
 
     var body: some View {
-        Text(text.uppercased(with: LanguageStore.shared.language.locale))
+        Text(text.uppercased(with: Locale(identifier: "en")))
             .font(Theme.body(size, weight: .semibold))
             .tracking(size * 0.14)
             .foregroundStyle(color)

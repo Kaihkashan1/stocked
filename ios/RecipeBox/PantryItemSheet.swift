@@ -204,7 +204,7 @@ struct PantryItemSheet: View {
 
     private func field<Content: View>(kicker: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(kicker.uppercased(with: LanguageStore.shared.language.locale))
+            Text(kicker.uppercased(with: Locale(identifier: "en")))
                 .font(Theme.body(10.5, weight: .semibold))
                 .tracking(1.26)
                 .foregroundStyle(Theme.neutral600)

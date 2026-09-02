@@ -78,7 +78,7 @@ struct CookModeView: View {
                     .clipShape(Circle())
             }
             Spacer()
-            Text(recipe.title.uppercased(with: LanguageStore.shared.language.locale))
+            Text(recipe.title.uppercased(with: Locale(identifier: "en")))
                 .font(Theme.body(12, weight: .semibold))
                 .tracking(1.2)
                 .foregroundStyle(Theme.cookForeground.opacity(0.65))
@@ -109,7 +109,7 @@ struct CookModeView: View {
         GeometryReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
-                    Text(L("Step \(index + 1) of \(steps.count)").uppercased(with: LanguageStore.shared.language.locale))
+                    Text(L("Step \(index + 1) of \(steps.count)").uppercased(with: Locale(identifier: "en")))
                         .font(Theme.body(12, weight: .semibold))
                         .tracking(2.4)
                         .foregroundStyle(Theme.accent400)

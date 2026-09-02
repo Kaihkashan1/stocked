@@ -247,7 +247,7 @@ struct PantryView: View {
         } else {
             ForEach(filteredGroupedItems, id: \.category) { group in
                 VStack(alignment: .leading, spacing: 9) {
-                    Text(group.category.localizedName.uppercased(with: LanguageStore.shared.language.locale))
+                    Text(group.category.localizedName.uppercased(with: Locale(identifier: "en")))
                         .font(Theme.body(10.5, weight: .semibold))
                         .tracking(1.26)
                         .foregroundStyle(Theme.neutral600)
@@ -536,7 +536,7 @@ extension PantryItem {
             )
         }
         let formatter = DateFormatter()
-        formatter.locale = LanguageStore.shared.language.locale
+        formatter.locale = Locale(identifier: "en")
         formatter.setLocalizedDateFormatFromTemplate("MMMd")
         return ExpiryBadge(
             label: formatter.string(from: date),

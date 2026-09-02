@@ -231,7 +231,7 @@ function formatUsd(value) {
 }
 
 function appDateLocale() {
-  return appLocale() === "de" ? "de-DE" : "en-US";
+  return "en-US";
 }
 
 /// Next Gemini free-tier reset: midnight Pacific, shown as a CET clock time
@@ -270,18 +270,6 @@ async function fetchUsage() {
 }
 
 function settingsFormHtml() {
-  const pref = languagePreference();
-  const options = [
-    ["system", t("matchDevice")],
-    ["en", "English"],
-    ["de", "Deutsch"],
-  ];
-  const chips = options
-    .map(([value, label]) => {
-      const active = pref === value;
-      return `<button class="pill pill-btn-plain${active ? " active" : ""}" type="button" data-action="pick-language" data-lang="${value}">${escapeHtml(label)}</button>`;
-    })
-    .join("");
   const secret = localStorage.getItem(SECRET_KEY) || "";
   const usage = state.usage;
   let limitsHtml = "";
@@ -325,10 +313,6 @@ function settingsFormHtml() {
     </div>
     <div class="recipe recipe-body">
       <h2 style="margin-bottom:1.2rem;">${escapeHtml(t("settings"))}</h2>
-      <div class="field">
-        <span>${escapeHtml(t("language"))}</span>
-        <div class="chips">${chips}</div>
-      </div>
       ${limitsHtml}
       <button class="dev-toggle" type="button" data-action="toggle-developer">
         <span class="eyebrow">${escapeHtml(t("developer"))}</span>
@@ -336,17 +320,6 @@ function settingsFormHtml() {
       </button>
       ${devBody}
     </div>`;
-}
-
-function applyLanguage(value) {
-  if (value !== "en" && value !== "de" && value !== "system") return;
-  setLanguagePreference(value);
-  applyStaticI18n();
-  renderFilters();
-  renderGrid();
-  if (!els.drawer.hidden && state.openRecipeId == null && !state.addingRecipe && state.editingId == null) {
-    renderSettings();
-  }
 }
 
 function saveSettings() {
@@ -1355,9 +1328,6 @@ document.addEventListener("click", (event) => {
       break;
     case "save-settings":
       saveSettings();
-      break;
-    case "pick-language":
-      applyLanguage(actionEl.dataset.lang);
       break;
     case "toggle-developer":
       state.devSettingsOpen = !state.devSettingsOpen;

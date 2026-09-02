@@ -1,49 +1,9 @@
 import SwiftUI
 
-enum AppLanguage: String, CaseIterable, Identifiable {
-    case system
-    case english = "en"
-    case german = "de"
-
-    var id: String { rawValue }
-
-    var localizedName: String {
-        switch self {
-        case .system: L("System")
-        case .english: "English"
-        case .german: "Deutsch"
-        }
-    }
-
-    var locale: Locale {
-        switch self {
-        case .system: Locale.autoupdatingCurrent
-        case .english: Locale(identifier: "en")
-        case .german: Locale(identifier: "de")
-        }
-    }
-}
-
-/// Looks up a catalog string in the in-app language, not the phone language.
-/// `Text("Save")` already follows SwiftUI's locale environment; this is for
-/// `String` kickers, placeholders, errors, and accessibility labels.
+/// Catalog lookup forced to English — Stocked does not ship in-app
+/// translations. `Text("Save")` also follows `.environment(\.locale)`.
 func L(_ value: String.LocalizationValue) -> String {
-    String(localized: value, locale: LanguageStore.shared.language.locale)
-}
-
-@Observable
-final class LanguageStore {
-    static let shared = LanguageStore()
-    private static let key = "appLanguage"
-
-    var language: AppLanguage {
-        didSet { UserDefaults.standard.set(language.rawValue, forKey: Self.key) }
-    }
-
-    private init() {
-        let raw = UserDefaults.standard.string(forKey: Self.key) ?? AppLanguage.system.rawValue
-        language = AppLanguage(rawValue: raw) ?? .system
-    }
+    String(localized: value, locale: Locale(identifier: "en"))
 }
 
 @main
@@ -51,7 +11,6 @@ struct RecipeBoxApp: App {
     @State private var store = RecipeStore()
     @State private var pantryStore = PantryStore()
     @State private var connectivity = Connectivity()
-    @State private var languageStore = LanguageStore.shared
 
     init() {
         BundledFonts.register()
@@ -63,8 +22,7 @@ struct RecipeBoxApp: App {
                 .environment(store)
                 .environment(pantryStore)
                 .environment(connectivity)
-                .environment(languageStore)
-                .environment(\.locale, languageStore.language.locale)
+                .environment(\.locale, Locale(identifier: "en"))
                 .onOpenURL { url in
                     store.pendingRoute = Self.route(for: url)
                 }

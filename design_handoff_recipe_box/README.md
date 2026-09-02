@@ -211,20 +211,17 @@ with a divider border.
 
 ### 8. Settings (SettingsView)
 Close button; title "Settings". Reordered so the settings a normal user cares about are visible by default, and
-the ones only useful for debugging are tucked away:
-- **Language** chip row, first on the page: System, English, Deutsch. Selecting one applies immediately —
-  no save step, no "reload" — since it's a live app preference, not a value round-tripping to the server.
-- Divider, then **Import limits** as its own labeled section (no card/background — plain label + two 6pt
-  progress bars on neutral-200 tracks, accent fill), separate from Language rather than nested under it:
-  "Imports today — 6 of 20" (a count) and "Import cost this month — $1.20 of $5" (a dollar figure; keep it
-  as cost, not a count — these are two different kinds of limit). User-facing because the user needs to know
-  how many recipe imports they have left before hitting the daily/monthly cap; the labels intentionally say
-  nothing about which backend/model serves the import.
+the ones only useful for debugging are tucked away. English only — Stocked does not ship in-app translations.
+- **Import limits** as its own labeled section, first on the page (no card/background — plain label + two 6pt
+  progress bars on neutral-200 tracks, accent fill): "Imports today — 6 of 20" (a count) and "Import cost this
+  month — $1.20 of $5" (a dollar figure; keep it as cost, not a count — these are two different kinds of
+  limit). User-facing because the user needs to know how many recipe imports they have left before hitting
+  the daily/monthly cap; the labels intentionally say nothing about which backend/model serves the import.
 - **"Developer" disclosure row** below that: an uppercase label with a chevron that rotates 180° when open,
   collapsed by default. Expanding it reveals: Server field (pill, showing the hosted URL) with its
   explanatory footnote; Edit key field (masked, 0.22em tracking) with its footnote; and a "Save and reload"
   primary button, scoped only to those two fields (Import limits is display-only and sits outside this
-  section; Language applies instantly and also sits outside it).
+  section).
 The quota numbers backing Import limits need a small backend addition; if that is not wanted, drop the card
 rather than faking it, but keep it visible (not inside Developer) once real — recipe-import cadence is
 something end users plan around.
@@ -306,8 +303,7 @@ and `editTagsList` (Edit recipe) each hold their own selected-tags array so pick
 touches the Filters selection. The app's global tag list (`ALL_TAGS`) grows whenever "Add tag" is used from
 any of the three add/edit surfaces.
 
-`language: String` ("System" | "English" | "Deutsch") and the Server/Edit key fields are Settings-only state;
-Import limits values come from the backend, not local state.
+The Server/Edit key fields are Settings-only state; Import limits values come from the backend, not local state.
 
 `pantry: [PantryItem]` (id, name, category, amount, unit, status: open|unopened, expiry: Date?, notes) and
 `toBuy: [{id, text, checked}]` are new, independent top-level stores — no foreign key to `RecipeStore`.

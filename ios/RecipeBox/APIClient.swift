@@ -3,6 +3,7 @@ import Foundation
 enum APIError: LocalizedError {
     case badURL
     case unreachable(String)
+    case timedOut
     case badResponse(Int)
     /// A FastAPI HTTPException's `detail` — usually a real, actionable
     /// message (e.g. "Gemini's free daily quota is used up...") rather than
@@ -15,6 +16,8 @@ enum APIError: LocalizedError {
             return L("The server address is not a valid URL.")
         case .unreachable(let host):
             return L("Could not reach \(host). Check your internet connection, or update the server address in Settings.")
+        case .timedOut:
+            return L("That took too long. Check your connection and try again.")
         case .badResponse(let code):
             return L("The server returned HTTP \(code).")
         case .serverMessage(let message):
@@ -36,6 +39,13 @@ private func throwForStatus(_ status: Int, data: Data) throws -> Never {
     throw APIError.badResponse(status)
 }
 
+private func throwForTransport(_ error: Error, host: String) throws -> Never {
+    if (error as? URLError)?.code == .timedOut {
+        throw APIError.timedOut
+    }
+    throw APIError.unreachable(host)
+}
+
 struct APIClient {
     var baseURLString: String
 
@@ -47,6 +57,17 @@ struct APIClient {
         config.requestCachePolicy = .useProtocolCachePolicy
         config.timeoutIntervalForRequest = 15
         config.waitsForConnectivity = false
+        return URLSession(configuration: config)
+    }()
+
+    /// Photo extract and /ingest wait on Gemini with no bytes until the
+    /// function finishes (up to Vercel's 60s). The default session's 15s
+    /// between-packets timer otherwise fails those as "could not reach".
+    private static let longSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 75
+        config.timeoutIntervalForResource = 75
+        config.waitsForConnectivity = true
         return URLSession(configuration: config)
     }()
 
@@ -64,7 +85,7 @@ struct APIClient {
 
         var request = URLRequest(url: url.absoluteURL)
         request.httpMethod = "POST"
-        request.timeoutInterval = 60
+        request.timeoutInterval = 75
         let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedSecret.isEmpty {
             request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
@@ -84,9 +105,9 @@ struct APIClient {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await Self.session.data(for: request)
+            (data, response) = try await Self.longSession.data(for: request)
         } catch {
-            throw APIError.unreachable(trimmedBase)
+            try throwForTransport(error, host: trimmedBase)
         }
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -195,7 +216,7 @@ struct APIClient {
 
         var request = URLRequest(url: endpoint.absoluteURL)
         request.httpMethod = "POST"
-        request.timeoutInterval = 65
+        request.timeoutInterval = 75
         request.setValue("text/plain; charset=utf-8", forHTTPHeaderField: "Content-Type")
         let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedSecret.isEmpty {
@@ -206,9 +227,9 @@ struct APIClient {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await Self.session.data(for: request)
+            (data, response) = try await Self.longSession.data(for: request)
         } catch {
-            throw APIError.unreachable(trimmedBase)
+            try throwForTransport(error, host: trimmedBase)
         }
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
