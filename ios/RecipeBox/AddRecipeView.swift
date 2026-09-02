@@ -92,11 +92,12 @@ struct AddRecipeView: View {
                     }
 
                     field(kicker: L("Course")) {
-                        HStack(spacing: 7) {
+                        FlowLayout(spacing: 7) {
                             ForEach(Course.allCases) { option in
                                 ChipButton(title: option.localizedName, selected: course == option) {
                                     course = option
                                 }
+                                .fixedSize()
                             }
                         }
                     }

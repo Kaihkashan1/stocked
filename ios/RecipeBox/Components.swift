@@ -65,13 +65,17 @@ struct ChipButton: View {
     let title: String
     let selected: Bool
     var font: Font = Theme.body(12.5, weight: .semibold)
+    /// Sort pills sit in an equal-width HStack. Course / tag / language chips
+    /// in a FlowLayout must size to their label — `maxWidth: .infinity` there
+    /// reports a huge width, so later chips (Dips) wrap into a clipped row.
+    var fillsWidth: Bool = false
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(font)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: fillsWidth ? .infinity : nil)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
         }

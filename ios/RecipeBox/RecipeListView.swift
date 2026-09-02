@@ -274,11 +274,12 @@ private struct CourseFilterRow: View {
     @Environment(RecipeStore.self) private var store
 
     var body: some View {
-        HStack(spacing: 7) {
+        FlowLayout(spacing: 7) {
             ForEach(Course.allCases) { course in
                 ChipButton(title: course.localizedName, selected: store.courseFilter == course) {
                     store.courseFilter = (store.courseFilter == course) ? nil : course
                 }
+                .fixedSize()
             }
         }
         .padding(.horizontal, Theme.screenPadding)
@@ -609,7 +610,7 @@ struct FiltersSheet: View {
                         Kicker(text: L("Sort"), color: Theme.neutral600)
                         HStack(spacing: 7) {
                             ForEach(SortOption.allCases, id: \.self) { option in
-                                ChipButton(title: option.localizedName, selected: store.sortOption == option) {
+                                ChipButton(title: option.localizedName, selected: store.sortOption == option, fillsWidth: true) {
                                     store.sortOption = option
                                 }
                             }

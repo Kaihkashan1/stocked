@@ -24,7 +24,7 @@ final class RecipeStore {
         didSet { if oldValue != tagFilters { updateVisible() } }
     }
     /// The course filter row on the list screen — Main course / Appetizers /
-    /// Desserts. nil means no course filter is applied. Composes with every
+    /// Desserts / Dips. nil means no course filter is applied. Composes with every
     /// other filter (AND), same as tagFilters.
     var courseFilter: Course? {
         didSet { if oldValue != courseFilter { updateVisible() } }

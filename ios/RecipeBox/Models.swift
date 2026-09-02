@@ -143,7 +143,7 @@ struct Recipe: Codable, Identifiable, Hashable {
     let source: String
     let confidence: String
     let savedAt: String?
-    /// Main course / Appetizers / Desserts — a direct field from the sheet
+    /// Main course / Appetizers / Desserts / Dips — a direct field from the sheet
     /// now (see app.store's "Course" column), not derived from a `meal`
     /// classification the way it used to be.
     let course: Course
@@ -209,7 +209,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         confidence = try container.decodeIfPresent(String.self, forKey: .confidence) ?? "medium"
         savedAt = try container.decodeIfPresent(String.self, forKey: .savedAt)
         let courseRaw = try container.decodeIfPresent(String.self, forKey: .course)
-        course = courseRaw.flatMap(Course.init(rawValue:)) ?? .mainCourse
+        course = Course.resolve(courseRaw)
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         pantry = collapsePantryItems(try container.decodeIfPresent([String].self, forKey: .pantry) ?? [])
         favorite = try container.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
@@ -301,20 +301,26 @@ struct Recipe: Codable, Identifiable, Hashable {
     }
 }
 
-/// The three-way classification new to this redesign — "Main course" /
-/// "Appetizers" / "Desserts" — shown as a filter row and a detail pill. A
-/// direct field on a saved Recipe (see app.store's "Course" column) rather
-/// than derived from `meal` the way it used to be, back when Course rode
-/// along on the Meal column instead of having one of its own.
+/// Course on a saved recipe — "Main course", "Appetizers", "Desserts",
+/// "Dips" — shown as a filter row and a detail pill. A direct field on a
+/// saved Recipe (see app.store's "Course" column) rather than derived from
+/// `meal` the way it used to be, back when Course rode along on the Meal
+/// column instead of having one of its own.
 enum Course: String, CaseIterable, Identifiable {
     case mainCourse = "Main course"
     case appetizers = "Appetizers"
     case desserts = "Desserts"
+    case dips = "Dips"
 
     var id: String { rawValue }
 
     var localizedName: String {
         L(String.LocalizationValue(rawValue))
+    }
+
+    static func resolve(_ raw: String?) -> Course {
+        let trimmed = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return allCases.first { $0.rawValue.compare(trimmed, options: .caseInsensitive) == .orderedSame } ?? .mainCourse
     }
 
     /// Only used to seed an initial guess from a photo extraction's Gemini

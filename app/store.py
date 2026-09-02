@@ -36,7 +36,7 @@ HEADERS = [
     "Course",
 ]
 TRUE_VALUES = {"true", "yes", "1", "y"}
-COURSES = ("Main course", "Appetizers", "Desserts")
+COURSES = ("Main course", "Appetizers", "Desserts", "Dips")
 
 
 def _col_letter(one_based_index: int) -> str:
@@ -47,6 +47,7 @@ def _col_letter(one_based_index: int) -> str:
 
 SOURCE_COL = HEADERS.index("Source") + 1  # 1-based, matches HEADERS
 LAST_COL_LETTER = _col_letter(len(HEADERS))
+COURSE_COL_LETTER = _col_letter(HEADERS.index("Course") + 1)
 
 
 @lru_cache(maxsize=1)
@@ -67,6 +68,7 @@ def _worksheet():
         ) from exc
     worksheet = sheet.sheet1
     _ensure_headers(worksheet)
+    _ensure_course_validation(worksheet)
     return worksheet
 
 
@@ -85,6 +87,42 @@ def _ensure_headers(worksheet) -> None:
         worksheet.update_cell(1, len(HEADERS), HEADERS[-1])
         return
     logger.warning("Sheet already has a header row that does not match %s", HEADERS)
+
+
+def _ensure_course_validation(worksheet) -> None:
+    """Keeps the Course column dropdown in sync with COURSES.
+
+    A sheet that predates Dips often still has a strict three-value list
+    (Main course / Appetizers / Desserts). USER_ENTERED writes of "Dips"
+    then fail or land blank, and the next read maps the empty cell back to
+    Main course — which looks like "saving as a dip does nothing"."""
+    existing = worksheet.row_values(1)
+    course_index = HEADERS.index("Course")
+    if len(existing) <= course_index or existing[course_index] != "Course":
+        return
+    try:
+        from gspread.utils import ValidationConditionType
+
+        worksheet.add_validation(
+            f"{COURSE_COL_LETTER}2:{COURSE_COL_LETTER}",
+            ValidationConditionType.one_of_list,
+            list(COURSES),
+            showCustomUi=True,
+            strict=False,
+        )
+    except Exception:
+        logger.warning("Could not refresh the Course column dropdown", exc_info=True)
+
+
+def _update_recipe_row(worksheet, row_id: int, row: list) -> None:
+    """Writes one recipe row. USER_ENTERED is the usual path; a RAW retry
+    covers a leftover strict Course dropdown that still rejects Dips."""
+    range_name = f"A{row_id}:{LAST_COL_LETTER}{row_id}"
+    try:
+        worksheet.update(range_name, [row], value_input_option="USER_ENTERED")
+    except gspread.exceptions.APIError:
+        logger.warning("USER_ENTERED write failed for row %s; retrying RAW", row_id)
+        worksheet.update(range_name, [row], value_input_option="RAW")
 
 
 STATE_SHEET_TITLE = "AppState"
@@ -301,7 +339,7 @@ def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
     # in between, so its length is exactly the last real row number.
     worksheet = _worksheet()
     next_row = len(worksheet.col_values(1)) + 1
-    worksheet.update(f"A{next_row}:{LAST_COL_LETTER}{next_row}", [row], value_input_option="USER_ENTERED")
+    _update_recipe_row(worksheet, next_row, row)
     logger.info("Saved %r to Google Sheets", recipe.title)
 
 
@@ -339,7 +377,7 @@ def create_recipe(
     # using append_row's auto-detected table range.
     worksheet = _worksheet()
     row_id = len(worksheet.col_values(1)) + 1
-    worksheet.update(f"A{row_id}:{LAST_COL_LETTER}{row_id}", [row], value_input_option="USER_ENTERED")
+    _update_recipe_row(worksheet, row_id, row)
     logger.info("Created row %s (%r) via manual entry", row_id, title)
 
     # Build the response from what we just wrote instead of a second read —
@@ -411,7 +449,7 @@ def update_recipe(row_id: int, **fields) -> dict | None:
         notes,
         course,
     ]
-    _worksheet().update(f"A{row_id}:{LAST_COL_LETTER}{row_id}", [row], value_input_option="USER_ENTERED")
+    _update_recipe_row(_worksheet(), row_id, row)
     logger.info("Updated row %s (%r)", row_id, title)
 
     # Build the response from what we just wrote instead of a second read —
@@ -496,7 +534,10 @@ def _parse_lines(text: str, bullets: bool = False, numbered: bool = False) -> li
 
 def _clean_course(value: str) -> str:
     value = (value or "").strip()
-    return value if value in COURSES else "Main course"
+    for course in COURSES:
+        if value.casefold() == course.casefold():
+            return course
+    return "Main course"
 
 
 def _meal_to_course(meal: str) -> str:

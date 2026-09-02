@@ -1,21 +1,31 @@
-function mealLabels() {
-  return {
-    breakfast: t("Breakfast"),
-    lunch: t("Lunch"),
-    dinner: t("Dinner"),
-    snack: t("Snack"),
-    dessert: t("Dessert"),
-    drink: t("Drink"),
-    other: t("Other"),
-  };
-}
-
 const STAPLES = new Set(["salt", "water", "oil", "pepper", "black pepper", "sugar"]);
 
 // Suggested chips. Gemini still picks from this list; add/edit can type more.
 const RECIPE_TAGS = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"];
 const MAX_RECIPE_TAG_LENGTH = 32;
 const MAX_RECIPE_TAGS = 24;
+const COURSES = ["Main course", "Appetizers", "Desserts", "Dips"];
+
+function courseFromMeal(meal) {
+  if (meal === "dessert") return "Desserts";
+  if (meal === "snack") return "Appetizers";
+  return "Main course";
+}
+
+function courseChipsHtml(selected, action) {
+  return COURSES.map((course) => {
+    const active = course === selected;
+    return `<button class="chip${active ? " active" : ""}" type="button" data-action="${action}" data-course="${escapeAttr(course)}">${escapeHtml(t(course))}</button>`;
+  }).join("");
+}
+
+function setCourseSelection(which, course) {
+  const input = document.getElementById(`${which}-course`);
+  const chips = document.getElementById(`${which}-course-chips`);
+  if (!input || !chips || !COURSES.includes(course)) return;
+  input.value = course;
+  chips.innerHTML = courseChipsHtml(course, which === "edit" ? "pick-edit-course" : "pick-add-course");
+}
 
 // Mirrors app/match.py's UNITS and Models.swift's ingredientUnits, so a
 // quantity gets called out the same way on every surface.
@@ -651,7 +661,7 @@ function missingIngredients(recipe) {
 // change these fields) rather than rebuilt on every filtered() call — the
 // same tradeoff Models.swift makes on iOS (see Recipe.searchBlob there).
 function computeSearchBlob(recipe) {
-  return [recipe.title, ...(recipe.tags || []), ...(recipe.ingredients || [])].join(" ").toLowerCase();
+  return [recipe.title, recipe.course, ...(recipe.tags || []), ...(recipe.ingredients || [])].join(" ").toLowerCase();
 }
 
 function filtered() {
@@ -814,7 +824,11 @@ function refreshOpenRecipe() {
 function recipeHtml(recipe) {
   if (state.editingId === recipe.id) return editFormHtml(recipe);
 
-  const bits = [recipe.servings ? t("servings", { n: recipe.servings }) : null, recipe.time].filter(Boolean);
+  const bits = [
+    recipe.course && COURSES.includes(recipe.course) ? t(recipe.course) : recipe.course,
+    recipe.servings ? t("servings", { n: recipe.servings }) : null,
+    recipe.time,
+  ].filter(Boolean);
   const tags = (recipe.tags || [])
     .map((tag) => `<button class="pill pill-btn-plain" type="button" data-action="filter-tag" data-tag="${escapeAttr(tag)}">${escapeHtml(tTag(tag))}</button>`)
     .join("");
@@ -895,10 +909,11 @@ function editFormHtml(recipe) {
         <span>${escapeHtml(t("title"))}</span>
         <input id="edit-title" value="${escapeAttr(recipe.title)}">
       </label>
-      <label class="field">
-        <span>${escapeHtml(t("servingsLabel"))}</span>
-        <input id="edit-servings" value="${escapeAttr(recipe.servings || "")}">
-      </label>
+      <div class="field">
+        <span>${escapeHtml(t("course"))}</span>
+        <input type="hidden" id="edit-course" value="${escapeAttr(recipe.course && COURSES.includes(recipe.course) ? recipe.course : "Main course")}">
+        <div id="edit-course-chips" class="chips">${courseChipsHtml(recipe.course && COURSES.includes(recipe.course) ? recipe.course : "Main course", "pick-edit-course")}</div>
+      </div>
       <label class="field">
         <span>${escapeHtml(t("ingredientsOnePerLine"))}</span>
         <textarea id="edit-ingredients" rows="8">${escapeHtml((recipe.ingredients || []).join("\n"))}</textarea>
@@ -999,10 +1014,7 @@ function addCustomTag(which) {
 }
 
 function addRecipeFormHtml(prefill) {
-  const mealValue = prefill?.meal || "other";
-  const mealOptions = Object.entries(mealLabels())
-    .map(([value, label]) => `<option value="${escapeAttr(value)}"${value === mealValue ? " selected" : ""}>${escapeHtml(label)}</option>`)
-    .join("");
+  const courseValue = courseFromMeal(prefill?.meal);
   const ingredientsValue = prefill ? prefill.ingredients.join("\n") : "";
   const stepsValue = prefill ? prefill.steps.join("\n") : "";
   const prefillTags = prefill ? prefill.tags : [];
@@ -1022,10 +1034,6 @@ function addRecipeFormHtml(prefill) {
         <input id="add-title" placeholder="${escapeAttr(t("title"))}" value="${escapeAttr(prefill?.title || "")}">
       </label>
       <label class="field">
-        <span>${escapeHtml(t("servingsLabel"))}</span>
-        <input id="add-servings" placeholder="${escapeAttr(t("exampleFour"))}" value="${escapeAttr(prefill?.servings || "")}">
-      </label>
-      <label class="field">
         <span>${escapeHtml(t("ingredientsOnePerLine"))}</span>
         <textarea id="add-ingredients" rows="8">${escapeHtml(ingredientsValue)}</textarea>
       </label>
@@ -1033,15 +1041,11 @@ function addRecipeFormHtml(prefill) {
         <span>${escapeHtml(t("stepsOnePerLine"))}</span>
         <textarea id="add-steps" rows="10">${escapeHtml(stepsValue)}</textarea>
       </label>
-      <label class="field">
-        <span>${escapeHtml(t("meal"))}</span>
-        <select id="add-meal">${mealOptions}</select>
-      </label>
-      <input type="hidden" id="add-cuisine" value="${escapeAttr(prefill?.cuisine || "")}">
-      <label class="field">
-        <span>${escapeHtml(t("time"))}</span>
-        <input id="add-time" placeholder="${escapeAttr(t("exampleTime"))}" value="${escapeAttr(prefill?.time || "")}">
-      </label>
+      <div class="field">
+        <span>${escapeHtml(t("course"))}</span>
+        <input type="hidden" id="add-course" value="${escapeAttr(courseValue)}">
+        <div id="add-course-chips" class="chips">${courseChipsHtml(courseValue, "pick-add-course")}</div>
+      </div>
       <div class="field">
         <span>${escapeHtml(t("tags"))}</span>
         <input type="hidden" id="add-tags" value="${escapeAttr(prefillTags.join(", "))}">
@@ -1059,12 +1063,9 @@ function addRecipeFormHtml(prefill) {
 
 async function saveAddRecipe() {
   const titleInput = document.getElementById("add-title");
-  const servingsInput = document.getElementById("add-servings");
   const ingredientsInput = document.getElementById("add-ingredients");
   const stepsInput = document.getElementById("add-steps");
-  const mealInput = document.getElementById("add-meal");
-  const cuisineInput = document.getElementById("add-cuisine");
-  const timeInput = document.getElementById("add-time");
+  const courseInput = document.getElementById("add-course");
   const tagsInput = document.getElementById("add-tags");
   const notesInput = document.getElementById("add-notes");
   const errorEl = document.getElementById("add-error");
@@ -1079,12 +1080,9 @@ async function saveAddRecipe() {
 
   const draft = {
     title,
-    servings: servingsInput.value.trim() || null,
     ingredients: linesFrom(ingredientsInput.value),
     steps: linesFrom(stepsInput.value),
-    meal: mealInput.value,
-    cuisine: cuisineInput.value.trim() || "Uncategorized",
-    time: timeInput.value.trim() || null,
+    course: courseInput.value || "Main course",
     tags: tagsInput.value.split(",").map((tag) => tag.trim()).filter(Boolean),
     notes: notesInput.value.trim(),
   };
@@ -1139,11 +1137,11 @@ function cancelEdit() {
 async function saveEdit(id) {
   id = Number(id);
   const titleInput = document.getElementById("edit-title");
-  const servingsInput = document.getElementById("edit-servings");
   const ingredientsInput = document.getElementById("edit-ingredients");
   const stepsInput = document.getElementById("edit-steps");
   const notesInput = document.getElementById("edit-notes");
   const tagsInput = document.getElementById("edit-tags");
+  const courseInput = document.getElementById("edit-course");
   const errorEl = document.getElementById("edit-error");
   const saveBtn = document.querySelector('[data-action="save-edit"]');
 
@@ -1156,11 +1154,11 @@ async function saveEdit(id) {
 
   const patch = {
     title,
-    servings: servingsInput.value.trim() || null,
     notes: notesInput.value.trim(),
     ingredients: linesFrom(ingredientsInput.value),
     steps: linesFrom(stepsInput.value),
     tags: tagsInput.value.split(",").map((tag) => tag.trim()).filter(Boolean),
+    course: courseInput?.value || "Main course",
   };
 
   saveBtn.disabled = true;
@@ -1389,6 +1387,10 @@ document.addEventListener("click", (event) => {
       break;
     case "save-add-recipe":
       saveAddRecipe();
+      break;
+    case "pick-add-course":
+    case "pick-edit-course":
+      setCourseSelection(action === "pick-edit-course" ? "edit" : "add", actionEl.dataset.course);
       break;
     case "pick-add-tag":
     case "pick-edit-tag": {

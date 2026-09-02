@@ -118,6 +118,7 @@ SIMPLE = {
     "Main course": "Hauptgericht",
     "Appetizers": "Vorspeisen",
     "Desserts": "Nachspeisen",
+    "Dips": "Dips",
     "Recent": "Neueste",
     "A–Z": "A–Z",
     "Z–A": "Z–A",

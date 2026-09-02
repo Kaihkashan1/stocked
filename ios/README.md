@@ -32,7 +32,7 @@ The Home Screen icon is the book-over-shelf mark in `Assets.xcassets`. If an ins
 - After a successful sync, recipes and cupboard data stay on the phone. You can browse, filter, and cook **offline**. A sage banner reads **Offline — showing recipes saved on this phone**. Adding recipes, favoriting, editing, deleting, and cupboard writes still need the network.
 - **Search recipes** filters the list by title/text as you type. If what you typed also matches an ingredient name, a row under search lets you **filter by ingredient** — tap a suggestion, or **+ Add "…"** for a custom name.
 - Next to search: a **filter** button (fills accent when any list filter is active) and a **grid/list toggle** for recipe cards (remembered on this phone).
-- A **Main course / Appetizers / Desserts** row sits below search — tap one to filter, tap again to clear.
+- A **Main course / Appetizers / Desserts / Dips** row sits below search — tap one to filter, tap again to clear.
 - Ingredient filters are **AND**: only recipes that use **all** selected ingredients stay visible. Results are ranked by **fit %** (sage **% FIT** pill on each card). Sort (Recent / A–Z / Z–A) is ignored while ingredient filters are active. The sage banner reads **Filtered by …** with **Clear**.
 - **Clear all filters** appears on the list whenever search, course, tags, sources, favorites, or ingredients are narrowing it.
 - **Filters** sheet, in order: **Ingredients** (only if any are selected — same sage card as before), **Favorites only**, **Sort**, **Source** (Instagram / YouTube / TikTok / Link / Photo / Typed in), **Tags**. **Reset** clears everything including ingredients.
