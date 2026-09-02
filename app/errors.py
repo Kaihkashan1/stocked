@@ -28,17 +28,22 @@ GEMINI_BUSY_MESSAGE = (
 
 
 def gemini_is_busy(exc: Exception) -> bool:
-    """Capacity blips (503 / 'high demand'), not the daily free-tier cap.
+    """Capacity blips (503 / 'high demand' / 504 DEADLINE_EXCEEDED), not the
+    daily free-tier cap.
 
     A client-side timeout (see app.extract's explicit HttpOptions.timeout)
     counts too: the SDK has no timeout of its own, so without ours a slow
     Gemini response would just run out the clock until Vercel's hard 60s
     kill instead of failing cleanly — and a response that takes that long
-    reads the same as "busy" from here, whether Gemini ever answered or not."""
+    reads the same as "busy" from here, whether Gemini ever answered or not.
+
+    504 is Gemini's own server-side deadline, not ours — seen live as
+    "DEADLINE_EXCEEDED. ... Deadline expired before operation could
+    complete." when the model itself is currently slow to respond."""
     if isinstance(exc, httpx.TimeoutException):
         return True
     code = getattr(exc, "code", None)
-    if code in (500, 503):
+    if code in (500, 503, 504):
         return True
     message = str(getattr(exc, "message", None) or exc).lower()
     return (
@@ -48,6 +53,8 @@ def gemini_is_busy(exc: Exception) -> bool:
         or "try again later" in message
         or "timeout" in message
         or "timed out" in message
+        or "deadline_exceeded" in message
+        or "deadline expired" in message
     )
 
 
