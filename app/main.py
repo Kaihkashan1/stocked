@@ -134,8 +134,13 @@ async def api_extract_photo(photo: UploadFile = File(...)):
         post = FetchedPost(url="", caption="", video_path=None, thumbnail_path=str(tmp_path))
         try:
             recipe = extract_recipe(post)
-        except GeminiAPIError as exc:
-            if exc.code == 429:
+        except Exception as exc:
+            # Not just GeminiAPIError: a slow response now fails as a plain
+            # httpx.TimeoutException (see app.extract's explicit call
+            # timeout) rather than a Gemini-shaped error, and still needs
+            # the same friendly 503/429/502 treatment instead of leaking a
+            # raw exception as an unhandled 500.
+            if isinstance(exc, GeminiAPIError) and exc.code == 429:
                 status = 429
             elif gemini_is_busy(exc):
                 status = 503

@@ -7,6 +7,7 @@ hit or an Apify limit reads the same way no matter which path triggered it.
 
 from __future__ import annotations
 
+import httpx
 from google.genai.errors import APIError as GeminiAPIError
 
 from app.fetch import ApifyLimitError
@@ -27,7 +28,15 @@ GEMINI_BUSY_MESSAGE = (
 
 
 def gemini_is_busy(exc: Exception) -> bool:
-    """Capacity blips (503 / 'high demand'), not the daily free-tier cap."""
+    """Capacity blips (503 / 'high demand'), not the daily free-tier cap.
+
+    A client-side timeout (see app.extract's explicit HttpOptions.timeout)
+    counts too: the SDK has no timeout of its own, so without ours a slow
+    Gemini response would just run out the clock until Vercel's hard 60s
+    kill instead of failing cleanly — and a response that takes that long
+    reads the same as "busy" from here, whether Gemini ever answered or not."""
+    if isinstance(exc, httpx.TimeoutException):
+        return True
     code = getattr(exc, "code", None)
     if code in (500, 503):
         return True
@@ -37,6 +46,8 @@ def gemini_is_busy(exc: Exception) -> bool:
         or "unavailable" in message
         or "overloaded" in message
         or "try again later" in message
+        or "timeout" in message
+        or "timed out" in message
     )
 
 
