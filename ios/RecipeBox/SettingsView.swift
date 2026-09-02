@@ -3,7 +3,6 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(PantryStore.self) private var pantryStore
-    @Environment(LanguageStore.self) private var languages
     @Environment(\.dismiss) private var dismiss
     @State private var draftURL = ""
     @State private var saving = false
@@ -34,18 +33,6 @@ struct SettingsView: View {
                     Text("Settings")
                         .font(Theme.display(30))
                         .foregroundStyle(Theme.ink)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Kicker(text: L("Language"), color: Theme.neutral600)
-                        FlowLayout(spacing: 7) {
-                            ForEach(AppLanguage.allCases) { option in
-                                ChipButton(title: option.localizedName, selected: languages.language == option) {
-                                    languages.language = option
-                                }
-                                .fixedSize()
-                            }
-                        }
-                    }
 
                     if let usage {
                         importLimitsSection(usage)

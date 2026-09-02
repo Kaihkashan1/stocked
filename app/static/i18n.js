@@ -124,157 +124,11 @@ const I18N = {
     "high protein": "high protein",
     airfryer: "airfryer",
   },
-  de: {
-    personalCollection: "Persönliche Sammlung",
-    recipeBox: "Rezeptbox",
-    addRecipe: "Rezept hinzufügen",
-    typeItIn: "Selbst eintippen",
-    fromAPhoto: "Aus einem Foto",
-    settings: "Einstellungen",
-    language: "Sprache",
-    matchDevice: "System",
-    english: "Englisch",
-    german: "Deutsch",
-    languageHint: "Tasten und Beschriftungen folgen dieser Sprache. Rezepttitel und Schritte bleiben so, wie sie gespeichert wurden.",
-    editKey: "Bearbeitungsschlüssel",
-    developer: "Entwickler",
-    importLimits: "Importlimits",
-    importsToday: "Importe heute",
-    importCostThisMonth: "Importkosten diesen Monat",
-    ofCount: "{used} von {limit}",
-    resetsAround: "Zurücksetzung gegen {time} MEZ/MESZ",
-    resetsOn: "Zurücksetzung {date}",
-    saveAndReload: "Sichern und neu laden",
-    server: "Server",
-    serverFootnote: "Rezepte kommen vom gehosteten Server. Dein Mac muss nicht laufen.",
-    editKeyFootnote: "Nur zum Favorisieren oder Bearbeiten nötig. Derselbe Wert, den der Kurzbefehl sendet.",
-    searchAria: "Rezepte suchen oder etwas markieren, das du hast",
-    searchPlaceholder: "Titel, Zutat, Tag suchen … oder markieren, was du hast",
-    filters: "Filter",
-    whatIHave: "Was ich habe",
-    whatIHaveHint: "Sortiert Rezepte nach der besten Passung. Tippe oben eine Zutat ein, um eine hinzuzufügen.",
-    nothingMarkedYet: "Noch nichts markiert.",
-    tag: "Tag",
-    tags: "Tags",
-    source: "Quelle",
-    Instagram: "Instagram",
-    YouTube: "YouTube",
-    TikTok: "TikTok",
-    Link: "Link",
-    Photo: "Foto",
-    "Typed in": "Eingetippt",
-    favoritesOnly: "Nur Favoriten",
-    sort: "Sortierung",
-    recent: "Neueste",
-    az: "A–Z",
-    za: "Z–A",
-    resetFilters: "Filter zurücksetzen",
-    offlineBanner: "Offline — Rezepte von diesem Gerät",
-    loadingRecipes: "Rezepte werden geladen…",
-    couldNotLoad: "Rezepte konnten nicht geladen werden.",
-    editKeyPrompt:
-      "Bearbeitungsschlüssel — derselbe Wert wie RECIPE_BOX_SECRET auf dem Server. Wird zum Favorisieren, Bearbeiten oder Löschen hier gebraucht. Leer lassen bei einem Entwicklungsserver ohne Schlüssel.",
-    couldntSaveHave: "Was du hast, konnte nicht gespeichert werden: {error}",
-    markAsHave: "Als vorhanden markieren:",
-    addQuoted: "+ „{item}“ hinzufügen",
-    filtersCount: "Filter ({count})",
-    recipeCountOne: "{n} Rezept",
-    recipeCountOther: "{n} Rezepte",
-    closestFit: "{count} · beste Passung zuerst",
-    noMatch: "Keine Rezepte passen zu diesen Filtern.",
-    favorite: "Favorit",
-    bestFit: "Beste Passung",
-    fitMissing: "{pct} % Passung · {n} fehlen",
-    fitPct: "{pct} % Passung",
-    originalPost: "Originalbeitrag",
-    notes: "Notizen",
-    missingFromHaveOne: "Es fehlt {n} Zutat von dem, was du hast: {list}",
-    missingFromHaveOther: "Es fehlen {n} Zutaten von dem, was du hast: {list}",
-    haveEverything: "Du hast alles dafür.",
-    close: "Schließen",
-    edit: "Bearbeiten",
-    deleteRecipe: "Rezept löschen",
-    ingredients: "Zutaten",
-    steps: "Schritte",
-    noneListed: "Keine angegeben",
-    servings: "{n} Portionen",
-    cancel: "Abbrechen",
-    editRecipe: "Rezept bearbeiten",
-    title: "Titel",
-    servingsLabel: "Portionen",
-    ingredientsOnePerLine: "Zutaten — eine pro Zeile",
-    stepsOnePerLine: "Schritte — eine pro Zeile",
-    tags: "Tags",
-    newTag: "Neues Tag",
-    addTag: "Tag hinzufügen",
-    save: "Sichern",
-    saving: "Wird gespeichert…",
-    addRecipeTitle: "Rezept hinzufügen",
-    photoPrefillHint: "Aus deinem Foto gelesen — prüfe es, bevor du speicherst.",
-    meal: "Mahlzeit",
-    time: "Zeit",
-    titleEmpty: "Der Titel darf nicht leer sein.",
-    couldntSave: "Speichern fehlgeschlagen: {error}",
-    couldntDelete: "Löschen fehlgeschlagen: {error}",
-    deleteConfirm: "Dieses Rezept löschen?\n\nEs wird aus deiner Sammlung entfernt. Das lässt sich nicht rückgängig machen.",
-    readingRecipe: "Rezept wird gelesen…",
-    couldntReadPhoto: "Foto konnte nicht gelesen werden: {error}",
-    couldNotProcessPhoto: "Dieses Foto konnte nicht verarbeitet werden.",
-    couldNotReadPhoto: "Dieses Foto konnte nicht gelesen werden.",
-    exampleFour: "z. B. 4",
-    exampleTime: "z. B. 20 Min.",
-    course: "Gang",
-    "Main course": "Hauptgericht",
-    Appetizers: "Vorspeisen",
-    Desserts: "Nachspeisen",
-    Dips: "Dips",
-    Breakfast: "Frühstück",
-    Lunch: "Mittagessen",
-    Dinner: "Abendessen",
-    Snack: "Snack",
-    Dessert: "Dessert",
-    Drink: "Getränk",
-    Other: "Sonstiges",
-    Ingredients: "Zutaten",
-    Produce: "Obst & Gemüse",
-    "Dairy & eggs": "Milchprodukte & Eier",
-    "Meat & seafood": "Fleisch & Fisch",
-    "Grains & cupboard": "Getreide & Vorrat",
-    "Grains & pantry": "Getreide & Vorrat",
-    "Condiments & spices": "Würzmittel & Gewürze",
-    "mom's recipes": "Rezepte von Mama",
-    veg: "vegetarisch",
-    "non-veg": "nicht vegetarisch",
-    dessert: "Dessert",
-    "high protein": "proteinreich",
-    airfryer: "Heißluftfritteuse",
-  },
 };
 
-const LANGUAGE_KEY = "recipeBox.language";
-
-function languagePreference() {
-  return localStorage.getItem(LANGUAGE_KEY) || "system";
-}
-
-function setLanguagePreference(value) {
-  localStorage.setItem(LANGUAGE_KEY, value);
-}
-
-function appLocale() {
-  const pref = languagePreference();
-  if (pref === "de" || pref === "en") return pref;
-  const lang = (navigator.language || "en").toLowerCase();
-  return lang.startsWith("de") ? "de" : "en";
-}
-
 function t(key, vars) {
-  const table = I18N[appLocale()] || {};
-  let text = Object.prototype.hasOwnProperty.call(table, key) ? table[key] : null;
-  if (text == null) {
-    const fallback = I18N.en || {};
-    text = Object.prototype.hasOwnProperty.call(fallback, key) ? fallback[key] : key;
-  }
+  const table = I18N.en || {};
+  let text = Object.prototype.hasOwnProperty.call(table, key) ? table[key] : key;
   if (vars) {
     for (const [name, value] of Object.entries(vars)) {
       text = text.replaceAll(`{${name}}`, String(value));
@@ -296,7 +150,7 @@ function tTag(tag) {
 }
 
 function applyStaticI18n() {
-  document.documentElement.lang = appLocale() === "de" ? "de" : "en";
+  document.documentElement.lang = "en";
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     el.textContent = t(el.getAttribute("data-i18n"));
   });

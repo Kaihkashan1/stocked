@@ -482,7 +482,7 @@ struct RecipeCard: View, Equatable {
         VStack(alignment: .leading, spacing: isGrid ? 8 : 10) {
             HStack(spacing: 8) {
                 if !isGrid {
-                    Text(recipe.sourceLabel.uppercased(with: LanguageStore.shared.language.locale))
+                    Text(recipe.sourceLabel.uppercased(with: Locale(identifier: "en")))
                         .font(Theme.body(10, weight: .semibold))
                         .tracking(1.2)
                         .foregroundStyle(Theme.neutral600)

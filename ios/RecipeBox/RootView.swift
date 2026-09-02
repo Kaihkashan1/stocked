@@ -39,7 +39,6 @@ struct RootView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(PantryStore.self) private var pantryStore
     @Environment(Connectivity.self) private var connectivity
-    @Environment(LanguageStore.self) private var languages
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: AppTab = .recipes
     @State private var activeSheet: ActiveSheet?
@@ -60,22 +59,13 @@ struct RootView: View {
         TabView(selection: $selectedTab) {
             recipesTab
                 .tabItem {
-                    // Tab bar items are bridged to UIKit and don't reliably
-                    // redraw on their own when the locale environment
-                    // changes — scoping the identity reset to just the
-                    // label (rather than the whole TabView, as before) is
-                    // what actually needs it, without discarding
-                    // recipesTab/pantryTab's own state (scroll position, an
-                    // open sheet, in-flight tasks) on every language switch.
                     Label("Cookbook", systemImage: "book")
-                        .id(languages.language)
                 }
                 .tag(AppTab.recipes)
 
             pantryTab
                 .tabItem {
                     Label("Cupboard", systemImage: "cabinet")
-                        .id(languages.language)
                 }
                 .tag(AppTab.pantry)
         }

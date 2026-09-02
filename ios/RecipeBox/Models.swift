@@ -252,7 +252,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         guard let savedAt, let date = Self.savedAtFormatter.date(from: savedAt) else { return nil }
         let relativeFormatter = RelativeDateTimeFormatter()
         relativeFormatter.unitsStyle = .full
-        relativeFormatter.locale = LanguageStore.shared.language.locale
+        relativeFormatter.locale = Locale(identifier: "en")
         let relative = relativeFormatter.localizedString(for: date, relativeTo: Date())
         return L("Saved \(relative)")
     }
@@ -440,7 +440,7 @@ struct UsageStats: Decodable {
             calendar.timeZone = pacific
             let startOfToday = calendar.startOfDay(for: Date())
             let nextMidnightPacific = calendar.date(byAdding: .day, value: 1, to: startOfToday) ?? Date()
-            display.locale = LanguageStore.shared.language.locale
+            display.locale = Locale(identifier: "en")
             return L("Resets around \(display.string(from: nextMidnightPacific)) CET")
         }
     }
@@ -478,7 +478,7 @@ struct UsageStats: Decodable {
             guard let resetsAt else { return nil }
             let date = Self.parser.date(from: resetsAt) ?? Self.fallbackParser.date(from: resetsAt)
             guard let date else { return nil }
-            Self.display.locale = LanguageStore.shared.language.locale
+            Self.display.locale = Locale(identifier: "en")
             return L("Resets \(Self.display.string(from: date))")
         }
     }

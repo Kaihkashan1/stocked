@@ -4,12 +4,6 @@
     "CFBundleDisplayName" : {
       "extractionState" : "manual",
       "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stocked"
-          }
-        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -34,12 +28,6 @@
       "comment" : "Permission prompt when photographing a recipe card.",
       "extractionState" : "manual",
       "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stocked verwendet die Kamera, um eine Rezeptkarte oder Kochbuchseite zu fotografieren und das Rezept für dich auszulesen."
-          }
-        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -52,12 +40,6 @@
       "comment" : "Permission prompt when talking to a local dev server.",
       "extractionState" : "manual",
       "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stocked kann Rezepte von einem Server in deinem lokalen Netzwerk laden, wenn du testest."
-          }
-        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
