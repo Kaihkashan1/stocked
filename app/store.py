@@ -37,6 +37,7 @@ HEADERS = [
 ]
 TRUE_VALUES = {"true", "yes", "1", "y"}
 COURSES = ("Main course", "Appetizers", "Desserts", "Dips")
+_COURSES_CASEFOLDED = {course.casefold(): course for course in COURSES}
 
 
 def _col_letter(one_based_index: int) -> str:
@@ -549,11 +550,12 @@ def _parse_lines(text: str, bullets: bool = False, numbered: bool = False) -> li
 
 
 def _clean_course(value: str) -> str:
-    value = (value or "").strip()
-    for course in COURSES:
-        if value.casefold() == course.casefold():
-            return course
-    return "Main course"
+    """Case-fold against the known Course vocabulary, else fall back to
+    Main course — the same shape as app/models.py's _RECIPE_TAGS_LOWER tag
+    lookup, via a precomputed dict rather than a linear scan. Mirrored (not
+    shared — no code-sharing path across Python/Swift for this) by
+    ios/RecipeBox/Models.swift's Course.resolve()."""
+    return _COURSES_CASEFOLDED.get((value or "").strip().casefold(), "Main course")
 
 
 def _meal_to_course(meal: str) -> str:

@@ -12,11 +12,18 @@ function courseFromMeal(meal) {
   return "Main course";
 }
 
+// Shared by courseChipsHtml (single-select) and existingTagChips
+// (multi-select) below — the only thing that varies between a course chip
+// and a tag chip is the CSS class, the data-* attribute name, which item is
+// "active", and how its label is looked up.
+function chipButtonHtml({ className, action, dataAttr, value, active, label }) {
+  return `<button class="${className}${active ? " active" : ""}" type="button" data-action="${action}" data-${dataAttr}="${escapeAttr(value)}">${escapeHtml(label)}</button>`;
+}
+
 function courseChipsHtml(selected, action) {
-  return COURSES.map((course) => {
-    const active = course === selected;
-    return `<button class="chip${active ? " active" : ""}" type="button" data-action="${action}" data-course="${escapeAttr(course)}">${escapeHtml(t(course))}</button>`;
-  }).join("");
+  return COURSES.map((course) =>
+    chipButtonHtml({ className: "chip", action, dataAttr: "course", value: course, active: course === selected, label: t(course) })
+  ).join("");
 }
 
 function setCourseSelection(which, course) {
@@ -965,7 +972,7 @@ function offeredFormTags(selectedTags) {
 function existingTagChips(action, selectedTags) {
   return offeredFormTags(selectedTags).map((tag) => {
     const active = selectedTags.some((selected) => selected.toLowerCase() === tag.toLowerCase());
-    return `<button class="pill pill-btn-plain${active ? " active" : ""}" type="button" data-action="${action}" data-tag="${escapeAttr(tag)}">${escapeHtml(tTag(tag))}</button>`;
+    return chipButtonHtml({ className: "pill pill-btn-plain", action, dataAttr: "tag", value: tag, active, label: tTag(tag) });
   }).join("");
 }
 
