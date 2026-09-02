@@ -318,9 +318,13 @@ enum Course: String, CaseIterable, Identifiable {
         L(String.LocalizationValue(rawValue))
     }
 
+    /// Case-fold against the known Course cases, else fall back to
+    /// mainCourse — the same shape as normalizeRecipeTag's case-insensitive
+    /// lookup below. Mirrored (not shared — no code-sharing path across
+    /// Swift/Python for this) by app/store.py's _clean_course.
     static func resolve(_ raw: String?) -> Course {
         let trimmed = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        return allCases.first { $0.rawValue.compare(trimmed, options: .caseInsensitive) == .orderedSame } ?? .mainCourse
+        return allCases.first { $0.rawValue.caseInsensitiveCompare(trimmed) == .orderedSame } ?? .mainCourse
     }
 
     /// Only used to seed an initial guess from a photo extraction's Gemini

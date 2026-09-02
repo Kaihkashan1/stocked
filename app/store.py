@@ -37,6 +37,7 @@ HEADERS = [
 ]
 TRUE_VALUES = {"true", "yes", "1", "y"}
 COURSES = ("Main course", "Appetizers", "Desserts", "Dips")
+_COURSES_CASEFOLDED = {course.casefold(): course for course in COURSES}
 
 
 def _col_letter(one_based_index: int) -> str:
@@ -67,38 +68,47 @@ def _worksheet():
             "uncheck Notify people → Share."
         ) from exc
     worksheet = sheet.sheet1
-    _ensure_headers(worksheet)
-    _ensure_course_validation(worksheet)
+    existing_headers = _ensure_headers(worksheet)
+    _ensure_course_validation(worksheet, existing_headers)
     return worksheet
 
 
-def _ensure_headers(worksheet) -> None:
+def _ensure_headers(worksheet) -> list[str]:
+    """Returns the sheet's current header row, creating/extending it first
+    if needed. Callers that only care about a specific column (see
+    _ensure_course_validation) can reuse this instead of issuing their own
+    row_values(1) read."""
     existing = worksheet.row_values(1)
     if existing[: len(HEADERS)] == HEADERS:
-        return
+        return existing
     if not any(existing):
         worksheet.append_row(HEADERS, value_input_option="RAW")
-        return
+        return list(HEADERS)
     if existing == HEADERS[:-1]:
         # Exactly the pre-Course shape: every other header already matches,
         # in the same order, nothing missing in between — so this is a pure
         # append (one new cell) rather than a rewrite of a row that already
         # has real columns under it.
         worksheet.update_cell(1, len(HEADERS), HEADERS[-1])
-        return
+        return list(HEADERS)
     logger.warning("Sheet already has a header row that does not match %s", HEADERS)
+    return existing
 
 
-def _ensure_course_validation(worksheet) -> None:
+def _ensure_course_validation(worksheet, headers: list[str]) -> None:
     """Keeps the Course column dropdown in sync with COURSES.
 
     A sheet that predates Dips often still has a strict three-value list
     (Main course / Appetizers / Desserts). USER_ENTERED writes of "Dips"
     then fail or land blank, and the next read maps the empty cell back to
-    Main course — which looks like "saving as a dip does nothing"."""
-    existing = worksheet.row_values(1)
+    Main course — which looks like "saving as a dip does nothing".
+
+    Takes the header row from _ensure_headers rather than re-reading it —
+    this only runs once per warm process (behind _worksheet's lru_cache),
+    but on Vercel that's once per cold start, so it's worth not doubling
+    the read."""
     course_index = HEADERS.index("Course")
-    if len(existing) <= course_index or existing[course_index] != "Course":
+    if len(headers) <= course_index or headers[course_index] != "Course":
         return
     try:
         from gspread.utils import ValidationConditionType
@@ -116,12 +126,19 @@ def _ensure_course_validation(worksheet) -> None:
 
 def _update_recipe_row(worksheet, row_id: int, row: list) -> None:
     """Writes one recipe row. USER_ENTERED is the usual path; a RAW retry
-    covers a leftover strict Course dropdown that still rejects Dips."""
+    covers a leftover strict Course dropdown that still rejects Dips.
+
+    Only retried when the API actually rejects the request (code 400,
+    e.g. a data-validation failure) — a rate limit, auth problem, or other
+    APIError is a real failure and should propagate rather than be masked
+    by a silent retry in a different (less type-aware) input mode."""
     range_name = f"A{row_id}:{LAST_COL_LETTER}{row_id}"
     try:
         worksheet.update(range_name, [row], value_input_option="USER_ENTERED")
-    except gspread.exceptions.APIError:
-        logger.warning("USER_ENTERED write failed for row %s; retrying RAW", row_id)
+    except gspread.exceptions.APIError as exc:
+        if exc.code != 400:
+            raise
+        logger.warning("USER_ENTERED write rejected for row %s (code %s); retrying RAW", row_id, exc.code)
         worksheet.update(range_name, [row], value_input_option="RAW")
 
 
@@ -533,11 +550,12 @@ def _parse_lines(text: str, bullets: bool = False, numbered: bool = False) -> li
 
 
 def _clean_course(value: str) -> str:
-    value = (value or "").strip()
-    for course in COURSES:
-        if value.casefold() == course.casefold():
-            return course
-    return "Main course"
+    """Case-fold against the known Course vocabulary, else fall back to
+    Main course — the same shape as app/models.py's _RECIPE_TAGS_LOWER tag
+    lookup, via a precomputed dict rather than a linear scan. Mirrored (not
+    shared — no code-sharing path across Python/Swift for this) by
+    ios/RecipeBox/Models.swift's Course.resolve()."""
+    return _COURSES_CASEFOLDED.get((value or "").strip().casefold(), "Main course")
 
 
 def _meal_to_course(meal: str) -> str:

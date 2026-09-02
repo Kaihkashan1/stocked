@@ -48,7 +48,6 @@ struct EditRecipeView: View {
                                 ChipButton(title: option.localizedName, selected: course == option) {
                                     course = option
                                 }
-                                .fixedSize()
                             }
                         }
                     }

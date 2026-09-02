@@ -279,7 +279,6 @@ private struct CourseFilterRow: View {
                 ChipButton(title: course.localizedName, selected: store.courseFilter == course) {
                     store.courseFilter = (store.courseFilter == course) ? nil : course
                 }
-                .fixedSize()
             }
         }
         .padding(.horizontal, Theme.screenPadding)
