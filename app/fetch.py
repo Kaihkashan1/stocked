@@ -485,12 +485,14 @@ def _find_ingredient_heading(text: str) -> re.Match | None:
     right back near the top of the page, defeating the point of this
     function. Prefer a match followed by a colon — a real heading reads
     "Ingredients:" once whitespace is flattened, a passing mention doesn't.
-    Failing that, the LAST bare mention is a better bet than the first:
-    recipe blogs put their story/SEO padding before the actual card, so the
-    final occurrence is far more likely to be the real heading."""
-    colon_match = _INGREDIENT_HEADING_COLON.search(text)
-    if colon_match:
-        return colon_match
+    Within each tier the LAST match wins, not the first: recipe blogs put
+    their story/SEO padding (which can itself contain an early, colon-suffixed
+    false positive, e.g. "A note on ingredients: feel free to substitute...")
+    before the actual card, so the final occurrence of either pattern is far
+    more likely to be the real heading."""
+    colon_matches = list(_INGREDIENT_HEADING_COLON.finditer(text))
+    if colon_matches:
+        return colon_matches[-1]
     matches = list(_INGREDIENT_HEADING.finditer(text))
     return matches[-1] if matches else None
 
@@ -546,15 +548,25 @@ def _select_primary_jsonld_recipe(recipes: list[dict], html: str) -> dict:
     silently pick a minor variation over the page's actual subject. Prefer
     whichever recipe's name matches the page's <title>; only fall back to
     the ingredient-count heuristic when there's no clear match (or there's
-    just one recipe, where the question doesn't arise)."""
+    just one recipe, where the question doesn't arise).
+
+    The title match has to be unambiguous to be trusted: a short, generic
+    recipe name (e.g. "Cookies") can be a substring of an unrelated page
+    title purely by chance. If more than one recipe's name matches, that's
+    a sign the substring check isn't discriminating and we fall through to
+    the ingredient-count heuristic instead of guessing which match is real."""
     if len(recipes) == 1:
         return recipes[0]
     page_title = _extract_page_title(html)
     if page_title:
-        for recipe in recipes:
-            name = str(recipe.get("name") or "").strip().lower()
-            if name and (name in page_title or page_title in name):
-                return recipe
+        matches = [
+            recipe
+            for recipe in recipes
+            if (name := str(recipe.get("name") or "").strip().lower())
+            and (name in page_title or page_title in name)
+        ]
+        if len(matches) == 1:
+            return matches[0]
     return max(recipes, key=lambda item: len(item.get("recipeIngredient") or []))
 
 

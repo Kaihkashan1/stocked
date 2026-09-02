@@ -1011,7 +1011,7 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Expires in %lld days"
+                  "value" : "Expires in %lld day"
                 }
               },
               "other" : {

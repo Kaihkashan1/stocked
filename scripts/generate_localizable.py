@@ -239,7 +239,7 @@ PLURALS = {
         "de": ("one", "%lld Schritt", "other", "%lld Schritte"),
     },
     "Expires in %lld days": {
-        "en": ("one", "Expires in %lldd", "other", "Expires in %lldd"),
+        "en": ("one", "Expires in %lld day", "other", "Expires in %lld days"),
         "de": ("one", "Läuft in %lld T. ab", "other", "Läuft in %lld T. ab"),
     },
     "%lld of %lld ingredients": {
