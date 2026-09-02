@@ -262,7 +262,7 @@ neutral-500 otherwise. This is the user's own inventory — it is not required t
   spices, Other) under 10.5pt uppercase kickers. Each row: surface card, 22pt radius, shadow-sm — name (14.5pt
   semibold) with a chip line below it: amount+unit (neutral-100 pill), Open/Unopened status (sage or neutral
   tint), and an **expiry badge** when set — neutral outline showing the date normally, a sage-200/800 tint for
-  "Expires in Nd" between 4-7 days out, a solid accent-500 fill ("Expires in 2d" / "Expires today") inside
+  "Expires in N days" between 4-7 days out, a solid accent-500 fill ("Expires in 2 days" / "Expires today") inside
   3 days, and accent-800 ("Expired") once past.
   Tapping a row (outside match mode) opens it in the same add/edit sheet, prefilled, for editing; a trash
   icon on the row deletes it directly.
