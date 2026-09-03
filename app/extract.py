@@ -10,7 +10,7 @@ from google import genai
 from google.genai import types
 
 from app.config import settings
-from app.errors import gemini_is_quota_exhausted
+from app.errors import gemini_is_busy, gemini_is_quota_exhausted
 from app.models import RECIPE_TAGS, FetchedPost, Recipe, RecipeCategory
 from app.store import record_gemini_read
 
@@ -73,16 +73,21 @@ def _gemini_api_keys() -> list[str]:
     return [key.strip() for key in keys if key.strip()]
 
 
+def _client_timeout_ms() -> int:
+    """Client-level timeout for calls other than generate_content (file
+    upload/poll below). generate_content itself gets its own, tighter,
+    per-model timeouts in _generate_with_retry so a primary-model
+    overload still leaves room for the gemini-2.5-flash fallback under
+    Vercel's 60s cap."""
+    return 50_000 if os.environ.get("VERCEL") else 170_000
+
+
 def extract_recipe(post: FetchedPost) -> Recipe:
     keys = _gemini_api_keys()
     if not keys:
         raise RuntimeError("GEMINI_API_KEY is missing. Add it to .env (see README).")
 
-    # One generate_content wait. A short timeout + retry was billing two
-    # requests for saves that used to finish in a single slower call.
-    # ~50s on Vercel still leaves a little room under the 60s function cap
-    # after fetch; locally we can wait much longer.
-    call_timeout_ms = 50_000 if os.environ.get("VERCEL") else 170_000
+    call_timeout_ms = _client_timeout_ms()
     media_path = post.video_path or post.thumbnail_path
     caption_part = PROMPT.format(caption=post.caption or "(no caption)")
 
@@ -104,7 +109,7 @@ def extract_recipe(post: FetchedPost) -> Recipe:
                     uploaded = _upload_and_wait(client, path)
                     contents.append(uploaded)
             contents.append(caption_part)
-            text = _generate_with_retry(client, contents)
+            text = _generate_with_retry(client, contents, Recipe)
             return _parse_recipe(text)
         except Exception as exc:
             last_error = exc
@@ -155,39 +160,65 @@ def _upload_and_wait(client: genai.Client, path: Path, timeout: int = 180):
     raise TimeoutError("Timed out waiting for Gemini to process the video.")
 
 
-def _generate_with_retry(client: genai.Client, contents: list, attempts: int = 5) -> str:
-    """One generate_content per import on Vercel (busy/timeouts are not
-    retried — those retries were billing twice). Locally, a daily-quota
-    429 can retry on the same key before extract_recipe tries the next."""
-    last_error: Exception | None = None
-    if os.environ.get("VERCEL"):
+def _generate_with_retry(client: genai.Client, contents, response_schema: type, attempts: int = 5) -> str:
+    """Tries settings.gemini_model first, then — only when it's genuinely
+    overloaded (gemini_is_busy: 503/"high demand"/deadline, not a daily
+    quota 429) — falls back to the lighter gemini_fallback_model. Both
+    calls have to fit inside Vercel's 60s function cap, so on Vercel each
+    gets one shot with its own short timeout instead of one call sharing
+    a long one (a short timeout + retry there was billing two requests
+    for saves that used to finish in a single slower call). Locally,
+    where there's no hard cap, the primary model also gets a few
+    same-key retries on a daily-quota 429 before falling back.
+
+    Shared by extract_recipe (contents = recipe prompt + media, schema =
+    Recipe) and categorize_recipe (contents = category prompt, schema =
+    RecipeCategory) — both need the same overload fallback."""
+    on_vercel = bool(os.environ.get("VERCEL"))
+    if on_vercel:
         attempts = 1
-    for i in range(attempts):
-        try:
-            record_gemini_read()
-            response = client.models.generate_content(
-                model=settings.gemini_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=Recipe,
-                    thinking_config=types.ThinkingConfig(
-                        thinking_level=types.ThinkingLevel.MINIMAL,
+    # ~30s + ~18s still leaves a little room under the 60s cap after
+    # fetch, whether the primary model answers, is overloaded and falls
+    # through to the fallback, or the fallback is tried too.
+    model_attempts = [
+        (settings.gemini_model, 30_000 if on_vercel else 170_000),
+        (settings.gemini_fallback_model, 18_000 if on_vercel else 170_000),
+    ]
+
+    last_error: Exception | None = None
+    for model_index, (model, timeout_ms) in enumerate(model_attempts):
+        is_last_model = model_index == len(model_attempts) - 1
+        for i in range(attempts):
+            try:
+                record_gemini_read()
+                response = client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=response_schema,
+                        thinking_config=types.ThinkingConfig(
+                            thinking_level=types.ThinkingLevel.MINIMAL,
+                        ),
+                        http_options=types.HttpOptions(timeout=timeout_ms),
                     ),
-                ),
-            )
-            text = (response.text or "").strip()
-            if not text:
-                raise RuntimeError("Gemini returned an empty response.")
-            return text
-        except Exception as exc:
-            last_error = exc
-            if gemini_is_quota_exhausted(exc) and i < attempts - 1:
-                delay = 2 ** (i + 1)
-                logger.warning("Gemini rate-limited; retrying in %ss", delay)
-                time.sleep(delay)
-                continue
-            raise
+                )
+                text = (response.text or "").strip()
+                if not text:
+                    raise RuntimeError("Gemini returned an empty response.")
+                return text
+            except Exception as exc:
+                last_error = exc
+                if gemini_is_quota_exhausted(exc) and i < attempts - 1:
+                    delay = 2 ** (i + 1)
+                    logger.warning("Gemini rate-limited; retrying in %ss", delay)
+                    time.sleep(delay)
+                    continue
+                break
+        if not is_last_model and gemini_is_busy(last_error):
+            logger.warning("Gemini model %s is overloaded; falling back to %s", model, model_attempts[model_index + 1][0])
+            continue
+        raise last_error
     raise RuntimeError("Gemini call failed") from last_error
 
 
@@ -201,7 +232,7 @@ def categorize_recipe(
     if not settings.gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY is missing. Add it to .env (see README).")
 
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = genai.Client(api_key=settings.gemini_api_key, http_options=types.HttpOptions(timeout=_client_timeout_ms()))
     prompt = CATEGORY_PROMPT.format(
         title=title or "(untitled)",
         servings=servings or "",
@@ -209,21 +240,7 @@ def categorize_recipe(
         steps=steps or "(none)",
         caption=caption or "(none)",
     )
-    record_gemini_read()
-    response = client.models.generate_content(
-        model=settings.gemini_model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=RecipeCategory,
-            thinking_config=types.ThinkingConfig(
-                thinking_level=types.ThinkingLevel.MINIMAL,
-            ),
-        ),
-    )
-    text = (response.text or "").strip()
-    if not text:
-        raise RuntimeError("Gemini returned an empty category response.")
+    text = _generate_with_retry(client, prompt, RecipeCategory)
     try:
         return RecipeCategory.model_validate_json(text)
     except Exception:
