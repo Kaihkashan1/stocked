@@ -10,7 +10,7 @@ from google import genai
 from google.genai import types
 
 from app.config import settings
-from app.errors import gemini_is_quota_exhausted, gemini_is_retryable
+from app.errors import gemini_is_quota_exhausted
 from app.models import RECIPE_TAGS, FetchedPost, Recipe, RecipeCategory
 from app.store import record_gemini_read
 
@@ -78,14 +78,11 @@ def extract_recipe(post: FetchedPost) -> Recipe:
     if not keys:
         raise RuntimeError("GEMINI_API_KEY is missing. Add it to .env (see README).")
 
-    # The SDK's default client has no per-call timeout at all (it waits on
-    # the underlying HTTP request indefinitely) — so a single slow Gemini
-    # response doesn't fail, it just runs out the clock until Vercel's hard
-    # 60s kill, which surfaces as an opaque FUNCTION_INVOCATION_TIMEOUT with
-    # no friendly message and no chance for _generate_with_retry to react.
-    # A shorter, explicit timeout turns that into a normal (retryable, or at
-    # least cleanly reported) exception well before the platform gives up.
-    call_timeout_ms = 25_000 if os.environ.get("VERCEL") else 170_000
+    # One generate_content wait. A short timeout + retry was billing two
+    # requests for saves that used to finish in a single slower call.
+    # ~50s on Vercel still leaves a little room under the 60s function cap
+    # after fetch; locally we can wait much longer.
+    call_timeout_ms = 50_000 if os.environ.get("VERCEL") else 170_000
     media_path = post.video_path or post.thumbnail_path
     caption_part = PROMPT.format(caption=post.caption or "(no caption)")
 
@@ -158,14 +155,13 @@ def _upload_and_wait(client: genai.Client, path: Path, timeout: int = 180):
     raise TimeoutError("Timed out waiting for Gemini to process the video.")
 
 
-def _generate_with_retry(client: genai.Client, contents: list, attempts: int = 3) -> str:
-    """A couple of short retries for 429 / high-demand blips. Kept brief so
-    the whole photo-extract still fits inside Vercel's 60s function cap.
-    Each attempt is a real Gemini request and is counted, including ones
-    that fail — that's what the free-tier daily cap bills."""
+def _generate_with_retry(client: genai.Client, contents: list, attempts: int = 5) -> str:
+    """One generate_content per import on Vercel (busy/timeouts are not
+    retried — those retries were billing twice). Locally, a daily-quota
+    429 can retry on the same key before extract_recipe tries the next."""
     last_error: Exception | None = None
     if os.environ.get("VERCEL"):
-        attempts = min(attempts, 2)
+        attempts = 1
     for i in range(attempts):
         try:
             record_gemini_read()
@@ -186,9 +182,9 @@ def _generate_with_retry(client: genai.Client, contents: list, attempts: int = 3
             return text
         except Exception as exc:
             last_error = exc
-            if gemini_is_retryable(exc) and i < attempts - 1:
-                delay = 2 * (i + 1)
-                logger.warning("Gemini busy or rate-limited; retrying in %ss", delay)
+            if gemini_is_quota_exhausted(exc) and i < attempts - 1:
+                delay = 2 ** (i + 1)
+                logger.warning("Gemini rate-limited; retrying in %ss", delay)
                 time.sleep(delay)
                 continue
             raise
