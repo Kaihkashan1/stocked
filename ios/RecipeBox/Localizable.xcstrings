@@ -517,6 +517,9 @@
     "Link" : {
       "extractionState" : "manual"
     },
+    "Loading logs…" : {
+      "extractionState" : "manual"
+    },
     "Loading your recipes…" : {
       "extractionState" : "manual"
     },

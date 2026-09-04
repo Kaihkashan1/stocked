@@ -450,7 +450,15 @@ struct ImportLogEntry: Decodable, Identifiable {
         url = try container.decodeIfPresent(String.self, forKey: .url) ?? ""
         status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
         reason = try container.decodeIfPresent(String.self, forKey: .reason) ?? ""
-        usedBackup = try container.decodeIfPresent(Bool.self, forKey: .usedBackup) ?? false
+        if let flag = try? container.decode(Bool.self, forKey: .usedBackup) {
+            usedBackup = flag
+        } else if let raw = try? container.decode(String.self, forKey: .usedBackup) {
+            usedBackup = ["true", "yes", "1", "y"].contains(raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        } else if let number = try? container.decode(Int.self, forKey: .usedBackup) {
+            usedBackup = number != 0
+        } else {
+            usedBackup = false
+        }
         model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
     }
 }

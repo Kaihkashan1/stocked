@@ -171,6 +171,11 @@ struct SettingsView: View {
                     .font(Theme.body(13.5))
                     .foregroundStyle(Theme.neutral600)
                     .padding(.vertical, 14)
+            } else if importLog == nil {
+                Text(L("Loading logs…"))
+                    .font(Theme.body(13.5))
+                    .foregroundStyle(Theme.neutral600)
+                    .padding(.vertical, 14)
             } else if let importLog, importLog.isEmpty {
                 Text(L("No imports yet."))
                     .font(Theme.body(13.5))

@@ -331,7 +331,7 @@ function importLogHtml() {
     .join("");
   let body = `<div class="log-filters chips">${chips}</div>`;
   if (state.importLog === undefined) {
-    body += "";
+    body += `<p class="field-note">${escapeHtml(t("loadingLogs"))}</p>`;
   } else if (state.importLog === null) {
     body += `<p class="field-note">${escapeHtml(t("couldntLoadLogs"))}</p>`;
   } else {

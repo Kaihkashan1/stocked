@@ -6,6 +6,7 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.errors import NOT_A_RECIPE_MESSAGE
 from app.extract import _generate_with_retry, _parse_recipe_set
+from app.store import _parse_import_log_values
 
 
 class GenerateWithRetryTests(TestCase):
@@ -163,28 +164,22 @@ class ParseRecipeSetTests(TestCase):
         self.assertEqual(len(recipes), 1)
         self.assertEqual(recipes[0].title, "Pasta")
 
-    def test_rejects_hallucinated_recipe_when_caption_is_not_cooking(self):
-        payload = json.dumps({"content_kind": "recipe", "recipes": [_pasta(title="Meeting the Mayor")]})
-        with self.assertRaises(RuntimeError) as ctx:
-            _parse_recipe_set(
-                payload,
-                source_text="Had a great time meeting the mayor downtown today with the team.",
-                require_grounding=True,
-            )
-        self.assertEqual(str(ctx.exception), NOT_A_RECIPE_MESSAGE)
-
-    def test_keeps_recipe_when_two_ingredients_appear_in_caption(self):
-        payload = json.dumps(
-            {
-                "content_kind": "recipe",
-                "recipes": [
-                    _pasta(ingredients=[{"item": "spaghetti"}, {"item": "garlic"}])
-                ],
-            }
-        )
-        recipes = _parse_recipe_set(
-            payload,
-            source_text="Making spaghetti with garlic tonight.",
-            require_grounding=True,
-        )
+    def test_keeps_recipe_when_caption_has_no_ingredients(self):
+        payload = json.dumps({"content_kind": "recipe", "recipes": [_pasta()]})
+        recipes = _parse_recipe_set(payload)
         self.assertEqual(recipes[0].title, "Pasta")
+
+
+class ImportLogParseTests(TestCase):
+    def test_reads_rows_when_header_has_duplicate_empty_cells(self):
+        values = [
+            ["timestamp", "url", "status", "reason", "used_backup", "model", "", ""],
+            ["04-09-2026 17:00 CEST", "https://instagram.com/p/abc", "ok", "Pasta", "FALSE", "gemini-3.6-flash", "", ""],
+            ["04-09-2026 16:00 CEST", "(photo)", "error", "That didn't look like a recipe.", "TRUE", "gemini-3.5-flash-lite", "", ""],
+        ]
+        rows = _parse_import_log_values(values, limit=50)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["reason"], "That didn't look like a recipe.")
+        self.assertTrue(rows[0]["used_backup"])
+        self.assertEqual(rows[1]["url"], "https://instagram.com/p/abc")
+        self.assertFalse(rows[1]["used_backup"])

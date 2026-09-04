@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.errors import NOT_A_RECIPE_MESSAGE, gemini_is_busy, gemini_is_quota_exhausted
 from app.match import apply_section_labels
-from app.models import RECIPE_TAGS, FetchedPost, FetchedSlide, Recipe, RecipeCategory, RecipeSet, recipe_is_importable, source_has_recipe_cues
+from app.models import RECIPE_TAGS, FetchedPost, FetchedSlide, Recipe, RecipeCategory, RecipeSet, recipe_is_importable
 from app.store import record_gemini_read
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,7 @@ How many recipes to return:
 - Intro, title, or collage slides that are not a recipe → skip them.
 - First decide content_kind. Use "recipe" only if the post is meant to teach someone how to cook a dish (ingredients and a method). Use "not_recipe" for vlogs, news, events, interviews, travel, memes, ads, product posts, restaurant visits, or anything that merely shows food. A civic event, a "day in my life", or someone eating on camera is not_recipe even if a plate is visible.
 - Never invent a recipe to match a video's title, setting, or vibe. If the TEXT is not a recipe and the video is not teaching a dish, content_kind is "not_recipe".
+- Many recipe reels put the method only in the video, with a short caption and no ingredient list in TEXT. Those are still "recipe" if the video teaches a dish.
 
 Rules:
 - is_recipe must be true only for a real dish to save. If you are unsure, set content_kind to "not_recipe" and return no recipes.
@@ -89,11 +90,6 @@ def extract_recipe(post: FetchedPost) -> tuple[list[Recipe], bool]:
         raise RuntimeError("GEMINI_API_KEY is missing. Add it to .env (see README).")
 
     caption = post.caption or ""
-    # Link imports: a long caption with no cooking language is a vlog/news
-    # post. Skip Gemini so it cannot invent a dish from the video.
-    if (post.url or "").strip() and len(caption.strip()) >= 40 and not source_has_recipe_cues(caption):
-        raise RuntimeError(NOT_A_RECIPE_MESSAGE)
-
     call_timeout_ms = _client_timeout_ms()
     caption_part = PROMPT.format(caption=caption or "(no caption)")
     slides = list(post.slides)
@@ -134,11 +130,7 @@ def extract_recipe(post: FetchedPost) -> tuple[list[Recipe], bool]:
             RecipeSet,
             timeout_ms=(70_000 if os.environ.get("VERCEL") and video_count > 1 else None),
         )
-        return _parse_recipe_set(
-            text,
-            source_text=caption,
-            require_grounding=bool((post.url or "").strip()),
-        ), used_backup
+        return _parse_recipe_set(text), used_backup
     finally:
         for file in uploaded:
             try:
@@ -274,7 +266,7 @@ def categorize_recipe(
         return RecipeCategory.model_validate(json.loads(text[start : end + 1]))
 
 
-def _parse_recipe_set(text: str, source_text: str = "", require_grounding: bool = False) -> list[Recipe]:
+def _parse_recipe_set(text: str) -> list[Recipe]:
     parsed = None
     try:
         parsed = RecipeSet.model_validate_json(text)
@@ -299,7 +291,7 @@ def _parse_recipe_set(text: str, source_text: str = "", require_grounding: bool 
     filled = [
         item
         for item in recipes
-        if recipe_is_importable(item, source_text, require_grounding=require_grounding)
+        if recipe_is_importable(item)
     ]
     if filled:
         return filled[:5]

@@ -19,6 +19,7 @@ const I18N = {
     noImportLogs: "No imports yet.",
     noMatchingLogs: "No matching logs.",
     couldntLoadLogs: "Couldn't load logs.",
+    loadingLogs: "Loading logs…",
     allLogs: "All",
     savedLogs: "Saved",
     errorLogs: "Errors",

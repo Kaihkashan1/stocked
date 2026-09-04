@@ -341,6 +341,12 @@ def _import_model_name(used_backup: bool, stored: str = "") -> str:
     return (settings.gemini_model or "").strip() or "gemini-3.6-flash"
 
 
+def _widen_import_log(worksheet, cols: int = len(IMPORT_LOG_HEADERS)) -> None:
+    """ImportLog was created with 5 columns; writing F1 without this 400s."""
+    if worksheet.col_count < cols:
+        worksheet.resize(rows=max(worksheet.row_count, 2), cols=cols)
+
+
 @lru_cache(maxsize=1)
 def _import_log_worksheet():
     spreadsheet = _worksheet().spreadsheet
@@ -354,10 +360,15 @@ def _import_log_worksheet():
     if existing[: len(IMPORT_LOG_HEADERS)] == IMPORT_LOG_HEADERS:
         return worksheet
     if not any(existing):
+        _widen_import_log(worksheet)
         worksheet.append_row(IMPORT_LOG_HEADERS, value_input_option="RAW")
         return worksheet
     if existing[:5] == IMPORT_LOG_HEADERS[:5] and (len(existing) < 6 or existing[5] != "model"):
-        worksheet.update_cell(1, 6, "model")
+        try:
+            _widen_import_log(worksheet)
+            worksheet.update_cell(1, 6, "model")
+        except Exception:
+            logger.exception("Could not add ImportLog model column")
         return worksheet
     logger.warning("ImportLog header row does not match %s", IMPORT_LOG_HEADERS)
     return worksheet
@@ -389,35 +400,74 @@ def log_import(url: str | None, status: str, reason: str, used_backup: bool = Fa
             "TRUE" if used_backup else "FALSE",
             model,
         ]
-        _import_log_worksheet().append_row(row, value_input_option="RAW")
+        sheet = _import_log_worksheet()
+        _widen_import_log(sheet)
+        sheet.append_row(row, value_input_option="RAW")
     except Exception:
         logger.exception("Failed to write import log")
 
 
-def get_recent_imports(limit: int = 50) -> list[dict]:
-    try:
-        records = _import_log_worksheet().get_all_records()
-    except Exception:
-        logger.exception("Failed to read import log")
+def _header_index(headers: list[str], name: str) -> int | None:
+    want = name.strip().lower()
+    for index, header in enumerate(headers):
+        if str(header).strip().lower() == want:
+            return index
+    return None
+
+
+def _cell(row: list, index: int | None) -> str:
+    if index is None or index < 0 or index >= len(row):
+        return ""
+    return str(row[index] or "").strip()
+
+
+def _parse_import_log_values(values: list[list], limit: int = 50) -> list[dict]:
+    """Build API rows from a raw sheet dump.
+
+    gspread's get_all_records() raises when the header row has duplicate
+    empty cells (common after adding a column). Reading values by column
+    name keeps older ImportLog tabs readable.
+    """
+    if not values:
         return []
+    headers = [str(cell or "") for cell in values[0]]
+    ts_i = _header_index(headers, "timestamp")
+    url_i = _header_index(headers, "url")
+    status_i = _header_index(headers, "status")
+    reason_i = _header_index(headers, "reason")
+    backup_i = _header_index(headers, "used_backup")
+    model_i = _header_index(headers, "model")
+    if ts_i is None and url_i is None:
+        ts_i, url_i, status_i, reason_i, backup_i = 0, 1, 2, 3, 4
+        if model_i is None and len(headers) > 5:
+            model_i = 5
     rows = []
-    for record in records:
-        url = str(record.get("url") or "").strip()
-        used_backup = str(record.get("used_backup") or "").strip().lower() in TRUE_VALUES
-        status = str(record.get("status") or "").strip()
-        stored_model = str(record.get("model") or "").strip()
+    for raw in values[1:]:
+        if not any(str(cell or "").strip() for cell in raw):
+            continue
+        used_backup = _cell(raw, backup_i).lower() in TRUE_VALUES
+        stored_model = _cell(raw, model_i)
         rows.append(
             {
-                "timestamp": _display_log_timestamp(str(record.get("timestamp") or "")),
-                "url": url,
-                "status": status,
-                "reason": _log_headline(str(record.get("reason") or "")),
+                "timestamp": _display_log_timestamp(_cell(raw, ts_i)),
+                "url": _cell(raw, url_i),
+                "status": _cell(raw, status_i),
+                "reason": _log_headline(_cell(raw, reason_i)),
                 "used_backup": used_backup,
                 "model": _import_model_name(used_backup, stored_model),
             }
         )
     rows.reverse()
     return rows[: max(0, limit)]
+
+
+def get_recent_imports(limit: int = 50) -> list[dict]:
+    try:
+        values = _import_log_worksheet().get_all_values()
+    except Exception:
+        logger.exception("Failed to read import log")
+        return []
+    return _parse_import_log_values(values, limit=limit)
 
 
 def source_exists(url: str) -> bool:
@@ -428,11 +478,7 @@ def source_exists(url: str) -> bool:
 
 
 def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
-    if not recipe_is_importable(
-        recipe,
-        post.caption or "",
-        require_grounding=bool((post.url or "").strip()),
-    ):
+    if not recipe_is_importable(recipe):
         raise RuntimeError(NOT_A_RECIPE_MESSAGE)
     ingredients = format_ingredient_lines(recipe.ingredients)
     steps = "\n".join(f"{i}. {step}" for i, step in enumerate(recipe.steps, start=1))
