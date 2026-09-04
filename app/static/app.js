@@ -336,7 +336,7 @@ function importLogHtml() {
     body += `<p class="field-note">${escapeHtml(t("couldntLoadLogs"))}</p>`;
   } else {
     const filtered = state.importLog.filter((row) => {
-      if (filter === "saved") return row.status !== "error";
+      if (filter === "saved") return row.status === "saved" || row.status === "duplicate";
       if (filter === "errors") return row.status === "error";
       return true;
     });

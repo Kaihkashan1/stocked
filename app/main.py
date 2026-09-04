@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -15,9 +16,9 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.auth import require_secret
 from app.config import ROOT, settings
-from app.errors import GEMINI_DAILY_QUOTA, NOT_A_RECIPE_MESSAGE, friendly_message, gemini_is_busy
+from app.errors import GEMINI_DAILY_QUOTA, NOT_A_RECIPE_MESSAGE, REQUEST_TIMEOUT_MESSAGE, friendly_message, gemini_is_busy
 from app.extract import extract_recipe
-from app.fetch import get_apify_usage
+from app.fetch import extract_url, get_apify_usage
 from app.match import STAPLES, grouped_pantry
 from app.models import FetchedPost, PantryInventoryUpdate, PantryUpdate, RecipeCreate, RecipeUpdate, ToBuyUpdate
 from app.pipeline import jobs, process_recipe
@@ -263,9 +264,33 @@ async def ingest(request: Request, background_tasks: BackgroundTasks):
     if os.environ.get("VERCEL"):
         # Keep HTTP 200 on save/duplicate/error so the iPhone Shortcut can
         # read `status` and notify only when it is "error".
-        return process_recipe(content)
+        return await _ingest_watching_client(request, content)
     background_tasks.add_task(process_recipe, content)
     return {"status": "queued", "message": "Saving… I'll add it to your sheet shortly."}
+
+
+async def _ingest_watching_client(request: Request, content: str) -> dict:
+    """Run ingest off the event loop so a Shortcut hang-up can be logged.
+
+    process_recipe is blocking. If it ran inline, the phone closing the
+    HTTP request (Shortcuts timeout) would never be observed, and ImportLog
+    would stay empty whenever Vercel then killed the function.
+    """
+    try:
+        url = extract_url(content)
+    except Exception:
+        url = None
+    task = asyncio.create_task(asyncio.to_thread(process_recipe, content))
+    logged_timeout = False
+    while not task.done():
+        if not logged_timeout and await request.is_disconnected():
+            logged_timeout = True
+            log_import(url, "error", REQUEST_TIMEOUT_MESSAGE)
+        try:
+            return await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
+        except TimeoutError:
+            continue
+    return task.result()
 
 
 def _public(recipe: dict) -> dict:

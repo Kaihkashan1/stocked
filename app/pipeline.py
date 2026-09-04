@@ -70,11 +70,11 @@ def process_recipe(raw_content: str) -> dict:
 def _record(**fields) -> None:
     jobs.appendleft({"at": datetime.now(timezone.utc).isoformat(), **fields})
     status = fields.get("status")
-    if status == "started":
-        return
     url = fields.get("url")
     used_backup = bool(fields.get("used_backup"))
-    if status == "duplicate":
+    if status == "started":
+        reason = "Saving…"
+    elif status == "duplicate":
         reason = "Already saved"
     elif status == "saved":
         reason = fields.get("title") or "Recipe"

@@ -13,7 +13,7 @@ import gspread
 from app.config import settings
 from app.fetch import normalize_url
 from app.match import pantry_items, split_ingredient_section
-from app.errors import NOT_A_RECIPE_MESSAGE
+from app.errors import NOT_A_RECIPE_MESSAGE, REQUEST_TIMEOUT_MESSAGE
 from app.models import PANTRY_CATEGORIES, FetchedPost, Recipe, recipe_is_importable
 
 logger = logging.getLogger(__name__)
@@ -330,7 +330,13 @@ IMPORT_LOG_TITLE = "ImportLog"
 IMPORT_LOG_HEADERS = ["timestamp", "url", "status", "reason", "used_backup", "model"]
 _BERLIN = ZoneInfo("Europe/Berlin")
 _LOG_YMD = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(\s.*)$")
+_LOG_DMY_HM = re.compile(r"^(\d{2})-(\d{2})-(\d{4})[ T](\d{2}):(\d{2})")
 _CONFIDENCE_SUFFIX = re.compile(r"\s*\((high|medium|low)\)\s*$", re.I)
+# Vercel Hobby ingest can run up to 300s. A "started" row older than that
+# means the function died before it could write saved/error (Shortcut
+# timeout, 499, platform kill) — surface it as a timeout instead of
+# leaving a permanent "Saving…" line.
+_STALE_STARTED_SECONDS = 300
 
 
 def _import_model_name(used_backup: bool, stored: str = "") -> str:
@@ -385,6 +391,48 @@ def _display_log_timestamp(raw: str) -> str:
 
 def _log_headline(reason: str) -> str:
     return _CONFIDENCE_SUFFIX.sub("", (reason or "").strip())
+
+
+def _log_row_time(timestamp: str) -> datetime | None:
+    match = _LOG_DMY_HM.match((timestamp or "").strip())
+    if not match:
+        return None
+    try:
+        return datetime(
+            int(match.group(3)),
+            int(match.group(2)),
+            int(match.group(1)),
+            int(match.group(4)),
+            int(match.group(5)),
+            tzinfo=_BERLIN,
+        )
+    except ValueError:
+        return None
+
+
+def _present_import_rows(rows: list[dict], now: datetime | None = None) -> list[dict]:
+    """Newest-first. Drop 'started' once that URL has a later outcome;
+    treat a started row older than the Vercel ingest ceiling as a timeout."""
+    clock = now or datetime.now(_BERLIN)
+    done_urls: set[str] = set()
+    presented: list[dict] = []
+    for row in rows:
+        status = (row.get("status") or "").strip()
+        url = (row.get("url") or "").strip()
+        if status == "started":
+            if url in done_urls:
+                continue
+            started_at = _log_row_time(str(row.get("timestamp") or ""))
+            age = (clock - started_at).total_seconds() if started_at else None
+            if age is None or age >= _STALE_STARTED_SECONDS:
+                presented.append({**row, "status": "error", "reason": REQUEST_TIMEOUT_MESSAGE})
+            else:
+                presented.append({**row, "reason": row.get("reason") or "Saving…"})
+            continue
+        if status in {"saved", "duplicate", "error"} and url:
+            done_urls.add(url)
+        presented.append(row)
+    return presented
 
 
 def log_import(url: str | None, status: str, reason: str, used_backup: bool = False) -> None:
@@ -458,6 +506,7 @@ def _parse_import_log_values(values: list[list], limit: int = 50) -> list[dict]:
             }
         )
     rows.reverse()
+    rows = _present_import_rows(rows)
     return rows[: max(0, limit)]
 
 

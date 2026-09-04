@@ -1,12 +1,14 @@
 import json
+from datetime import datetime
 from unittest import TestCase
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from google.genai.errors import APIError as GeminiAPIError
 
-from app.errors import NOT_A_RECIPE_MESSAGE
+from app.errors import NOT_A_RECIPE_MESSAGE, REQUEST_TIMEOUT_MESSAGE
 from app.extract import _generate_with_retry, _parse_recipe_set
-from app.store import _parse_import_log_values
+from app.store import _parse_import_log_values, _present_import_rows
 
 
 class GenerateWithRetryTests(TestCase):
@@ -183,3 +185,90 @@ class ImportLogParseTests(TestCase):
         self.assertTrue(rows[0]["used_backup"])
         self.assertEqual(rows[1]["url"], "https://instagram.com/p/abc")
         self.assertFalse(rows[1]["used_backup"])
+
+
+class ImportLogPresentTests(TestCase):
+    def test_stale_started_becomes_timeout(self):
+        now = datetime(2026, 9, 4, 18, 0, tzinfo=ZoneInfo("Europe/Berlin"))
+        rows = [
+            {
+                "timestamp": "04-09-2026 17:00 CEST",
+                "url": "https://instagram.com/p/abc",
+                "status": "started",
+                "reason": "Saving…",
+                "used_backup": False,
+                "model": "gemini-3.6-flash",
+            }
+        ]
+        presented = _present_import_rows(rows, now=now)
+        self.assertEqual(presented[0]["status"], "error")
+        self.assertEqual(presented[0]["reason"], REQUEST_TIMEOUT_MESSAGE)
+
+    def test_recent_started_stays_in_progress(self):
+        now = datetime(2026, 9, 4, 17, 2, tzinfo=ZoneInfo("Europe/Berlin"))
+        rows = [
+            {
+                "timestamp": "04-09-2026 17:00 CEST",
+                "url": "https://instagram.com/p/abc",
+                "status": "started",
+                "reason": "Saving…",
+                "used_backup": False,
+                "model": "gemini-3.6-flash",
+            }
+        ]
+        presented = _present_import_rows(rows, now=now)
+        self.assertEqual(presented[0]["status"], "started")
+        self.assertEqual(presented[0]["reason"], "Saving…")
+
+    def test_hides_started_when_a_later_outcome_exists(self):
+        rows = [
+            {
+                "timestamp": "04-09-2026 17:10 CEST",
+                "url": "https://instagram.com/p/abc",
+                "status": "saved",
+                "reason": "Pasta",
+                "used_backup": False,
+                "model": "x",
+            },
+            {
+                "timestamp": "04-09-2026 17:00 CEST",
+                "url": "https://instagram.com/p/abc",
+                "status": "started",
+                "reason": "Saving…",
+                "used_backup": False,
+                "model": "x",
+            },
+        ]
+        presented = _present_import_rows(rows)
+        self.assertEqual([row["status"] for row in presented], ["saved"])
+
+    def test_keeps_timeout_even_if_the_save_later_succeeds(self):
+        rows = [
+            {
+                "timestamp": "04-09-2026 17:10 CEST",
+                "url": "https://instagram.com/p/abc",
+                "status": "saved",
+                "reason": "Pasta",
+                "used_backup": False,
+                "model": "x",
+            },
+            {
+                "timestamp": "04-09-2026 17:05 CEST",
+                "url": "https://instagram.com/p/abc",
+                "status": "error",
+                "reason": REQUEST_TIMEOUT_MESSAGE,
+                "used_backup": False,
+                "model": "x",
+            },
+            {
+                "timestamp": "04-09-2026 17:00 CEST",
+                "url": "https://instagram.com/p/abc",
+                "status": "started",
+                "reason": "Saving…",
+                "used_backup": False,
+                "model": "x",
+            },
+        ]
+        presented = _present_import_rows(rows)
+        self.assertEqual([row["status"] for row in presented], ["saved", "error"])
+        self.assertEqual(presented[1]["reason"], REQUEST_TIMEOUT_MESSAGE)

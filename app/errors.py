@@ -30,6 +30,11 @@ GEMINI_BUSY_MESSAGE = (
 
 NOT_A_RECIPE_MESSAGE = "That didn't look like a recipe."
 
+# Shortcut / iOS closed the HTTP request before /ingest could respond.
+# Distinct from GEMINI_BUSY_MESSAGE, which is a timeout talking to Gemini
+# that the pipeline still caught and returned as JSON.
+REQUEST_TIMEOUT_MESSAGE = "Request timed out."
+
 
 def gemini_is_busy(exc: Exception) -> bool:
     """Capacity blips (503 / 'high demand' / 504 DEADLINE_EXCEEDED), not the

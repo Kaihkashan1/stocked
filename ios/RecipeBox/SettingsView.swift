@@ -143,7 +143,7 @@ struct SettingsView: View {
         guard let importLog else { return [] }
         switch logFilter {
         case .all: return importLog
-        case .saved: return importLog.filter { !$0.isError }
+        case .saved: return importLog.filter { $0.status == "saved" || $0.status == "duplicate" }
         case .errors: return importLog.filter(\.isError)
         }
     }
