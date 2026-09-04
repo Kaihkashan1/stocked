@@ -424,7 +424,7 @@ private struct IngredientsCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Ingredients")
                     .font(Theme.display(23))
@@ -445,8 +445,9 @@ private struct IngredientsCard: View {
                             Text(title)
                                 .font(Theme.display(13.5))
                                 .foregroundStyle(Theme.sage800)
-                            Spacer(minLength: 0)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, index == 0 ? 2 : 20)
                         .padding(.bottom, 9)
                     case .item(let parsed):
@@ -457,10 +458,10 @@ private struct IngredientsCard: View {
                                     .foregroundStyle(scale == 1.0 ? Theme.accent800 : .white)
                                     .frame(minWidth: 62)
                                     .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 5)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
                                     .background(scale == 1.0 ? Theme.accent200 : Theme.accent)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .clipShape(Capsule())
                             }
                             Text(parsed.text)
                                 .font(Theme.body(14.5))
@@ -471,22 +472,16 @@ private struct IngredientsCard: View {
                         }
                         .padding(.vertical, 13)
 
-                        if showsDivider(after: index) {
+                        if index < rows.count - 1 {
                             Rectangle().fill(Theme.divider).frame(height: 1)
                         }
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .cardBackground(radius: Theme.radiusRow)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 6)
+            .cardBackground(radius: 28)
         }
-    }
-
-    private func showsDivider(after index: Int) -> Bool {
-        let next = index + 1
-        guard next < rows.count else { return false }
-        if case .item = rows[next] { return true }
-        return false
     }
 
     /// Round + / ✓ control — the only link from a recipe into the Cupboard

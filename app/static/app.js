@@ -62,7 +62,9 @@ const state = {
   editingId: null,
   addingRecipe: false,
   usage: null,
+  importLog: undefined,
   devSettingsOpen: false,
+  logsOpen: false,
 };
 
 const els = {
@@ -205,6 +207,7 @@ function openSettings() {
   state.editingId = null;
   state.addingRecipe = false;
   state.devSettingsOpen = false;
+  state.logsOpen = false;
   renderSettings();
   els.drawer.hidden = false;
   fetchUsage().then((usage) => {
@@ -259,6 +262,55 @@ function apifyResetsLabel(resetsAt) {
   return t("resetsOn", { date: formatted });
 }
 
+async function fetchImportLog() {
+  try {
+    const response = await fetch("/api/import-log", { headers: authHeaders() });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return Array.isArray(data.imports) ? data.imports : [];
+  } catch {
+    return null;
+  }
+}
+
+function importLogHtml() {
+  const chevron = state.logsOpen ? "180deg" : "0deg";
+  let body = "";
+  if (state.logsOpen) {
+    if (state.importLog === undefined) {
+      body = "";
+    } else if (state.importLog === null) {
+      body = `<p class="field-note">${escapeHtml(t("couldntLoadLogs"))}</p>`;
+    } else if (!state.importLog.length) {
+      body = `<p class="field-note">${escapeHtml(t("noImportLogs"))}</p>`;
+    } else {
+      const rows = state.importLog
+        .map((row) => {
+          const url = row.url && row.url !== "(photo)" ? row.url : t("photoImport");
+          const backup = row.used_backup
+            ? `<span class="log-backup">${escapeHtml(t("backup"))}</span>`
+            : "";
+          return `<li class="import-log-row">
+            <div class="import-log-meta">
+              <span>${escapeHtml(row.timestamp || "")}</span>
+              ${backup}
+            </div>
+            <div class="import-log-url">${escapeHtml(url)}</div>
+            <div class="import-log-status">${escapeHtml(row.status || "")}${row.reason ? ` — ${escapeHtml(row.reason)}` : ""}</div>
+          </li>`;
+        })
+        .join("");
+      body = `<ul class="import-log">${rows}</ul>`;
+    }
+  }
+  return `
+    <button class="dev-toggle nested" type="button" data-action="toggle-logs">
+      <span class="eyebrow">${escapeHtml(t("logs"))}</span>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${chevron})"><path d="M6 9l6 6 6-6"></path></svg>
+    </button>
+    ${body}`;
+}
+
 async function fetchUsage() {
   try {
     const response = await fetch("/api/usage", { headers: authHeaders() });
@@ -302,6 +354,7 @@ function settingsFormHtml() {
           <p class="field-note">${escapeHtml(t("editKeyFootnote"))}</p>
         </label>
         <button class="pill-btn primary" type="button" data-action="save-settings">${escapeHtml(t("saveAndReload"))}</button>
+        ${importLogHtml()}
       </div>`
     : "";
   return `
@@ -422,9 +475,20 @@ function splitIngredientSection(line) {
   if (heading && looksLikeSectionName(heading[1])) {
     return { section: heading[1].trim(), item: null };
   }
-  const prefixed = text.match(/^([^:]{1,40}):\s+(.+)$/);
+    prefixed = text.match(/^([^:]{1,40}):\s+(.+)$/);
   if (prefixed && looksLikeSectionName(prefixed[1])) {
     return { section: prefixed[1].trim(), item: prefixed[2].trim() };
+  }
+  const qtySplit = splitIngredientQuantity(text);
+  if (qtySplit.quantity) {
+    const inner = qtySplit.text.match(/^([^:]{1,40}):\s+(.+)$/);
+    if (inner && looksLikeSectionName(inner[1])) {
+      const item = inner[2].trim();
+      return {
+        section: inner[1].trim(),
+        item: item ? `${qtySplit.quantity} ${item}` : qtySplit.quantity,
+      };
+    }
   }
   return { section: null, item: text };
 }
@@ -1466,6 +1530,17 @@ document.addEventListener("click", (event) => {
       state.devSettingsOpen = !state.devSettingsOpen;
       renderSettings();
       break;
+    case "toggle-logs": {
+      state.logsOpen = !state.logsOpen;
+      renderSettings();
+      if (state.logsOpen && state.importLog === undefined) {
+        fetchImportLog().then((rows) => {
+          state.importLog = rows;
+          if (state.logsOpen && state.devSettingsOpen) renderSettings();
+        });
+      }
+      break;
+    }
     case "filter-tag":
       closeDrawer();
       state.tags = new Set([actionEl.dataset.tag]);

@@ -10,7 +10,7 @@ from app import notify
 from app.errors import friendly_message
 from app.extract import extract_recipe
 from app.fetch import extract_url, fetch_post
-from app.store import save_recipe, source_exists
+from app.store import log_import, save_recipe, source_exists
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ jobs: deque[dict] = deque(maxlen=30)
 
 def process_recipe(raw_content: str) -> dict:
     url = None
+    used_backup = False
     try:
         url = extract_url(raw_content)
         _record(url=url, status="started")
@@ -30,7 +31,7 @@ def process_recipe(raw_content: str) -> dict:
 
         with tempfile.TemporaryDirectory(prefix="recipe-") as tmp:
             post = fetch_post(url, Path(tmp))
-            recipes = extract_recipe(post)
+            recipes, used_backup = extract_recipe(post)
             if not recipes:
                 raise RuntimeError("Gemini returned no recipes.")
             for recipe in recipes:
@@ -39,7 +40,7 @@ def process_recipe(raw_content: str) -> dict:
         first = recipes[0]
         extra = len(recipes) - 1
         title = first.title if extra == 0 else f"{first.title} (+{extra} more)"
-        _record(url=url, status="saved", title=title, confidence=first.confidence)
+        _record(url=url, status="saved", title=title, confidence=first.confidence, used_backup=used_backup)
         notify.send("Recipe saved", f"{title} ({first.confidence})")
         logger.info("Done: %s", title)
         return {
@@ -51,7 +52,12 @@ def process_recipe(raw_content: str) -> dict:
     except Exception as exc:
         logger.exception("Failed to process recipe")
         message = friendly_message(exc)
-        _record(url=url, status="error", error=message)
+        _record(
+            url=url,
+            status="error",
+            error=message,
+            used_backup=bool(getattr(exc, "used_backup", used_backup)),
+        )
         notify.send("Recipe Box failed", message[:400])
         return {
             "status": "error",
@@ -63,3 +69,17 @@ def process_recipe(raw_content: str) -> dict:
 
 def _record(**fields) -> None:
     jobs.appendleft({"at": datetime.now(timezone.utc).isoformat(), **fields})
+    status = fields.get("status")
+    if status == "started":
+        return
+    url = fields.get("url")
+    used_backup = bool(fields.get("used_backup"))
+    if status == "duplicate":
+        reason = "Already saved"
+    elif status == "saved":
+        title = fields.get("title") or "Recipe"
+        confidence = fields.get("confidence") or ""
+        reason = f"{title} ({confidence})" if confidence else str(title)
+    else:
+        reason = fields.get("error") or "Import failed"
+    log_import(url, status or "error", reason, used_backup=used_backup)

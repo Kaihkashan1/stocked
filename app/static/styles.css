@@ -265,7 +265,60 @@ button { font-family: inherit; }
 
 .dev-toggle .eyebrow { margin: 0; }
 
+.dev-toggle.nested {
+  padding: 0.85rem 0;
+  margin-top: 0.5rem;
+}
+
 .dev-settings { padding-top: 0.25rem; }
+
+.import-log {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.import-log-row {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.import-log-row:last-child { border-bottom: none; }
+
+.import-log-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+
+.log-backup {
+  flex: none;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.import-log-url {
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.import-log-status {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
 
 .field-note {
   margin: 0.55rem 0 0;
@@ -582,38 +635,6 @@ button { font-family: inherit; }
 
 .recipe h3:first-of-type { margin-top: 0; }
 
-ul.ingredients li.ingredient-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 0 9px;
-  border-bottom: none;
-  font-family: "Fraunces", Georgia, serif;
-  font-size: 0.95rem;
-  font-weight: 600;
-  font-style: normal;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--accent);
-}
-
-ul.ingredients li.ingredient-section.first {
-  padding-top: 2px;
-}
-
-ul.ingredients li.ingredient-section::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex-shrink: 0;
-}
-
-ul.ingredients li:has(+ li.ingredient-section) {
-  border-bottom: none;
-}
-
 .notes-box {
   margin: 0;
   padding: 0.9rem 1rem;
@@ -639,6 +660,35 @@ ul.ingredients li {
 }
 
 ul.ingredients li:last-child { border-bottom: none; }
+
+ul.ingredients li.ingredient-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 0 9px;
+  border-bottom: none;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+ul.ingredients li.ingredient-section.first {
+  padding-top: 2px;
+}
+
+ul.ingredients li.ingredient-section::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
 
 .qty {
   flex-shrink: 0;

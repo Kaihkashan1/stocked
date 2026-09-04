@@ -15,7 +15,7 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.auth import require_secret
 from app.config import ROOT, settings
-from app.errors import GEMINI_DAILY_QUOTA, friendly_message, gemini_is_busy
+from app.errors import GEMINI_USAGE_DISPLAY_SCALE, friendly_message, gemini_is_busy
 from app.extract import extract_recipe
 from app.fetch import get_apify_usage
 from app.match import STAPLES, grouped_pantry
@@ -27,10 +27,12 @@ from app.store import (
     get_gemini_reads_today,
     get_have_items,
     get_pantry_inventory,
+    get_recent_imports,
     get_recipe,
     get_to_buy_items,
     ingredient_strings,
     list_recipes,
+    log_import,
     save_have_items,
     save_pantry_inventory,
     save_to_buy_items,
@@ -132,29 +134,35 @@ async def api_extract_photo(photo: UploadFile = File(...)):
         tmp_path = Path(tmp.name)
 
     recipes = []
+    used_backup = False
     try:
         post = FetchedPost(url="", caption="", video_path=None, thumbnail_path=str(tmp_path))
         try:
-            recipes = extract_recipe(post)
+            recipes, used_backup = extract_recipe(post)
         except Exception as exc:
             # Not just GeminiAPIError: a slow response now fails as a plain
             # httpx.TimeoutException (see app.extract's explicit call
             # timeout) rather than a Gemini-shaped error, and still needs
             # the same friendly 503/429/502 treatment instead of leaking a
             # raw exception as an unhandled 500.
+            used_backup = bool(getattr(exc, "used_backup", False))
+            message = friendly_message(exc)
+            log_import(None, "error", message, used_backup=used_backup)
             if isinstance(exc, GeminiAPIError) and exc.code == 429:
                 status = 429
             elif gemini_is_busy(exc):
                 status = 503
             else:
                 status = 502
-            raise HTTPException(status_code=status, detail=friendly_message(exc)) from exc
+            raise HTTPException(status_code=status, detail=message) from exc
     finally:
         tmp_path.unlink(missing_ok=True)
 
     if not recipes:
+        log_import(None, "error", "Gemini returned no recipes.", used_backup=used_backup)
         raise HTTPException(status_code=502, detail="Gemini returned no recipes.")
     recipe = recipes[0]
+    log_import(None, "saved", f"{recipe.title} ({recipe.confidence})", used_backup=used_backup)
 
     ingredients = ingredient_strings(recipe.ingredients)
     return {
@@ -228,9 +236,14 @@ async def api_usage():
     `apify` is null when the token is missing or the call fails — the app
     should just hide that half of the card rather than fake a number."""
     return {
-        "gemini": {"used": get_gemini_reads_today(), "limit": GEMINI_DAILY_QUOTA},
+        "gemini": {"used": get_gemini_reads_today(), "limit": GEMINI_USAGE_DISPLAY_SCALE},
         "apify": get_apify_usage(),
     }
+
+
+@app.get("/api/import-log", dependencies=[Depends(require_secret)])
+async def api_import_log():
+    return {"imports": get_recent_imports(limit=50)}
 
 
 @app.get("/jobs", dependencies=[Depends(require_secret)])

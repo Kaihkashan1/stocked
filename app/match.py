@@ -38,7 +38,57 @@ def split_ingredient_section(line: str) -> tuple[str | None, str | None]:
     prefixed = _SECTION_PREFIX.match(text)
     if prefixed and looks_like_section_name(prefixed.group(1)):
         return prefixed.group(1).strip(), prefixed.group(2).strip()
+    qty, rest = _split_leading_quantity(text)
+    if qty and rest:
+        prefixed = _SECTION_PREFIX.match(rest)
+        if prefixed and looks_like_section_name(prefixed.group(1)):
+            item = prefixed.group(2).strip()
+            combined = f"{qty} {item}".strip() if item else qty
+            return prefixed.group(1).strip(), combined
     return None, text
+
+
+def _split_leading_quantity(text: str) -> tuple[str, str]:
+    words = text.split()
+    if not words or not re.match(r"^[0-9¼½¾⅓⅔⅛⅜]", words[0]):
+        return "", text
+    consumed = 1
+    if len(words) > 1:
+        second = words[1].strip(".,;").lower()
+        if second in {"fl", "fl.", "fluid"} and len(words) > 2 and words[2].strip(".,;").lower() in {
+            "oz",
+            "ounce",
+            "ounces",
+        }:
+            consumed = 3
+        elif second in UNITS or second in {"floz", "fl.oz"}:
+            consumed = 2
+    return " ".join(words[:consumed]), " ".join(words[consumed:])
+
+
+def apply_section_labels(lines: list[str], sections: list[str]) -> list[str] | None:
+    """Insert `##` headings from per-line section labels. None if the
+    labels are unusable (wrong length, only one part, or the list already
+    has headings)."""
+    if len(sections) != len(lines) or not lines:
+        return None
+    if any(line.strip().startswith("#") for line in lines):
+        return None
+    labels = [(section or "").strip() for section in sections]
+    unique: list[str] = []
+    for label in labels:
+        if label and label.casefold() not in [item.casefold() for item in unique]:
+            unique.append(label)
+    if len(unique) < 2:
+        return None
+    out: list[str] = []
+    last = ""
+    for line, label in zip(lines, labels):
+        if label and label.casefold() != last.casefold():
+            out.append(f"## {label}")
+            last = label
+        out.append(line)
+    return out
 
 UNITS = {
     "cup",

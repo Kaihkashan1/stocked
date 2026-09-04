@@ -35,7 +35,7 @@ Free-tier content may be used to improve Google’s models. Fine for recipe vide
 
 Rate limits live at [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit). A handful of recipes a day stays under typical free-tier caps.
 
-**Optional: a second key to double the daily cap.** The free tier's 20/day limit is per key/project, not per person — a second Google account gets its own independent 20/day. Repeat steps 1–2 with a different Google account and paste the result into `.env` as `GEMINI_API_KEY_2`. Once the first key hits its daily quota, the app automatically falls back to the second for the rest of the day instead of failing; Settings' "Imports today" cap updates to 40 to match. Leave it unset if one key is enough.
+If the primary model (`gemini-3.6-flash`) is busy or hits its own daily cap, the app retries once on `gemini-3.5-flash-lite` with the same API key. Override the fallback with `GEMINI_FALLBACK_MODEL` if needed. Combined free-tier capacity is treated as about 520 requests/day (20 + 500); Settings shows a smaller display scale so the progress bar can fill at personal volume.
 
 ## 3. Google Sheet + service account (free)
 
@@ -170,7 +170,7 @@ If you skip both the Shortcut's notification step and ntfy, a failed save is sil
 
 Two specific messages worth knowing about, since both are common on a personal/free setup:
 
-- **"Gemini's daily quota (20 requests/day) is used up."** — Gemini's free tier caps at 20 requests/day per API key/project, across every save method except manual typing (photos, Instagram, YouTube/TikTok, and blog links all call Gemini; typing a recipe in by hand doesn't). Resets at midnight Pacific — around 9 am CET. If `GEMINI_API_KEY_2` is set (see section 2), this message means *both* keys are used up — the app already tried the second one automatically, and the cap/message both say 40 instead of 20.
+- **"Gemini's daily quota (520 requests/day) is used up."** — Gemini's free-tier caps apply per model. The app first uses `gemini-3.6-flash` (about 20/day) and, if that model is busy or out of quota, retries once on `gemini-3.5-flash-lite` (about 500/day) with the same key. This message means both of those attempts failed. It applies to every save method except manual typing (photos, Instagram, YouTube/TikTok, and blog links all call Gemini). Resets at midnight Pacific — around 9 am CET.
 - **"Apify's monthly usage limit has been reached."** — your Apify account's $5/month credit is used up. This resets on your personal Apify **billing-cycle anniversary** (visible in Apify Console → Billing → Current period) — not the 1st of the calendar month, which is a common mix-up since Apify's own usage charts default to calendar-month view. Or upgrade your Apify plan to raise it sooner.
 
 ## 7. Optional: failure pushes
@@ -194,8 +194,8 @@ The web app and recipe API run on Vercel as a FastAPI function. Secrets stay in 
    | Name | Value |
    | --- | --- |
    | `GEMINI_API_KEY` | same as `.env` |
-   | `GEMINI_API_KEY_2` | optional — same as `.env`, doubles the daily cap |
    | `GEMINI_MODEL` | `gemini-3.6-flash` |
+   | `GEMINI_FALLBACK_MODEL` | optional — defaults to `gemini-3.5-flash-lite` |
    | `GOOGLE_SHEET_ID` | same as `.env` |
    | `GOOGLE_SERVICE_ACCOUNT_JSON` | full contents of `service_account.json` |
    | `RECIPE_BOX_SECRET` | same as `.env` |
@@ -211,21 +211,21 @@ Browsing the box works well on Vercel. Ingest may run up to **300 seconds** on H
 - **The app.** Production is `https://stocked-cookbook-cupboard.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install **Stocked** — see [`ios/README.md`](ios/README.md). Google Sheets remains the recipe database; Cupboard inventory and to-buy live in App State JSON on the server (not Sheet rows).
 - **Offline and refresh.** Stocked keeps the last successful Cookbook and Cupboard sync on the phone. Browsing, filtering, and cook mode work without a network; adding, favoriting, editing, deleting, and cupboard writes still need the server. The app refreshes when you open it, when you return from the background (so a Shortcut/web save while it was away is picked up), when connectivity comes back, or when you pull to refresh. iOS does not let it poll the server while it is fully suspended.
 - **Duplicates.** The same source URL is not ingested twice. One carousel post can still create several recipe rows on the first save (same URL on each row).
-- **Rate limits and busy responses.** On Vercel Hobby, the function may run up to 300s; Gemini itself is given about 140s for one `generate_content` so a slow save still counts as one request. A daily-quota 429 surfaces the quota message below; a 503/504 capacity blip surfaces "Gemini is busy right now. Wait a few seconds and try again." If a 429 really is the daily quota and `GEMINI_API_KEY_2` is set, the app falls back to the second key automatically before surfacing anything to the user — see section 2. A real 503 from Google is still a failure. If the Shortcut timeout is shorter than the server, the phone can still show a 499.
+- **Rate limits and busy responses.** On Vercel Hobby, the function may run up to 300s; Gemini itself is given about 140s for one `generate_content` so a slow save still counts as one request. A daily-quota 429 or a 503/504 capacity blip first retries once on the fallback model (same API key). If that also fails, a quota 429 surfaces the quota message below and a 503/504 surfaces "Gemini is busy right now. Wait a few seconds and try again." If the Shortcut timeout is shorter than the server, the phone can still show a 499.
 - **Sources.** Instagram goes through Apify — required, no fallback (see section 4). Reels are downloaded and uploaded to Gemini (Files API) so a post with no caption can still be extracted from the video; if the video download fails, the cover still is used instead. Carousel posts send every still (up to 20) or short video clip per slide (up to 10, Gemini's video cap) so a recipe split across frames can be read; distinct dishes in one carousel are saved as separate rows. YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption directly — no login needed for those, since they don't require it the way Instagram does. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. Neither yt-dlp nor the Apify actor is an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If yt-dlp fetches start failing (YouTube/TikTok/blog links, not Instagram), update with `pip install -U yt-dlp`.
 - **Photos** (a card, cookbook page, or screenshot) are added via the app's photo add flow — reviewed and saved manually, not auto-ingested like a link. Sent to Gemini inline (not uploaded via the Files API first).
 - **Cookbook ingredient filter** (`GET`/`PUT /api/pantry`). Flat string list used only on the Cookbook tab: type in search to mark ingredients, **AND**-filter recipes that use all of them, rank by **fit %**, sage banner **Filtered by …**. Synced across devices. This is **not** kitchen inventory.
 - **Cupboard** (`GET`/`PUT /api/pantry-inventory`, `GET`/`PUT /api/to-buy`). Separate stock rows (amount, unit, open/unopened, expiry, notes) plus a to-buy checklist with optional **qty**. Expiry badges step from outline date → sage (4–7 days) → terracotta (≤3 days) → **Expired**. Match mode on Items suggests recipes from selected stock. Recipe detail **+** toggles a line onto to-buy (qty prefilled from the ingredient chip). Independent of the Cookbook ingredient filter and of ingest.
 - **Tags.** A small fixed set (mom's recipes, veg, non-veg, dessert, high protein, airfryer) shown as quick-pick chips when adding/editing a recipe — enforced at the model layer. Multi-select filtering on Cookbook.
 - **Course.** Every recipe is Main course, Appetizers, Desserts, or Dips — Sheet column, Cookbook filter row, detail pill. `/ingest` derives it from Gemini's meal classification; add/edit flows (including Edit recipe) set it directly.
-- **API usage.** Settings shows today's Gemini read count against the free tier's 20/day cap (self-tracked), and this month's Apify spend against live credit (when `APIFY_API_TOKEN` is set), each with when it resets.
+- **API usage.** Settings shows today's Gemini read count (self-tracked, combined across primary and fallback) against a display scale of 50, and this month's Apify spend against live credit (when `APIFY_API_TOKEN` is set), each with when it resets. Developer → Logs lists the last 50 import attempts (including photos).
 - **Design handoff.** Visual/interaction reference for the iOS redesign: [`design_handoff_recipe_box/`](design_handoff_recipe_box/).
 
 ## Layout
 
 ```
 app/
-  main.py       FastAPI: web UI, recipes CRUD, pantry / pantry-inventory / to-buy, usage, POST /ingest
+  main.py       FastAPI: web UI, recipes CRUD, pantry / pantry-inventory / to-buy, usage, import log, POST /ingest
   static/       Web browse UI
   pipeline.py   Background job: fetch → extract → save
   fetch.py      Apify for Instagram, yt-dlp for other video sources, plain HTTP + text extraction otherwise

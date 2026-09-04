@@ -9,8 +9,11 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
+from pydantic import BaseModel, Field
+
 from app.config import settings
-from app.errors import gemini_is_quota_exhausted
+from app.errors import gemini_is_busy, gemini_is_quota_exhausted
+from app.match import apply_section_labels
 from app.models import RECIPE_TAGS, FetchedPost, FetchedSlide, Recipe, RecipeCategory, RecipeSet
 from app.store import record_gemini_read
 
@@ -72,16 +75,6 @@ CAPTION:
 """
 
 
-def _gemini_api_keys() -> list[str]:
-    """GEMINI_API_KEY, plus the optional GEMINI_API_KEY_2 (a second Google
-    account's own free-tier key) if set — see app.config. The free tier's
-    daily cap is per key/project, so once the first is exhausted for the
-    day, extract_recipe falls back to the second instead of failing for
-    the rest of the day."""
-    keys = [settings.gemini_api_key, settings.gemini_api_key_2]
-    return [key.strip() for key in keys if key.strip()]
-
-
 def _client_timeout_ms() -> int:
     """Client-level timeout for calls other than generate_content (file
     upload/poll below). generate_content uses per-model timeouts in
@@ -89,9 +82,8 @@ def _client_timeout_ms() -> int:
     return 200_000 if os.environ.get("VERCEL") else 170_000
 
 
-def extract_recipe(post: FetchedPost) -> list[Recipe]:
-    keys = _gemini_api_keys()
-    if not keys:
+def extract_recipe(post: FetchedPost) -> tuple[list[Recipe], bool]:
+    if not settings.gemini_api_key.strip():
         raise RuntimeError("GEMINI_API_KEY is missing. Add it to .env (see README).")
 
     call_timeout_ms = _client_timeout_ms()
@@ -106,50 +98,41 @@ def extract_recipe(post: FetchedPost) -> list[Recipe]:
                 still_paths = [Path(post.thumbnail_path)]
             slides = [FetchedSlide(kind="image", path=str(path)) for path in still_paths]
 
-    last_error: Exception | None = None
-    for index, api_key in enumerate(keys):
-        # A fresh client (and, for the upload path, a fresh upload) per
-        # key: an uploaded file is scoped to the project that uploaded it,
-        # so a fallback key can't reuse the first key's upload.
-        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=call_timeout_ms))
-        uploaded: list = []
-        try:
-            contents: list = []
-            video_count = sum(1 for slide in slides if slide.kind == "video")
-            upload_timeout = 15 if os.environ.get("VERCEL") and video_count > 1 else (45 if os.environ.get("VERCEL") else 180)
-            for slide in slides:
-                path = Path(slide.path)
-                if slide.kind == "image":
-                    inline = _inline_image_part(path)
-                    if inline is not None:
-                        contents.append(inline)
-                    else:
-                        logger.warning("Skipping non-image media %s", path.name)
-                    continue
-                file = _upload_and_wait(client, path, timeout=upload_timeout)
-                uploaded.append(file)
-                contents.append(file)
-            contents.append(caption_part)
-            text = _generate_with_retry(
-                client,
-                contents,
-                RecipeSet,
-                timeout_ms=(70_000 if os.environ.get("VERCEL") and video_count > 1 else None),
-            )
-            return _parse_recipe_set(text)
-        except Exception as exc:
-            last_error = exc
-            if gemini_is_quota_exhausted(exc) and index < len(keys) - 1:
-                logger.warning("Gemini key %d/%d hit its daily quota; trying the next key", index + 1, len(keys))
+    client = genai.Client(
+        api_key=settings.gemini_api_key,
+        http_options=types.HttpOptions(timeout=call_timeout_ms),
+    )
+    uploaded: list = []
+    try:
+        contents: list = []
+        video_count = sum(1 for slide in slides if slide.kind == "video")
+        upload_timeout = 15 if os.environ.get("VERCEL") and video_count > 1 else (45 if os.environ.get("VERCEL") else 180)
+        for slide in slides:
+            path = Path(slide.path)
+            if slide.kind == "image":
+                inline = _inline_image_part(path)
+                if inline is not None:
+                    contents.append(inline)
+                else:
+                    logger.warning("Skipping non-image media %s", path.name)
                 continue
-            raise
-        finally:
-            for file in uploaded:
-                try:
-                    client.files.delete(name=file.name)
-                except Exception:
-                    logger.debug("Could not delete Gemini file %s", getattr(file, "name", file))
-    raise RuntimeError("Gemini call failed") from last_error
+            file = _upload_and_wait(client, path, timeout=upload_timeout)
+            uploaded.append(file)
+            contents.append(file)
+        contents.append(caption_part)
+        text, used_backup = _generate_with_retry(
+            client,
+            contents,
+            RecipeSet,
+            timeout_ms=(70_000 if os.environ.get("VERCEL") and video_count > 1 else None),
+        )
+        return _parse_recipe_set(text), used_backup
+    finally:
+        for file in uploaded:
+            try:
+                client.files.delete(name=file.name)
+            except Exception:
+                logger.debug("Could not delete Gemini file %s", getattr(file, "name", file))
 
 
 _IMAGE_MIME = {
@@ -186,56 +169,68 @@ def _upload_and_wait(client: genai.Client, path: Path, timeout: int = 180):
     raise TimeoutError("Timed out waiting for Gemini to process the video.")
 
 
+def _generate_once(
+    client: genai.Client,
+    model: str,
+    contents,
+    response_schema: type,
+    timeout_ms: int,
+) -> str:
+    record_gemini_read()
+    response = client.models.generate_content(
+        model=model,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=response_schema,
+            thinking_config=types.ThinkingConfig(
+                thinking_level=types.ThinkingLevel.MINIMAL,
+            ),
+            http_options=types.HttpOptions(timeout=timeout_ms),
+        ),
+    )
+    text = (response.text or "").strip()
+    if not text:
+        raise RuntimeError("Gemini returned an empty response.")
+    return text
+
+
 def _generate_with_retry(
     client: genai.Client,
     contents,
     response_schema: type,
-    attempts: int = 5,
     timeout_ms: int | None = None,
-) -> str:
-    """One generate_content on settings.gemini_model. On Vercel Hobby the
-    function may run 300s; this call gets one shot so a slow reply is not
-    billed twice. Locally, a daily-quota 429 can retry on the same key
-    before extract_recipe tries the next key.
+) -> tuple[str, bool]:
+    """One generate_content on the primary model, then one shot on the
+    fallback model if the primary is busy or out of daily quota.
 
     Shared by extract_recipe (contents = recipe prompt + media, schema =
-    Recipe) and categorize_recipe (contents = category prompt, schema =
-    RecipeCategory)."""
+    RecipeSet) and categorize_recipe (contents = category prompt, schema =
+    RecipeCategory). Returns (json_text, used_backup)."""
     on_vercel = bool(os.environ.get("VERCEL"))
-    if on_vercel:
-        attempts = 1
     if timeout_ms is None:
         timeout_ms = 140_000 if on_vercel else 170_000
 
-    last_error: Exception | None = None
-    for i in range(attempts):
-        try:
-            record_gemini_read()
-            response = client.models.generate_content(
-                model=settings.gemini_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=response_schema,
-                    thinking_config=types.ThinkingConfig(
-                        thinking_level=types.ThinkingLevel.MINIMAL,
-                    ),
-                    http_options=types.HttpOptions(timeout=timeout_ms),
-                ),
-            )
-            text = (response.text or "").strip()
-            if not text:
-                raise RuntimeError("Gemini returned an empty response.")
-            return text
-        except Exception as exc:
-            last_error = exc
-            if gemini_is_quota_exhausted(exc) and i < attempts - 1:
-                delay = 2 ** (i + 1)
-                logger.warning("Gemini rate-limited; retrying in %ss", delay)
-                time.sleep(delay)
-                continue
+    try:
+        return (
+            _generate_once(client, settings.gemini_model, contents, response_schema, timeout_ms),
+            False,
+        )
+    except Exception as exc:
+        if not (gemini_is_busy(exc) or gemini_is_quota_exhausted(exc)):
             raise
-    raise RuntimeError("Gemini call failed") from last_error
+        fallback = settings.gemini_fallback_model.strip()
+        if not fallback or fallback == settings.gemini_model:
+            raise
+        logger.warning("Primary Gemini model failed (%s); trying fallback", type(exc).__name__)
+        try:
+            return (
+                _generate_once(client, fallback, contents, response_schema, timeout_ms),
+                True,
+            )
+        except Exception as fallback_exc:
+            fallback_exc.used_backup = True  # type: ignore[attr-defined]
+            raise
 
 
 def categorize_recipe(
@@ -256,7 +251,7 @@ def categorize_recipe(
         steps=steps or "(none)",
         caption=caption or "(none)",
     )
-    text = _generate_with_retry(client, prompt, RecipeCategory)
+    text, _used_backup = _generate_with_retry(client, prompt, RecipeCategory)
     try:
         return RecipeCategory.model_validate_json(text)
     except Exception:
@@ -298,3 +293,87 @@ def _parse_recipe(text: str) -> Recipe:
         if start == -1 or end == -1:
             raise RuntimeError(f"Could not parse recipe JSON: {text[:400]}")
         return Recipe.model_validate(json.loads(text[start : end + 1]))
+
+
+class _IngredientSectionHit(BaseModel):
+    n: int
+    section: str = ""
+
+
+class _RecipeSectionHit(BaseModel):
+    id: int
+    parts: list[_IngredientSectionHit] = Field(default_factory=list)
+
+
+class _RecipeSectionBatch(BaseModel):
+    recipes: list[_RecipeSectionHit] = Field(default_factory=list)
+
+
+_SECTION_BACKFILL_PROMPT = """Assign ingredient-list section headings for saved recipes.
+
+For each recipe, look at the title, ingredient lines, and steps. If this is one mixed list (a single marinade, a single batter, one soup), leave every section empty.
+If it is a multi-part meal that cooks would split on the page (chicken vs sauce vs rice vs slaw vs "to serve"), give each ingredient a short cook-facing label such as "For the chicken", "For the sauce", "For the rice", "To serve". Consecutive ingredients of the same part share the same label.
+
+Rules:
+- Do not add, remove, rewrite, or reorder ingredients. Only assign a section label per line number.
+- Every ingredient line number in the input must appear once in parts.
+- Use empty section when unsure.
+
+RECIPES:
+{body}
+"""
+
+
+def suggest_ingredient_sections(recipes: list[dict]) -> dict[int, list[str]]:
+    """Gemini labels for a batch of already-saved recipes. Keys are row
+    ids; values are full ingredient lists with `##` headings inserted, or
+    omitted when the recipe should stay a flat list."""
+    if not settings.gemini_api_key.strip():
+        raise RuntimeError("GEMINI_API_KEY is missing.")
+    chunks: list[str] = []
+    wanted: dict[int, list[str]] = {}
+    for recipe in recipes:
+        row_id = int(recipe["id"])
+        lines = list(recipe.get("ingredients") or [])
+        if not lines or any(line.strip().startswith("#") for line in lines):
+            continue
+        wanted[row_id] = lines
+        steps = recipe.get("steps") or []
+        numbered = "\n".join(f"  {i}. {line}" for i, line in enumerate(lines, start=1))
+        step_text = "\n".join(f"  - {step}" for step in steps[:12]) or "  (none)"
+        chunks.append(
+            f"id {row_id}\nTITLE: {recipe.get('title') or '(untitled)'}\nINGREDIENTS:\n{numbered}\nSTEPS:\n{step_text}"
+        )
+    if not wanted:
+        return {}
+    prompt = _SECTION_BACKFILL_PROMPT.format(body="\n\n".join(chunks))
+    client = genai.Client(
+        api_key=settings.gemini_api_key,
+        http_options=types.HttpOptions(timeout=_client_timeout_ms()),
+    )
+    text, _used_backup = _generate_with_retry(client, prompt, _RecipeSectionBatch)
+
+    try:
+        parsed = _RecipeSectionBatch.model_validate_json(text)
+    except Exception:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1:
+            raise RuntimeError(f"Could not parse section JSON: {text[:400]}")
+        parsed = _RecipeSectionBatch.model_validate(json.loads(text[start : end + 1]))
+
+    out: dict[int, list[str]] = {}
+    by_id = {item.id: item for item in parsed.recipes}
+    for row_id, lines in wanted.items():
+        hit = by_id.get(row_id)
+        if not hit:
+            continue
+        labels = [""] * len(lines)
+        for part in hit.parts:
+            index = part.n - 1
+            if 0 <= index < len(labels):
+                labels[index] = (part.section or "").strip()
+        rewritten = apply_section_labels(lines, labels)
+        if rewritten:
+            out[row_id] = rewritten
+    return out

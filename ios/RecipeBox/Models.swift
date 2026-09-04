@@ -679,10 +679,13 @@ func looksLikeSectionName(_ name: String) -> Bool {
 func splitIngredientSection(_ line: String) -> (section: String?, item: String?) {
     let text = line.trimmingCharacters(in: .whitespaces)
     guard !text.isEmpty else { return (nil, "") }
-    if let hash = text.range(of: "^#{1,3}\\s+(.+)$", options: .regularExpression) {
-        let name = String(text[hash])
-            .replacingOccurrences(of: "^#{1,3}\\s+", with: "", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: ": ").union(.whitespaces))
+    if let regex = try? NSRegularExpression(pattern: "^#{1,3}\\s+(.+)$"),
+       let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+       match.numberOfRanges >= 2,
+       let nameRange = Range(match.range(at: 1), in: text) {
+        let name = String(text[nameRange])
+            .trimmingCharacters(in: .whitespaces)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ":"))
         if !name.isEmpty {
             return (name, nil)
         }
@@ -698,6 +701,17 @@ func splitIngredientSection(_ line: String) -> (section: String?, item: String?)
         let rest = String(text[text.index(after: idx)...]).trimmingCharacters(in: .whitespaces)
         if !rest.isEmpty, looksLikeSectionName(name) {
             return (name, rest)
+        }
+    }
+    let qtySplit = splitIngredientQuantity(text)
+    if let quantity = qtySplit.quantity {
+        let inner = qtySplit.text
+        if let idx = inner.firstIndex(of: ":") {
+            let name = String(inner[..<idx]).trimmingCharacters(in: .whitespaces)
+            let rest = String(inner[inner.index(after: idx)...]).trimmingCharacters(in: .whitespaces)
+            if !rest.isEmpty, looksLikeSectionName(name) {
+                return (name, "\(quantity) \(rest)")
+            }
         }
     }
     return (nil, text)

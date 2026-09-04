@@ -46,6 +46,8 @@ def _col_letter(one_based_index: int) -> str:
     return chr(ord("A") + one_based_index - 1)
 
 
+INGREDIENTS_COL = HEADERS.index("Ingredients") + 1
+INGREDIENTS_COL_LETTER = _col_letter(INGREDIENTS_COL)
 SOURCE_COL = HEADERS.index("Source") + 1  # 1-based, matches HEADERS
 LAST_COL_LETTER = _col_letter(len(HEADERS))
 COURSE_COL_LETTER = _col_letter(HEADERS.index("Course") + 1)
@@ -308,10 +310,9 @@ _PACIFIC = ZoneInfo("America/Los_Angeles")
 
 def record_gemini_read() -> None:
     """Ticks Settings "Imports today" once per Gemini API call we actually
-    make — success or failure. Failed photo/Instagram reads still count
-    toward the free-tier 20/day cap when Google accepted the request, so
-    the remaining number has to include them. There is no quota-remaining
-    endpoint; this is a local tally of those calls."""
+    make — success or failure, primary or backup model. Failed photo/
+    Instagram reads still count when Google accepted the request. There is
+    no quota-remaining endpoint; this is a local tally of those calls."""
     today = datetime.now(_PACIFIC).date().isoformat()
     usage = _read_app_state().get("gemini_usage") or {}
     count = usage.get("count", 0) + 1 if usage.get("date") == today else 1
@@ -322,6 +323,67 @@ def get_gemini_reads_today() -> int:
     usage = _read_app_state().get("gemini_usage") or {}
     today = datetime.now(_PACIFIC).date().isoformat()
     return usage.get("count", 0) if usage.get("date") == today else 0
+
+
+IMPORT_LOG_TITLE = "ImportLog"
+IMPORT_LOG_HEADERS = ["timestamp", "url", "status", "reason", "used_backup"]
+_BERLIN = ZoneInfo("Europe/Berlin")
+
+
+@lru_cache(maxsize=1)
+def _import_log_worksheet():
+    spreadsheet = _worksheet().spreadsheet
+    try:
+        worksheet = spreadsheet.worksheet(IMPORT_LOG_TITLE)
+    except gspread.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(title=IMPORT_LOG_TITLE, rows=2, cols=len(IMPORT_LOG_HEADERS))
+        worksheet.append_row(IMPORT_LOG_HEADERS, value_input_option="RAW")
+        return worksheet
+    existing = worksheet.row_values(1)
+    if existing[: len(IMPORT_LOG_HEADERS)] != IMPORT_LOG_HEADERS:
+        if not any(existing):
+            worksheet.append_row(IMPORT_LOG_HEADERS, value_input_option="RAW")
+        else:
+            logger.warning("ImportLog header row does not match %s", IMPORT_LOG_HEADERS)
+    return worksheet
+
+
+def log_import(url: str | None, status: str, reason: str, used_backup: bool = False) -> None:
+    """Append one ImportLog row. Best-effort — must never break an import."""
+    try:
+        timestamp = datetime.now(_BERLIN).strftime("%Y-%m-%d %H:%M %Z")
+        row = [
+            timestamp,
+            (url or "").strip() or "(photo)",
+            status,
+            (reason or "")[:500],
+            "TRUE" if used_backup else "FALSE",
+        ]
+        _import_log_worksheet().append_row(row, value_input_option="RAW")
+    except Exception:
+        logger.exception("Failed to write import log")
+
+
+def get_recent_imports(limit: int = 50) -> list[dict]:
+    try:
+        records = _import_log_worksheet().get_all_records()
+    except Exception:
+        logger.exception("Failed to read import log")
+        return []
+    rows = []
+    for record in records:
+        url = str(record.get("url") or "").strip()
+        rows.append(
+            {
+                "timestamp": str(record.get("timestamp") or "").strip(),
+                "url": url,
+                "status": str(record.get("status") or "").strip(),
+                "reason": str(record.get("reason") or "").strip(),
+                "used_backup": str(record.get("used_backup") or "").strip().lower() in TRUE_VALUES,
+            }
+        )
+    rows.reverse()
+    return rows[: max(0, limit)]
 
 
 def source_exists(url: str) -> bool:
@@ -487,6 +549,17 @@ def update_recipe(row_id: int, **fields) -> dict | None:
         "ingredients_text": ingredients_text,
         "steps_text": steps_text,
     }
+
+
+def replace_ingredient_lines(row_id: int, lines: list[str]) -> None:
+    """Rewrite only the Ingredients cell — used when backfilling section
+    headings onto recipes that were saved as a flat list."""
+    text = "\n".join(f"- {line}" for line in lines)
+    _worksheet().update(
+        f"{INGREDIENTS_COL_LETTER}{row_id}",
+        [[text]],
+        value_input_option="RAW",
+    )
 
 
 def list_recipes() -> list[dict]:
