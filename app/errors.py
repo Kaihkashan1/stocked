@@ -13,13 +13,11 @@ from google.genai.errors import APIError as GeminiAPIError
 from app.fetch import ApifyLimitError
 
 # Primary free-tier daily cap, plus the fallback model's own (much higher)
-# cap. Combined only for the quota-exhausted error, which fires after both
-# have actually failed. Settings' progress bar uses GEMINI_USAGE_DISPLAY_SCALE
-# instead so the bar can fill at personal volume.
+# cap. Combined for the quota-exhausted error and the Settings "Imports today"
+# bar. Used is still the self-tracked Gemini call count for today.
 GEMINI_PRIMARY_DAILY_QUOTA = 20
 GEMINI_FALLBACK_DAILY_QUOTA = 500
 GEMINI_DAILY_QUOTA = GEMINI_PRIMARY_DAILY_QUOTA + GEMINI_FALLBACK_DAILY_QUOTA
-GEMINI_USAGE_DISPLAY_SCALE = 50
 
 GEMINI_QUOTA_MESSAGE = (
     f"Gemini's daily quota ({GEMINI_DAILY_QUOTA} requests/day) is used up. "

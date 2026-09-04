@@ -269,6 +269,10 @@ final class RecipeStore {
         try? await APIClient(baseURLString: serverURL).fetchUsage(secret: serverSecret)
     }
 
+    func fetchImportLog() async -> [ImportLogEntry]? {
+        try? await APIClient(baseURLString: serverURL).fetchImportLog(secret: serverSecret)
+    }
+
     /// Optimistic: flips the star immediately, then confirms with the server.
     /// Reverts and surfaces actionError if the request fails.
     func toggleFavorite(_ recipe: Recipe) async {

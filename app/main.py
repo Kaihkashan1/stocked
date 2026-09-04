@@ -15,7 +15,7 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.auth import require_secret
 from app.config import ROOT, settings
-from app.errors import GEMINI_USAGE_DISPLAY_SCALE, friendly_message, gemini_is_busy
+from app.errors import GEMINI_DAILY_QUOTA, friendly_message, gemini_is_busy
 from app.extract import extract_recipe
 from app.fetch import get_apify_usage
 from app.match import STAPLES, grouped_pantry
@@ -236,7 +236,7 @@ async def api_usage():
     `apify` is null when the token is missing or the call fails — the app
     should just hide that half of the card rather than fake a number."""
     return {
-        "gemini": {"used": get_gemini_reads_today(), "limit": GEMINI_USAGE_DISPLAY_SCALE},
+        "gemini": {"used": get_gemini_reads_today(), "limit": GEMINI_DAILY_QUOTA},
         "apify": get_apify_usage(),
     }
 

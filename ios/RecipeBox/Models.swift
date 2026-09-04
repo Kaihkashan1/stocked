@@ -406,6 +406,26 @@ enum LinkIngestOutcome {
     case error(String)
 }
 
+/// Last 50 import attempts for Settings → Developer → Logs,
+/// from GET /api/import-log.
+struct ImportLogResponse: Decodable {
+    let imports: [ImportLogEntry]
+}
+
+struct ImportLogEntry: Decodable, Identifiable {
+    let id = UUID()
+    let timestamp: String
+    let url: String
+    let status: String
+    let reason: String
+    let usedBackup: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case timestamp, url, status, reason
+        case usedBackup = "used_backup"
+    }
+}
+
 /// Backs the Settings screen's "API usage" card, from GET /api/usage.
 /// `apify` is nil when the server has no Apify token or the live account
 /// query failed — the card shows only the Gemini bar in that case rather

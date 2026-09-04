@@ -8,6 +8,10 @@ struct SettingsView: View {
     @State private var saving = false
     @State private var saveError: String?
     @State private var developerOpen = false
+    @State private var logsOpen = false
+    /// nil until Developer → Logs is opened the first time.
+    @State private var importLog: [ImportLogEntry]?
+    @State private var importLogFailed = false
     /// nil while loading or if the fetch failed — the section is omitted
     /// rather than showing a stale/fake number (same rule the backend
     /// follows for a missing Apify token, see GET /api/usage).
@@ -117,9 +121,101 @@ struct SettingsView: View {
                                 .foregroundStyle(.red)
                         }
                     }
+
+                    logsSection
                 }
                 .padding(.top, 4)
             }
+        }
+    }
+
+    private var logsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    logsOpen.toggle()
+                }
+                if logsOpen, importLog == nil, !importLogFailed {
+                    Task {
+                        if let rows = await store.fetchImportLog() {
+                            importLog = rows
+                        } else {
+                            importLogFailed = true
+                        }
+                    }
+                }
+            } label: {
+                HStack {
+                    Kicker(text: L("Logs"), color: Theme.neutral600)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.neutral800)
+                        .rotationEffect(.degrees(logsOpen ? 180 : 0))
+                }
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Theme.divider)
+                    .frame(height: 1)
+            }
+
+            if logsOpen {
+                if importLogFailed {
+                    Text(L("Couldn't load logs."))
+                        .font(Theme.body(13))
+                        .foregroundStyle(Theme.neutral600)
+                        .padding(.bottom, 8)
+                } else if let importLog, importLog.isEmpty {
+                    Text(L("No imports yet."))
+                        .font(Theme.body(13))
+                        .foregroundStyle(Theme.neutral600)
+                        .padding(.bottom, 8)
+                } else if let importLog {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(importLog) { row in
+                            importLogRow(row)
+                        }
+                    }
+                    .padding(.bottom, 8)
+                }
+            }
+        }
+    }
+
+    private func importLogRow(_ row: ImportLogEntry) -> some View {
+        let urlText = (row.url.isEmpty || row.url == "(photo)") ? L("(photo)") : row.url
+        let statusText = row.reason.isEmpty ? row.status : "\(row.status) — \(row.reason)"
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(row.timestamp)
+                    .font(Theme.body(12))
+                    .foregroundStyle(Theme.neutral600)
+                Spacer(minLength: 0)
+                if row.usedBackup {
+                    Text(L("backup"))
+                        .font(Theme.body(11, weight: .semibold))
+                        .foregroundStyle(Theme.sage800)
+                        .textCase(.uppercase)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .overlay(Capsule().strokeBorder(Theme.sage800, lineWidth: 1))
+                }
+            }
+            Text(urlText)
+                .font(Theme.body(13.5))
+                .foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(statusText)
+                .font(Theme.body(12.5))
+                .foregroundStyle(Theme.neutral600)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.divider).frame(height: 1)
         }
     }
 

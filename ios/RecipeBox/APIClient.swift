@@ -373,6 +373,35 @@ struct APIClient {
         return try Self.decoder.decode(UsageStats.self, from: data)
     }
 
+    /// Last 50 import attempts for Settings → Developer → Logs.
+    func fetchImportLog(secret: String) async throws -> [ImportLogEntry] {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/import-log", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(ImportLogResponse.self, from: data).imports
+    }
+
     private var trimmedBase: String {
         baseURLString.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }

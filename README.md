@@ -35,7 +35,7 @@ Free-tier content may be used to improve Google’s models. Fine for recipe vide
 
 Rate limits live at [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit). A handful of recipes a day stays under typical free-tier caps.
 
-If the primary model (`gemini-3.6-flash`) is busy or hits its own daily cap, the app retries once on `gemini-3.5-flash-lite` with the same API key. Override the fallback with `GEMINI_FALLBACK_MODEL` if needed. Combined free-tier capacity is treated as about 520 requests/day (20 + 500); Settings shows a smaller display scale so the progress bar can fill at personal volume.
+If the primary model (`gemini-3.6-flash`) is busy or hits its own daily cap, the app retries once on `gemini-3.5-flash-lite` with the same API key. Override the fallback with `GEMINI_FALLBACK_MODEL` if needed. Combined free-tier capacity is treated as about 520 requests/day (20 + 500); Settings shows today's Gemini call count against that same number.
 
 ## 3. Google Sheet + service account (free)
 
@@ -218,7 +218,7 @@ Browsing the box works well on Vercel. Ingest may run up to **300 seconds** on H
 - **Cupboard** (`GET`/`PUT /api/pantry-inventory`, `GET`/`PUT /api/to-buy`). Separate stock rows (amount, unit, open/unopened, expiry, notes) plus a to-buy checklist with optional **qty**. Expiry badges step from outline date → sage (4–7 days) → terracotta (≤3 days) → **Expired**. Match mode on Items suggests recipes from selected stock. Recipe detail **+** toggles a line onto to-buy (qty prefilled from the ingredient chip). Independent of the Cookbook ingredient filter and of ingest.
 - **Tags.** A small fixed set (mom's recipes, veg, non-veg, dessert, high protein, airfryer) shown as quick-pick chips when adding/editing a recipe — enforced at the model layer. Multi-select filtering on Cookbook.
 - **Course.** Every recipe is Main course, Appetizers, Desserts, or Dips — Sheet column, Cookbook filter row, detail pill. `/ingest` derives it from Gemini's meal classification; add/edit flows (including Edit recipe) set it directly.
-- **API usage.** Settings shows today's Gemini read count (self-tracked, combined across primary and fallback) against a display scale of 50, and this month's Apify spend against live credit (when `APIFY_API_TOKEN` is set), each with when it resets. Developer → Logs lists the last 50 import attempts (including photos).
+- **API usage.** Settings shows today's Gemini read count (self-tracked, combined across primary and fallback) against 520, and this month's Apify spend against live credit (when `APIFY_API_TOKEN` is set), each with when it resets. Developer → Logs lists the last 50 import attempts (including photos).
 - **Design handoff.** Visual/interaction reference for the iOS redesign: [`design_handoff_recipe_box/`](design_handoff_recipe_box/).
 
 ## Layout
