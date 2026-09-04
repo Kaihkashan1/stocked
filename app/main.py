@@ -130,10 +130,11 @@ async def api_extract_photo(photo: UploadFile = File(...)):
         tmp.write(content)
         tmp_path = Path(tmp.name)
 
+    recipes = []
     try:
         post = FetchedPost(url="", caption="", video_path=None, thumbnail_path=str(tmp_path))
         try:
-            recipe = extract_recipe(post)
+            recipes = extract_recipe(post)
         except Exception as exc:
             # Not just GeminiAPIError: a slow response now fails as a plain
             # httpx.TimeoutException (see app.extract's explicit call
@@ -149,6 +150,10 @@ async def api_extract_photo(photo: UploadFile = File(...)):
             raise HTTPException(status_code=status, detail=friendly_message(exc)) from exc
     finally:
         tmp_path.unlink(missing_ok=True)
+
+    if not recipes:
+        raise HTTPException(status_code=502, detail="Gemini returned no recipes.")
+    recipe = recipes[0]
 
     ingredients = [
         " ".join(part for part in (item.quantity, item.unit, item.item) if part).strip() for item in recipe.ingredients

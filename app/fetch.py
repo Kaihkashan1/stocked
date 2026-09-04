@@ -12,7 +12,7 @@ import httpx
 import yt_dlp
 
 from app.config import settings
-from app.models import FetchedPost
+from app.models import FetchedPost, FetchedSlide
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,13 @@ _INGREDIENT_HEADING = re.compile(r"\bingredients\b", re.IGNORECASE)
 # when it exists — see _find_ingredient_heading.
 _INGREDIENT_HEADING_COLON = re.compile(r"\bingredients\s*:", re.IGNORECASE)
 APIFY_API_BASE = "https://api.apify.com/v2"
+# Cap how many carousel stills we send to Gemini. Instagram's own limit is
+# 10; some scrapers expose more, and 20 still fits a 300s Hobby run if
+# each download is kept short.
+MAX_CAROUSEL_IMAGES = 20
+# Gemini accepts at most 10 videos per prompt; short carousel clips share
+# that cap (Instagram sidecars are at most 10 items anyway).
+MAX_CAROUSEL_VIDEOS = 10
 
 
 def extract_url(text: str) -> str:
@@ -364,25 +371,64 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
 
     video_url = item.get("videoUrl")
     media_timeout = 40 if on_vercel else 60
-    video_path = (
-        _download_apify_media(video_url, out_dir, media_id, video=True, timeout=media_timeout)
-        if video_url
-        else None
-    )
+    slide_timeout_image = 8 if on_vercel else 45
+    slide_timeout_video = 10 if on_vercel else 45
 
-    images = item.get("images")
+    image_paths: list[Path] = []
+    slides: list[FetchedSlide] = []
+    video_path = None
     image_url = None
-    if video_path is None:
-        if isinstance(images, list) and images:
-            image_url = images[0]
-        image_url = image_url or item.get("displayUrl")
-    thumbnail_path = (
-        _download_apify_media(image_url, out_dir, media_id, video=False, timeout=media_timeout)
-        if image_url
-        else None
-    )
 
-    if video_path is None and thumbnail_path is None and not caption:
+    sidecar = _sidecar_slide_urls(item)
+    if sidecar:
+        has_video = any(kind == "video" for kind, _ in sidecar)
+        limit = MAX_CAROUSEL_VIDEOS if has_video else MAX_CAROUSEL_IMAGES
+        for index, (kind, slide_url) in enumerate(sidecar[:limit]):
+            if image_url is None and kind == "image":
+                image_url = slide_url
+            timeout = slide_timeout_video if kind == "video" else slide_timeout_image
+            saved = _download_apify_media(
+                slide_url,
+                out_dir,
+                media_id,
+                video=(kind == "video"),
+                timeout=timeout,
+                name_suffix=f"_{index}",
+            )
+            if saved is None:
+                continue
+            slides.append(FetchedSlide(kind=kind, path=str(saved)))
+            if kind == "video" and video_path is None:
+                video_path = saved
+            if kind == "image":
+                image_paths.append(saved)
+                if image_url is None:
+                    image_url = slide_url
+    elif video_url:
+        video_path = _download_apify_media(
+            video_url, out_dir, media_id, video=True, timeout=media_timeout
+        )
+        if video_path is not None:
+            slides.append(FetchedSlide(kind="video", path=str(video_path)))
+    else:
+        for index, slide_url in enumerate(_carousel_image_urls(item)[:MAX_CAROUSEL_IMAGES]):
+            if image_url is None:
+                image_url = slide_url
+            saved = _download_apify_media(
+                slide_url,
+                out_dir,
+                media_id,
+                video=False,
+                timeout=slide_timeout_image,
+                name_suffix=f"_{index}",
+            )
+            if saved is not None:
+                image_paths.append(saved)
+                slides.append(FetchedSlide(kind="image", path=str(saved)))
+
+    thumbnail_path = image_paths[0] if image_paths else None
+
+    if video_path is None and thumbnail_path is None and not caption and not slides:
         logger.warning("Apify result for %s had no caption or media", url)
         return None
 
@@ -392,12 +438,72 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
         video_path=str(video_path) if video_path else None,
         thumbnail_path=str(thumbnail_path) if thumbnail_path else None,
         thumbnail_url=image_url,
+        image_paths=[str(path) for path in image_paths],
+        slides=slides,
         media_id=media_id,
     )
 
 
-def _download_apify_media(url: str, out_dir: Path, media_id: str, video: bool, timeout: int = 60) -> Path | None:
-    dest = out_dir / f"{media_id or 'apify'}{'.mp4' if video else '.jpg'}"
+def _sidecar_slide_urls(item: dict) -> list[tuple[str, str]]:
+    """Ordered (kind, url) for a multi-item Instagram post. Empty when this
+    is a single reel or a stills-only carousel that only has `images`."""
+    children = item.get("childPosts")
+    if not isinstance(children, list) or len(children) < 2:
+        return []
+    slides: list[tuple[str, str]] = []
+    for child in children:
+        if not isinstance(child, dict):
+            continue
+        video = child.get("videoUrl")
+        if isinstance(video, str) and video.strip():
+            slides.append(("video", video.strip()))
+            continue
+        still = child.get("displayUrl") or child.get("imageUrl")
+        if isinstance(still, str) and still.strip():
+            slides.append(("image", still.strip()))
+    return slides
+
+
+def _carousel_image_urls(item: dict) -> list[str]:
+    """Every still URL Apify exposes for a sidecar/carousel post, in order,
+    de-duplicated. `images[0]` alone was dropping the rest of a recipe
+    that's written across slides."""
+    urls: list[str] = []
+    seen: set[str] = set()
+
+    def add(raw: object) -> None:
+        if not isinstance(raw, str):
+            return
+        url = raw.strip()
+        if url and url not in seen:
+            seen.add(url)
+            urls.append(url)
+
+    images = item.get("images")
+    if isinstance(images, list):
+        for entry in images:
+            if isinstance(entry, str):
+                add(entry)
+            elif isinstance(entry, dict):
+                add(entry.get("url") or entry.get("imageUrl") or entry.get("displayUrl"))
+    children = item.get("childPosts")
+    if isinstance(children, list):
+        for child in children:
+            if isinstance(child, dict) and not child.get("videoUrl"):
+                add(child.get("displayUrl") or child.get("imageUrl"))
+    add(item.get("displayUrl"))
+    return urls
+
+
+def _download_apify_media(
+    url: str,
+    out_dir: Path,
+    media_id: str,
+    video: bool,
+    timeout: int = 60,
+    name_suffix: str = "",
+) -> Path | None:
+    dest = out_dir / f"{media_id or 'apify'}{name_suffix}{'.mp4' if video else '.jpg'}"
     try:
         with httpx.stream("GET", url, timeout=timeout, follow_redirects=True) as response:
             response.raise_for_status()

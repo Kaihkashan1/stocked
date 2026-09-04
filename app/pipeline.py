@@ -30,17 +30,23 @@ def process_recipe(raw_content: str) -> dict:
 
         with tempfile.TemporaryDirectory(prefix="recipe-") as tmp:
             post = fetch_post(url, Path(tmp))
-            recipe = extract_recipe(post)
-            save_recipe(recipe, post)
+            recipes = extract_recipe(post)
+            if not recipes:
+                raise RuntimeError("Gemini returned no recipes.")
+            for recipe in recipes:
+                save_recipe(recipe, post)
 
-        _record(url=url, status="saved", title=recipe.title, confidence=recipe.confidence)
-        notify.send("Recipe saved", f"{recipe.title} ({recipe.confidence})")
-        logger.info("Done: %s", recipe.title)
+        first = recipes[0]
+        extra = len(recipes) - 1
+        title = first.title if extra == 0 else f"{first.title} (+{extra} more)"
+        _record(url=url, status="saved", title=title, confidence=first.confidence)
+        notify.send("Recipe saved", f"{title} ({first.confidence})")
+        logger.info("Done: %s", title)
         return {
             "status": "saved",
             "url": url,
-            "title": recipe.title,
-            "confidence": recipe.confidence,
+            "title": title,
+            "confidence": first.confidence,
         }
     except Exception as exc:
         logger.exception("Failed to process recipe")

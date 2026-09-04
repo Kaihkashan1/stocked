@@ -82,6 +82,13 @@ class Recipe(BaseModel):
     _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_tags(v))
 
 
+class RecipeSet(BaseModel):
+    """One Gemini call can return several recipes from an Instagram
+    carousel (distinct dishes) or a single recipe whose steps span slides."""
+
+    recipes: list[Recipe] = Field(default_factory=list, max_length=5)
+
+
 class RecipeCreate(BaseModel):
     """A recipe typed in by hand from the app — skips capture/Gemini
     entirely, so every field is supplied by the user up front. Course is a
@@ -166,10 +173,19 @@ class RecipeCategory(BaseModel):
     _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_tags(v))
 
 
+class FetchedSlide(BaseModel):
+    """One Instagram carousel item after download — a short clip or a still."""
+
+    kind: Literal["video", "image"]
+    path: str
+
+
 class FetchedPost(BaseModel):
     url: str
     caption: str = ""
     video_path: str | None = None
     thumbnail_path: str | None = None
     thumbnail_url: str | None = None
+    image_paths: list[str] = Field(default_factory=list)
+    slides: list[FetchedSlide] = Field(default_factory=list)
     media_id: str = ""
