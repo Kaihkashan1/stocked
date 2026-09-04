@@ -161,7 +161,7 @@ struct AddRecipeView: View {
     }
 
     private func confidencePill(_ prefill: RecipeExtraction) -> some View {
-        Text(L("Read \(prefill.ingredients.count) ingredients and \(prefill.steps.count) steps. Confidence: \(L(String.LocalizationValue(prefill.confidence)))."))
+        Text(L("Read \(ingredientItemLines(prefill.ingredients).count) ingredients and \(prefill.steps.count) steps. Confidence: \(L(String.LocalizationValue(prefill.confidence)))."))
             .font(Theme.body(13))
             .foregroundStyle(Theme.sage800)
             .padding(.horizontal, 16)

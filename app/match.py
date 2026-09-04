@@ -4,6 +4,36 @@ from __future__ import annotations
 
 import re
 
+# Heading-only line ("Sauce:") or "Sauce: yogurt" — used so the UI can
+# show a section title above the items without counting the heading as
+# an ingredient for pantry matching.
+_SECTION_HEADING = re.compile(r"^([^:]{1,40}):\s*$")
+_SECTION_PREFIX = re.compile(r"^([^:]{1,40}):\s+(.+)$")
+
+
+def looks_like_section_name(name: str) -> bool:
+    text = (name or "").strip()
+    if not text or len(text) > 40:
+        return False
+    if any(ch.isdigit() for ch in text):
+        return False
+    words = text.split()
+    return 1 <= len(words) <= 4
+
+
+def split_ingredient_section(line: str) -> tuple[str | None, str | None]:
+    """Return (section, item). item is None for a heading-only line."""
+    text = (line or "").strip()
+    if not text:
+        return None, ""
+    heading = _SECTION_HEADING.match(text)
+    if heading and looks_like_section_name(heading.group(1)):
+        return heading.group(1).strip(), None
+    prefixed = _SECTION_PREFIX.match(text)
+    if prefixed and looks_like_section_name(prefixed.group(1)):
+        return prefixed.group(1).strip(), prefixed.group(2).strip()
+    return None, text
+
 UNITS = {
     "cup",
     "cups",
@@ -139,7 +169,10 @@ def pantry_items(ingredients: list[str]) -> list[str]:
     found: list[str] = []
     seen: set[str] = set()
     for line in ingredients:
-        name = canonical_ingredient(line)
+        _section, item = split_ingredient_section(line)
+        if item is None:
+            continue
+        name = canonical_ingredient(item)
         if not name or name in seen:
             continue
         seen.add(name)

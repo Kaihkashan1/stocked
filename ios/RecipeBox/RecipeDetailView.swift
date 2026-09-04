@@ -408,14 +408,19 @@ private struct IngredientsCard: View {
     @State private var scale: Double = 1.0
 
     /// Parsed once per recipe (here in init), not on every scale change.
-    private let parsedLines: [IngredientLine]
+    private let rows: [IngredientDisplayRow]
     private let canScale: Bool
 
     init(recipe: Recipe) {
         self.recipe = recipe
-        let parsed = recipe.ingredients.map(splitIngredientQuantity)
-        parsedLines = parsed
-        canScale = parsed.contains { $0.quantity.flatMap { parseQuantityNumber(String($0.split(separator: " ").first ?? "")) } != nil }
+        let grouped = groupedIngredientDisplayRows(recipe.ingredients)
+        rows = grouped
+        canScale = grouped.contains { row in
+            if case .item(let parsed) = row {
+                return parsed.quantity.flatMap { parseQuantityNumber(String($0.split(separator: " ").first ?? "")) } != nil
+            }
+            return false
+        }
     }
 
     var body: some View {
@@ -430,36 +435,53 @@ private struct IngredientsCard: View {
                 }
             }
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(parsedLines.enumerated()), id: \.offset) { index, parsed in
-                    HStack(alignment: .center, spacing: 12) {
-                        if let quantity = parsed.quantity {
-                            Text(scaledQuantity(quantity, by: scale))
-                                .font(Theme.body(12.5, weight: .semibold))
-                                .foregroundStyle(scale == 1.0 ? Theme.accent800 : .white)
-                                .frame(minWidth: 62)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 5)
-                                .background(scale == 1.0 ? Theme.accent200 : Theme.accent)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
-                        Text(parsed.text)
-                            .font(Theme.body(14.5))
-                            .foregroundStyle(Theme.ink)
+                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                    switch row {
+                    case .heading(let title):
+                        Text(title)
+                            .font(Theme.display(15))
+                            .foregroundStyle(Theme.neutral700)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, index == 0 ? 4 : 18)
+                            .padding(.bottom, 6)
+                    case .item(let parsed):
+                        HStack(alignment: .center, spacing: 12) {
+                            if let quantity = parsed.quantity {
+                                Text(scaledQuantity(quantity, by: scale))
+                                    .font(Theme.body(12.5, weight: .semibold))
+                                    .foregroundStyle(scale == 1.0 ? Theme.accent800 : .white)
+                                    .frame(minWidth: 62)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(scale == 1.0 ? Theme.accent200 : Theme.accent)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
+                            Text(parsed.text)
+                                .font(Theme.body(14.5))
+                                .foregroundStyle(Theme.ink)
+                                .frame(maxWidth: .infinity, alignment: .leading)
 
-                        toBuyButton(for: parsed)
-                    }
-                    .padding(.vertical, 13)
+                            toBuyButton(for: parsed)
+                        }
+                        .padding(.vertical, 13)
 
-                    if index < parsedLines.count - 1 {
-                        Rectangle().fill(Theme.divider).frame(height: 1)
+                        if showsDivider(after: index) {
+                            Rectangle().fill(Theme.divider).frame(height: 1)
+                        }
                     }
                 }
             }
             .padding(.horizontal, 16)
             .cardBackground(radius: Theme.radiusRow)
         }
+    }
+
+    private func showsDivider(after index: Int) -> Bool {
+        let next = index + 1
+        guard next < rows.count else { return false }
+        if case .item = rows[next] { return true }
+        return false
     }
 
     /// Round + / ✓ control — the only link from a recipe into the Cupboard

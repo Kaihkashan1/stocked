@@ -66,6 +66,9 @@ class Ingredient(BaseModel):
     item: str
     quantity: str = ""
     unit: str = ""
+    # Component of a multi-part meal (Sauce, Chicken, Rice). Empty for a
+    # single list. Stored in the sheet as a heading line, then the items.
+    section: str = ""
 
 
 class Recipe(BaseModel):

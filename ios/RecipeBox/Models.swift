@@ -664,6 +664,69 @@ private let ingredientUnits: Set<String> = [
     "piece", "pieces", "pc", "pcs", "handful", "handfuls",
 ]
 
+/// A heading-only ingredient line (`Sauce:`) or a prefixed line
+/// (`Sauce: yogurt`). Headings are shown above the items; they are not
+/// pantry matches or to-buy rows.
+func looksLikeSectionName(_ name: String) -> Bool {
+    let text = name.trimmingCharacters(in: .whitespaces)
+    guard !text.isEmpty, text.count <= 40 else { return false }
+    if text.contains(where: \.isNumber) { return false }
+    let words = text.split { $0.isWhitespace }
+    return (1...4).contains(words.count)
+}
+
+/// `item` is `nil` for a heading-only line.
+func splitIngredientSection(_ line: String) -> (section: String?, item: String?) {
+    let text = line.trimmingCharacters(in: .whitespaces)
+    guard !text.isEmpty else { return (nil, "") }
+    if text.hasSuffix(":"), !text.dropLast().contains(":") {
+        let name = String(text.dropLast()).trimmingCharacters(in: .whitespaces)
+        if looksLikeSectionName(name) {
+            return (name, nil)
+        }
+    }
+    if let idx = text.firstIndex(of: ":") {
+        let name = String(text[..<idx]).trimmingCharacters(in: .whitespaces)
+        let rest = String(text[text.index(after: idx)...]).trimmingCharacters(in: .whitespaces)
+        if !rest.isEmpty, looksLikeSectionName(name) {
+            return (name, rest)
+        }
+    }
+    return (nil, text)
+}
+
+func ingredientItemLines(_ lines: [String]) -> [String] {
+    lines.compactMap { splitIngredientSection($0).item }
+}
+
+enum IngredientDisplayRow {
+    case heading(String)
+    case item(IngredientLine)
+}
+
+func groupedIngredientDisplayRows(_ lines: [String]) -> [IngredientDisplayRow] {
+    var rows: [IngredientDisplayRow] = []
+    var lastHeading: String?
+    for line in lines {
+        let parsed = splitIngredientSection(line)
+        if let section = parsed.section, parsed.item == nil {
+            rows.append(.heading(section))
+            lastHeading = section
+            continue
+        }
+        if let section = parsed.section, let item = parsed.item {
+            if lastHeading?.caseInsensitiveCompare(section) != .orderedSame {
+                rows.append(.heading(section))
+                lastHeading = section
+            }
+            rows.append(.item(splitIngredientQuantity(item)))
+            continue
+        }
+        rows.append(.item(splitIngredientQuantity(parsed.item ?? line)))
+    }
+    return rows
+}
+
 func splitIngredientQuantity(_ line: String) -> IngredientLine {
     let trimmed = line.trimmingCharacters(in: .whitespaces)
     let words = trimmed.split(separator: " ").map(String.init)

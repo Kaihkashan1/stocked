@@ -29,6 +29,7 @@ from app.store import (
     get_pantry_inventory,
     get_recipe,
     get_to_buy_items,
+    ingredient_strings,
     list_recipes,
     save_have_items,
     save_pantry_inventory,
@@ -155,9 +156,7 @@ async def api_extract_photo(photo: UploadFile = File(...)):
         raise HTTPException(status_code=502, detail="Gemini returned no recipes.")
     recipe = recipes[0]
 
-    ingredients = [
-        " ".join(part for part in (item.quantity, item.unit, item.item) if part).strip() for item in recipe.ingredients
-    ]
+    ingredients = ingredient_strings(recipe.ingredients)
     return {
         "title": recipe.title,
         "servings": recipe.servings,

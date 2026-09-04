@@ -336,6 +336,75 @@ function looksLikeQuantityToken(token) {
   return /^[0-9¼½¾⅓⅔⅛⅜]+([/.-][0-9]+)?$/.test(cleaned);
 }
 
+function looksLikeSectionName(name) {
+  const text = (name || "").trim();
+  if (!text || text.length > 40) return false;
+  if (/\d/.test(text)) return false;
+  const words = text.split(/\s+/).filter(Boolean);
+  return words.length >= 1 && words.length <= 4;
+}
+
+function splitIngredientSection(line) {
+  const text = (line || "").trim();
+  if (!text) return { section: null, item: "" };
+  const heading = text.match(/^([^:]{1,40}):\s*$/);
+  if (heading && looksLikeSectionName(heading[1])) {
+    return { section: heading[1].trim(), item: null };
+  }
+  const prefixed = text.match(/^([^:]{1,40}):\s+(.+)$/);
+  if (prefixed && looksLikeSectionName(prefixed[1])) {
+    return { section: prefixed[1].trim(), item: prefixed[2].trim() };
+  }
+  return { section: null, item: text };
+}
+
+function ingredientItemLi(line) {
+  const { quantity, text } = splitIngredientQuantity(line);
+  if (quantity) {
+    return `<li><span class="qty">${escapeHtml(quantity)}</span><span>${escapeHtml(text)}</span></li>`;
+  }
+  return `<li class="ingredient-plain"><span>${escapeHtml(text)}</span></li>`;
+}
+
+function ingredientsHtml(lines) {
+  const list = lines || [];
+  if (!list.length) {
+    return `<ul class="ingredients"><li>${escapeHtml(t("noneListed"))}</li></ul>`;
+  }
+  const parts = [];
+  let heading = null;
+  let items = [];
+  const sameHeading = (a, b) => (a || "").toLowerCase() === (b || "").toLowerCase();
+  const flush = () => {
+    if (heading) {
+      parts.push(`<h4 class="ingredient-section">${escapeHtml(heading)}</h4>`);
+    }
+    if (items.length) {
+      parts.push(`<ul class="ingredients">${items.join("")}</ul>`);
+    }
+    items = [];
+  };
+  for (const line of list) {
+    const parsed = splitIngredientSection(line);
+    if (parsed.item === null && parsed.section) {
+      flush();
+      heading = parsed.section;
+      continue;
+    }
+    if (parsed.section) {
+      if (!sameHeading(heading, parsed.section)) {
+        flush();
+        heading = parsed.section;
+      }
+      items.push(ingredientItemLi(parsed.item));
+      continue;
+    }
+    items.push(ingredientItemLi(parsed.item));
+  }
+  flush();
+  return parts.join("") || `<ul class="ingredients"><li>${escapeHtml(t("noneListed"))}</li></ul>`;
+}
+
 function splitIngredientQuantity(line) {
   const trimmed = line.trim();
   const words = trimmed.split(/\s+/).filter(Boolean);
@@ -812,15 +881,7 @@ function recipeHtml(recipe) {
   const tags = (recipe.tags || [])
     .map((tag) => `<button class="pill pill-btn-plain" type="button" data-action="filter-tag" data-tag="${escapeAttr(tag)}">${escapeHtml(tTag(tag))}</button>`)
     .join("");
-  const ingredients = (recipe.ingredients || [])
-    .map((item) => {
-      const { quantity, text } = splitIngredientQuantity(item);
-      if (quantity) {
-        return `<li><span class="qty">${escapeHtml(quantity)}</span><span>${escapeHtml(text)}</span></li>`;
-      }
-      return `<li class="ingredient-plain"><span>${escapeHtml(text)}</span></li>`;
-    })
-    .join("");
+  const ingredients = ingredientsHtml(recipe.ingredients || []);
   const steps = (recipe.steps || [])
     .map((item, index) => `<li><span class="step-num">${index + 1}</span><span>${escapeHtml(item)}</span></li>`)
     .join("");
@@ -870,7 +931,7 @@ function recipeHtml(recipe) {
     ${pantryNote}
     <div class="recipe recipe-body">
       <h3>${escapeHtml(t("ingredients"))}</h3>
-      <ul class="ingredients">${ingredients || `<li>${escapeHtml(t("noneListed"))}</li>`}</ul>
+      ${ingredients}
       <h3>${escapeHtml(t("steps"))}</h3>
       <ol class="steps">${steps || `<li>${escapeHtml(t("noneListed"))}</li>`}</ol>
       ${notesSection}

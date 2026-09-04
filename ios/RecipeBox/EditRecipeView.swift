@@ -165,6 +165,9 @@ struct EditRecipeView: View {
 
 /// Formats a stored ingredient line for the edit sheet's `qty | item` rows.
 func formatIngredientForEdit(_ line: String) -> String {
+    if splitIngredientSection(line).item == nil {
+        return line.trimmingCharacters(in: .whitespaces)
+    }
     let parsed = splitIngredientQuantity(line)
     if let quantity = parsed.quantity {
         return "\(quantity) | \(parsed.text)"

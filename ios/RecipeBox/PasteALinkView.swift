@@ -190,7 +190,7 @@ struct PasteALinkView: View {
     /// segment is gone along with the sheet's Time column.
     private func statsLine(for recipe: Recipe) -> String {
         [
-            L("\(recipe.ingredients.count) ingredients"),
+            L("\(ingredientItemLines(recipe.ingredients).count) ingredients"),
             L("\(recipe.steps.count) steps"),
         ].joined(separator: " · ")
     }

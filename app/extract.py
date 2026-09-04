@@ -41,7 +41,8 @@ How many recipes to return:
 - If this is not a recipe at all → one object with a short title, empty lists, confidence "low", and meal "other".
 
 Rules:
-- Quantities and units should be as specific as the content allows. Copy them exactly when they appear (for example "1.5 lb / 750 g", "2 tbsp"). Use "" only if the source truly has no amount. Do not replace a measured line with a bare ingredient name. For a multi-component meal, prefix the item with the component when needed (for example "Sauce: yogurt", "Chicken: cumin").
+- Quantities and units should be as specific as the content allows. Copy them exactly when they appear (for example "1.5 lb / 750 g", "2 tbsp"). Use "" only if the source truly has no amount. Do not replace a measured line with a bare ingredient name.
+- For a multi-component meal (sauce, chicken, rice, and so on), set each ingredient's "section" to the short component name and put only the ingredient in "item" (section "Sauce", item "yogurt" — not "Sauce: yogurt"). Leave section empty when the recipe is a single list.
 - Steps should be a cook-along list, one action per item, in order. For a multi-component meal, start a component with a short label step such as "Sauce:" then the actions for that part.
 - cuisine: a short regional label such as Indian, Italian, Mexican, East Asian, Middle Eastern, or American. Use Other only if it truly has no regional identity.
 - meal: breakfast, lunch, dinner, snack, dessert, drink, or other.

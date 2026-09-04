@@ -582,6 +582,23 @@ button { font-family: inherit; }
 
 .recipe h3:first-of-type { margin-top: 0; }
 
+.recipe h4.ingredient-section {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 1.2rem 0 0.2rem;
+}
+
+.recipe h3 + h4.ingredient-section {
+  margin-top: 0;
+}
+
+.recipe ul.ingredients + h4.ingredient-section {
+  margin-top: 1.15rem;
+}
+
 .notes-box {
   margin: 0;
   padding: 0.9rem 1rem;

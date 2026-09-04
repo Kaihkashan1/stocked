@@ -12,7 +12,7 @@ import gspread
 
 from app.config import settings
 from app.fetch import normalize_url
-from app.match import pantry_items
+from app.match import pantry_items, split_ingredient_section
 from app.models import PANTRY_CATEGORIES, FetchedPost, Recipe
 
 logger = logging.getLogger(__name__)
@@ -332,7 +332,7 @@ def source_exists(url: str) -> bool:
 
 
 def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
-    ingredients = "\n".join(_format_ingredient(item) for item in recipe.ingredients)
+    ingredients = format_ingredient_lines(recipe.ingredients)
     steps = "\n".join(f"{i}. {step}" for i, step in enumerate(recipe.steps, start=1))
     saved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     row = [
@@ -578,8 +578,44 @@ def _clean_tag(value: str) -> str:
     return re.sub(r"\s+", " ", (value or "").replace(",", " ").strip().lower())
 
 
-def _format_ingredient(item) -> str:
-    qty = " ".join(part for part in (item.quantity, item.unit) if part).strip()
-    if qty:
-        return f"- {qty} {item.item}"
-    return f"- {item.item}"
+def format_ingredient_lines(items) -> str:
+    """Sheet cell text: optional heading lines (`- Sauce:`) then items."""
+    return "\n".join(_iter_formatted_ingredient_lines(items))
+
+
+def ingredient_strings(items) -> list[str]:
+    """API/app shape: the same lines as the sheet, without leading bullets."""
+    return _parse_lines(format_ingredient_lines(items), bullets=True)
+
+
+def _iter_formatted_ingredient_lines(items):
+    last = ""
+    for item in items:
+        section = (getattr(item, "section", None) or "").strip()
+        name = (item.item or "").strip()
+        parsed_section, parsed_item = split_ingredient_section(name)
+        if parsed_item is None and parsed_section:
+            if parsed_section.casefold() != last.casefold():
+                yield f"- {parsed_section}:"
+                last = parsed_section
+            continue
+        if not section and parsed_section:
+            section = parsed_section
+            name = parsed_item or name
+        elif (
+            section
+            and parsed_section
+            and parsed_section.casefold() == section.casefold()
+            and parsed_item
+        ):
+            name = parsed_item
+        if section and section.casefold() != last.casefold():
+            yield f"- {section}:"
+            last = section
+        if not name:
+            continue
+        qty = " ".join(part for part in (item.quantity, item.unit) if part).strip()
+        if qty:
+            yield f"- {qty} {name}"
+        else:
+            yield f"- {name}"

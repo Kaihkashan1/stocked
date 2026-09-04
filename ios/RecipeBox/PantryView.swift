@@ -582,9 +582,10 @@ func matchingRecipes(from recipes: [Recipe], selectedNames: [String], limit: Int
     guard !selectedNames.isEmpty else { return [] }
     let selectedWordSets = selectedNames.map { matchWordSet(in: $0) }
     return recipes.compactMap { recipe -> PantryRecipeMatch? in
-        let total = recipe.ingredients.count
+        let items = ingredientItemLines(recipe.ingredients)
+        let total = items.count
         guard total > 0 else { return nil }
-        let hits = recipe.ingredients.filter { line in
+        let hits = items.filter { line in
             let words = matchWordSet(in: line)
             if selectedWordSets.contains(where: { !$0.isDisjoint(with: words) }) {
                 return true
