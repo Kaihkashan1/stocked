@@ -12,9 +12,9 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.errors import gemini_is_busy, gemini_is_quota_exhausted
+from app.errors import NOT_A_RECIPE_MESSAGE, gemini_is_busy, gemini_is_quota_exhausted
 from app.match import apply_section_labels
-from app.models import RECIPE_TAGS, FetchedPost, FetchedSlide, Recipe, RecipeCategory, RecipeSet
+from app.models import RECIPE_TAGS, FetchedPost, FetchedSlide, Recipe, RecipeCategory, RecipeSet, recipe_is_importable, source_has_recipe_cues
 from app.store import record_gemini_read
 
 logger = logging.getLogger(__name__)
@@ -41,9 +41,11 @@ How many recipes to return:
 - Components of one meal that are meant to be eaten together (for example a sauce, grilled chicken, and rice) → return exactly one object. Keep each component's ingredients and steps together, in order (sauce, then chicken, then rice, then how to plate/serve). Do not save those as three separate recipes.
 - Several clearly unrelated dishes in the same carousel (for example cookies and a soup, or two different dinners) → return one object per complete recipe (maximum 5).
 - Intro, title, or collage slides that are not a recipe → skip them.
-- If this is not a recipe at all → one object with a short title, empty lists, confidence "low", and meal "other".
+- First decide content_kind. Use "recipe" only if the post is meant to teach someone how to cook a dish (ingredients and a method). Use "not_recipe" for vlogs, news, events, interviews, travel, memes, ads, product posts, restaurant visits, or anything that merely shows food. A civic event, a "day in my life", or someone eating on camera is not_recipe even if a plate is visible.
+- Never invent a recipe to match a video's title, setting, or vibe. If the TEXT is not a recipe and the video is not teaching a dish, content_kind is "not_recipe".
 
 Rules:
+- is_recipe must be true only for a real dish to save. If you are unsure, set content_kind to "not_recipe" and return no recipes.
 - Quantities and units should be as specific as the content allows. Copy them exactly when they appear (for example "1.5 lb / 750 g", "2 tbsp"). Use "" only if the source truly has no amount. Do not replace a measured line with a bare ingredient name.
 - For a multi-component meal (sauce, chicken, rice, and so on), set each ingredient's "section" to a short cook-facing label such as "For the sauce" and put only the ingredient in "item" (not "Sauce: yogurt"). Leave section empty when the recipe is a single list.
 - Steps should be a cook-along list, one action per item, in order. For a multi-component meal, start a component with a short label step such as "Sauce:" then the actions for that part.
@@ -86,8 +88,14 @@ def extract_recipe(post: FetchedPost) -> tuple[list[Recipe], bool]:
     if not settings.gemini_api_key.strip():
         raise RuntimeError("GEMINI_API_KEY is missing. Add it to .env (see README).")
 
+    caption = post.caption or ""
+    # Link imports: a long caption with no cooking language is a vlog/news
+    # post. Skip Gemini so it cannot invent a dish from the video.
+    if (post.url or "").strip() and len(caption.strip()) >= 40 and not source_has_recipe_cues(caption):
+        raise RuntimeError(NOT_A_RECIPE_MESSAGE)
+
     call_timeout_ms = _client_timeout_ms()
-    caption_part = PROMPT.format(caption=post.caption or "(no caption)")
+    caption_part = PROMPT.format(caption=caption or "(no caption)")
     slides = list(post.slides)
     if not slides:
         if post.video_path:
@@ -126,7 +134,11 @@ def extract_recipe(post: FetchedPost) -> tuple[list[Recipe], bool]:
             RecipeSet,
             timeout_ms=(70_000 if os.environ.get("VERCEL") and video_count > 1 else None),
         )
-        return _parse_recipe_set(text), used_backup
+        return _parse_recipe_set(
+            text,
+            source_text=caption,
+            require_grounding=bool((post.url or "").strip()),
+        ), used_backup
     finally:
         for file in uploaded:
             try:
@@ -262,7 +274,7 @@ def categorize_recipe(
         return RecipeCategory.model_validate(json.loads(text[start : end + 1]))
 
 
-def _parse_recipe_set(text: str) -> list[Recipe]:
+def _parse_recipe_set(text: str, source_text: str = "", require_grounding: bool = False) -> list[Recipe]:
     parsed = None
     try:
         parsed = RecipeSet.model_validate_json(text)
@@ -275,13 +287,23 @@ def _parse_recipe_set(text: str) -> list[Recipe]:
             except Exception:
                 parsed = None
     recipes = list(parsed.recipes) if parsed else []
+    if parsed is not None and parsed.content_kind == "not_recipe":
+        raise RuntimeError(NOT_A_RECIPE_MESSAGE)
     if not recipes:
+        if parsed is not None:
+            raise RuntimeError(NOT_A_RECIPE_MESSAGE)
         try:
             recipes = [_parse_recipe(text)]
         except Exception:
             raise RuntimeError(f"Could not parse recipe JSON: {text[:400]}")
-    filled = [item for item in recipes if item.ingredients or item.steps]
-    return (filled or recipes)[:5]
+    filled = [
+        item
+        for item in recipes
+        if recipe_is_importable(item, source_text, require_grounding=require_grounding)
+    ]
+    if filled:
+        return filled[:5]
+    raise RuntimeError(NOT_A_RECIPE_MESSAGE)
 
 
 def _parse_recipe(text: str) -> Recipe:

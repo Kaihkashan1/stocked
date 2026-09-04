@@ -4,14 +4,17 @@ struct SettingsView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(PantryStore.self) private var pantryStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var draftURL = ""
     @State private var saving = false
     @State private var saveError: String?
     @State private var developerOpen = false
-    @State private var logsOpen = false
-    /// nil until Developer → Logs is opened the first time.
+    /// nil until Settings loads the log.
     @State private var importLog: [ImportLogEntry]?
     @State private var importLogFailed = false
+    @State private var logFilter: ImportLogFilter = .all
+    @State private var logShown = 5
+    @State private var revealedLogIDs: Set<UUID> = []
     /// nil while loading or if the fetch failed — the section is omitted
     /// rather than showing a stale/fake number (same rule the backend
     /// follows for a missing Apify token, see GET /api/usage).
@@ -43,6 +46,8 @@ struct SettingsView: View {
                     }
 
                     developerSection(secret: $store.serverSecret)
+
+                    logsSection
                 }
                 .padding(.horizontal, Theme.screenPadding)
                 .padding(.bottom, 32)
@@ -50,7 +55,14 @@ struct SettingsView: View {
         }
         .background(Theme.bg.ignoresSafeArea())
         .onAppear { draftURL = store.serverURL }
-        .task { usage = await store.fetchUsage() }
+        .task {
+            usage = await store.fetchUsage()
+            if let rows = await store.fetchImportLog() {
+                importLog = rows
+            } else {
+                importLogFailed = true
+            }
+        }
     }
 
     private func developerSection(secret: Binding<String>) -> some View {
@@ -61,7 +73,7 @@ struct SettingsView: View {
                 }
             } label: {
                 HStack {
-                    Kicker(text: L("Developer"), color: Theme.neutral600)
+                    Kicker(text: L("Developer settings"), color: Theme.neutral600)
                     Spacer()
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
@@ -121,101 +133,178 @@ struct SettingsView: View {
                                 .foregroundStyle(.red)
                         }
                     }
-
-                    logsSection
                 }
                 .padding(.top, 4)
             }
         }
     }
 
-    private var logsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    logsOpen.toggle()
-                }
-                if logsOpen, importLog == nil, !importLogFailed {
-                    Task {
-                        if let rows = await store.fetchImportLog() {
-                            importLog = rows
-                        } else {
-                            importLogFailed = true
-                        }
-                    }
-                }
-            } label: {
-                HStack {
-                    Kicker(text: L("Logs"), color: Theme.neutral600)
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Theme.neutral800)
-                        .rotationEffect(.degrees(logsOpen ? 180 : 0))
-                }
-                .padding(.vertical, 16)
-            }
-            .buttonStyle(.plain)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(Theme.divider)
-                    .frame(height: 1)
-            }
-
-            if logsOpen {
-                if importLogFailed {
-                    Text(L("Couldn't load logs."))
-                        .font(Theme.body(13))
-                        .foregroundStyle(Theme.neutral600)
-                        .padding(.bottom, 8)
-                } else if let importLog, importLog.isEmpty {
-                    Text(L("No imports yet."))
-                        .font(Theme.body(13))
-                        .foregroundStyle(Theme.neutral600)
-                        .padding(.bottom, 8)
-                } else if let importLog {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(importLog) { row in
-                            importLogRow(row)
-                        }
-                    }
-                    .padding(.bottom, 8)
-                }
-            }
+    private var filteredImportLog: [ImportLogEntry] {
+        guard let importLog else { return [] }
+        switch logFilter {
+        case .all: return importLog
+        case .saved: return importLog.filter { !$0.isError }
+        case .errors: return importLog.filter(\.isError)
         }
     }
 
+    private var logPageSize: Int { 5 }
+
+    private var visibleImportLog: [ImportLogEntry] {
+        Array(filteredImportLog.prefix(logShown))
+    }
+
+    private var logsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Kicker(text: L("Logs"), color: Theme.neutral600)
+                .padding(.bottom, 12)
+
+            HStack(spacing: 8) {
+                logFilterChip(.all, title: L("All"))
+                logFilterChip(.saved, title: L("Saved"))
+                logFilterChip(.errors, title: L("Errors"))
+            }
+            .padding(.bottom, 6)
+
+            if importLogFailed {
+                Text(L("Couldn't load logs."))
+                    .font(Theme.body(13.5))
+                    .foregroundStyle(Theme.neutral600)
+                    .padding(.vertical, 14)
+            } else if let importLog, importLog.isEmpty {
+                Text(L("No imports yet."))
+                    .font(Theme.body(13.5))
+                    .foregroundStyle(Theme.neutral600)
+                    .padding(.vertical, 14)
+            } else if importLog != nil, filteredImportLog.isEmpty {
+                Text(L("No matching logs."))
+                    .font(Theme.body(13.5))
+                    .foregroundStyle(Theme.neutral600)
+                    .padding(.vertical, 14)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(visibleImportLog) { row in
+                        importLogRow(row)
+                    }
+                    if logShown < filteredImportLog.count {
+                        Button(L("Show more")) {
+                            logShown += logPageSize
+                        }
+                        .font(Theme.body(13))
+                        .foregroundStyle(Theme.neutral800)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Theme.surface)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                        .buttonStyle(.plain)
+                        .padding(.top, 6)
+                    }
+                }
+                .padding(.bottom, 8)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 16)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Theme.divider)
+                .frame(height: 1)
+        }
+    }
+
+    private func logFilterChip(_ filter: ImportLogFilter, title: String) -> some View {
+        Button {
+            logFilter = filter
+            logShown = logPageSize
+        } label: {
+            Text(title)
+                .font(Theme.body(12, weight: .semibold))
+                .foregroundStyle(logFilter == filter ? Theme.bg : Theme.ink)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(logFilter == filter ? Theme.ink : Theme.surface)
+                .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
     private func importLogRow(_ row: ImportLogEntry) -> some View {
-        let urlText = (row.url.isEmpty || row.url == "(photo)") ? L("(photo)") : row.url
-        let statusText = row.reason.isEmpty ? row.status : "\(row.status) — \(row.reason)"
-        return VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        let isPhoto = row.url.isEmpty || row.url == "(photo)"
+        let headline = row.displayTitle.isEmpty
+            ? (row.isError ? L("Errors") : L("Saved"))
+            : row.displayTitle
+        let detailsOpen = revealedLogIDs.contains(row.id)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 8) {
+                Image(systemName: row.isError ? "xmark" : "checkmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(row.isError ? Theme.accent700 : Theme.sage500)
+                    .frame(width: 16, height: 16)
+                    .accessibilityLabel(row.isError ? L("Errors") : L("Saved"))
                 Text(row.timestamp)
-                    .font(Theme.body(12))
+                    .font(Theme.body(12.5))
                     .foregroundStyle(Theme.neutral600)
                 Spacer(minLength: 0)
-                if row.usedBackup {
-                    Text(L("backup"))
-                        .font(Theme.body(11, weight: .semibold))
-                        .foregroundStyle(Theme.sage800)
-                        .textCase(.uppercase)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .overlay(Capsule().strokeBorder(Theme.sage800, lineWidth: 1))
-                }
             }
-            Text(urlText)
-                .font(Theme.body(13.5))
+            .padding(.bottom, 9)
+            Text(headline)
+                .font(Theme.display(16))
                 .foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(statusText)
-                .font(Theme.body(12.5))
-                .foregroundStyle(Theme.neutral600)
-                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 8)
+            Button {
+                if detailsOpen {
+                    revealedLogIDs.remove(row.id)
+                } else {
+                    revealedLogIDs.insert(row.id)
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Text(L("Additional details"))
+                        .font(Theme.body(12.5))
+                        .foregroundStyle(Theme.neutral600)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Theme.neutral600)
+                        .rotationEffect(.degrees(detailsOpen ? 180 : 0))
+                }
+            }
+            .buttonStyle(.plain)
+            if detailsOpen {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(row.displayModel)
+                        .font(Theme.body(12.5))
+                        .foregroundStyle(Theme.neutral700)
+                    importLogLink(row, isPhoto: isPhoto)
+                }
+                .padding(.top, 9)
+            }
         }
-        .padding(.vertical, 10)
-        .overlay(alignment: .bottom) {
+        .padding(.vertical, 16)
+        .overlay(alignment: .top) {
             Rectangle().fill(Theme.divider).frame(height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private func importLogLink(_ row: ImportLogEntry, isPhoto: Bool) -> some View {
+        if isPhoto {
+            Text("(photo)")
+                .font(Theme.body(13))
+                .foregroundStyle(Theme.neutral600)
+        } else if let link = URL(string: row.url) {
+            Button {
+                openURL(link)
+            } label: {
+                Text(row.url)
+                    .font(Theme.body(13))
+                    .foregroundStyle(Theme.accent700)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .buttonStyle(.plain)
         }
     }
 

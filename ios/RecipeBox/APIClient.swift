@@ -373,7 +373,7 @@ struct APIClient {
         return try Self.decoder.decode(UsageStats.self, from: data)
     }
 
-    /// Last 50 import attempts for Settings → Developer → Logs.
+    /// Last 50 import attempts for Settings → Logs.
     func fetchImportLog(secret: String) async throws -> [ImportLogEntry] {
         guard let base = URL(string: trimmedBase),
               let url = URL(string: "/api/import-log", relativeTo: base)

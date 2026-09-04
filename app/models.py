@@ -81,14 +81,84 @@ class Recipe(BaseModel):
     meal: Meal = "other"
     time: str | None = None
     tags: list[str] = Field(default_factory=list)
+    is_recipe: bool
 
     _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_tags(v))
+
+
+_PLACEHOLDER_TEXT = re.compile(
+    r"^(not a recipe|n/?a|none|nothing|unknown|untitled|no ingredients?|no steps?|no recipe)\b",
+    re.IGNORECASE,
+)
+_RECIPE_CUES = re.compile(
+    r"\b(ingredients?|recipes?|cookbook|tbsp|tsp|teaspoons?|tablespoons?|"
+    r"preheat|marinate|sauté|saute|simmer|whisk|mince[ds]?|how to make|"
+    r"air[\s-]?fry)\b|"
+    r"\d[\d.,/]*\s*(g|kg|ml|l|oz|lb|lbs|cups?|tbsp|tsp)\b",
+    re.IGNORECASE,
+)
+_INGREDIENT_STOP = {
+    "the", "and", "for", "with", "from", "fresh", "dried", "optional",
+    "salt", "pepper", "oil", "water", "to", "of", "a", "an", "or",
+}
+
+
+def _meaningful_recipe_text(value: str) -> bool:
+    text = re.sub(r"\s+", " ", (value or "").strip())
+    if len(text) < 2:
+        return False
+    return _PLACEHOLDER_TEXT.match(text) is None
+
+
+def source_has_recipe_cues(source_text: str) -> bool:
+    """True when the caption/article itself looks like cooking instructions."""
+    return bool(_RECIPE_CUES.search(source_text or ""))
+
+
+def _ingredient_overlap_count(recipe: Recipe, source_text: str) -> int:
+    haystack = (source_text or "").lower()
+    if not haystack:
+        return 0
+    hits = 0
+    for ing in recipe.ingredients:
+        tokens = [
+            word
+            for word in re.findall(r"[a-z0-9]+", (ing.item or "").lower())
+            if len(word) > 2 and word not in _INGREDIENT_STOP
+        ]
+        if tokens and all(token in haystack for token in tokens):
+            hits += 1
+    return hits
+
+
+def recipe_is_grounded(recipe: Recipe, source_text: str) -> bool:
+    """Reject dishes Gemini invented that are not supported by the caption."""
+    if source_has_recipe_cues(source_text):
+        return True
+    return _ingredient_overlap_count(recipe, source_text) >= 2
+
+
+def recipe_is_importable(recipe: Recipe, source_text: str = "", *, require_grounding: bool = False) -> bool:
+    """True only when the model returned a cookable recipe, not a
+    placeholder or a hallucinated dish from a non-recipe video."""
+    if not recipe.is_recipe:
+        return False
+    if not _meaningful_recipe_text(recipe.title):
+        return False
+    has_ingredients = any(_meaningful_recipe_text(ing.item) for ing in recipe.ingredients)
+    has_steps = any(_meaningful_recipe_text(step) for step in recipe.steps)
+    if not (has_ingredients and has_steps):
+        return False
+    if require_grounding and not recipe_is_grounded(recipe, source_text):
+        return False
+    return True
 
 
 class RecipeSet(BaseModel):
     """One Gemini call can return several recipes from an Instagram
     carousel (distinct dishes) or a single recipe whose steps span slides."""
 
+    content_kind: Literal["recipe", "not_recipe"]
     recipes: list[Recipe] = Field(default_factory=list, max_length=5)
 
 

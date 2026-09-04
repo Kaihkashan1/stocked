@@ -466,9 +466,8 @@ a:hover{color:var(--color-accent-800)}
           <div style="background:var(--color-surface);border-radius:28px;padding:6px 20px;margin-bottom:28px">
             <sc-for list="{{ detailIngredients }}" as="i" hint-placeholder-count="6">
               <sc-if value="{{ i.isHeader }}" hint-placeholder-val="{{ false }}">
-                <div style="display:flex;align-items:center;gap:8px;padding:{{ i.headerPad }} 0 9px">
-                  <span style="width:6px;height:6px;border-radius:50%;background:var(--color-accent-2-500);flex:none"></span>
-                  <span style="font-family:var(--font-heading);font-size:13.5px;color:var(--color-accent-2-800)">{{ i.label }}</span>
+                <div style="padding:{{ i.headerPad }} 0 9px">
+                  <span style="font-family:var(--font-body);font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-accent-2-800)">{{ i.label }}</span>
                 </div>
               </sc-if>
               <sc-if value="{{ i.isItem }}" hint-placeholder-val="{{ true }}">
@@ -771,20 +770,13 @@ Melt butter with chili crisp" style="width:100%;height:130px;border-radius:26px;
         <div class="rb-scroll" style="flex:1;padding:16px 22px 60px">
           <h2 style="font-size:30px;margin:0 0 22px;line-height:1.1">Settings</h2>
           <div style="margin-bottom:24px">
-            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:10px">Language</div>
-            <div style="display:flex;flex-wrap:wrap;gap:7px">
-              <sc-for list="{{ languageChips }}" as="l" hint-placeholder-count="3">
-                <button onClick="{{ l.on }}" style="cursor:pointer;font:inherit;font-size:13px;padding:9px 16px;border-radius:999px;border:1px solid {{ l.bd }};background:{{ l.bg }};color:{{ l.fg }}">{{ l.label }}</button>
-              </sc-for>
-            </div>
-          </div>
-          <div style="margin-bottom:24px">
             <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:12px">Import limits</div>
             <div style="display:flex;flex-direction:column;gap:10px">
               <sc-for list="{{ quotaRows }}" as="q" hint-placeholder-count="2">
                 <div>
                   <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:6px"><span>{{ q.label }}</span><span style="color:var(--color-neutral-700)">{{ q.value }}</span></div>
-                  <div style="height:6px;border-radius:999px;background:var(--color-neutral-200);overflow:hidden"><div style="height:100%;border-radius:999px;background:var(--color-accent);width:{{ q.pct }}"></div></div>
+                  <div style="height:6px;border-radius:999px;background:var(--color-neutral-200);overflow:hidden;margin-bottom:6px"><div style="height:100%;border-radius:999px;background:var(--color-accent);width:{{ q.pct }}"></div></div>
+                  <div style="font-size:12.5px;color:var(--color-neutral-600)">{{ q.resets }}</div>
                 </div>
               </sc-for>
             </div>
@@ -808,6 +800,46 @@ Melt butter with chili crisp" style="width:100%;height:130px;border-radius:26px;
               <button onClick="{{ saveSettings }}" style="width:100%;border:none;border-radius:999px;padding:15px;cursor:pointer;font:inherit;font-family:var(--font-heading);font-size:15px;background:var(--color-accent);color:var(--color-bg)" style-hover="background:var(--color-accent-600)">Save and reload</button>
             </div>
           </sc-if>
+          <div style="margin-top:8px;border-top:1px solid var(--color-divider);padding-top:16px">
+            <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:12px">Logs</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px">
+              <sc-for list="{{ logFilterChips }}" as="f" hint-placeholder-count="3">
+                <button onClick="{{ f.on }}" style="cursor:pointer;font:inherit;font-size:13px;padding:9px 16px;border-radius:999px;border:1px solid {{ f.bd }};background:{{ f.bg }};color:{{ f.fg }}">{{ f.label }}</button>
+              </sc-for>
+            </div>
+            <sc-if value="{{ noLogs }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:13.5px;color:var(--color-neutral-600);padding:14px 0">No logs yet.</div>
+            </sc-if>
+            <sc-for list="{{ logRows }}" as="lg" hint-placeholder-count="4">
+              <div style="padding:16px 0;border-top:1px solid var(--color-divider)">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ lg.iconColor }}" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="{{ lg.iconPath }}"></path></svg>
+                  <span style="font-size:12.5px;color:var(--color-neutral-600)">{{ lg.time }}</span>
+                </div>
+                <div style="font-family:var(--font-heading);font-size:16px;line-height:1.25;margin-bottom:8px;color:var(--color-neutral-900)">{{ lg.title }}</div>
+                <button onClick="{{ lg.toggle }}" style="cursor:pointer;font:inherit;background:transparent;border:none;padding:0;display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--color-neutral-600)">
+                  <span>Additional details</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate({{ lg.chevronRotate }});transition:transform .15s ease"><path d="M6 9l6 6 6-6"></path></svg>
+                </button>
+                <sc-if value="{{ lg.open }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--color-neutral-700)">
+                    <sc-if value="{{ lg.hasModel }}" hint-placeholder-val="{{ false }}">
+                      <span>{{ lg.model }}</span>
+                    </sc-if>
+                    <sc-if value="{{ lg.hasLink }}" hint-placeholder-val="{{ false }}">
+                      <a href="{{ lg.link }}" style="color:var(--color-accent-700);word-break:break-all">{{ lg.link }}</a>
+                    </sc-if>
+                    <sc-if value="{{ lg.hasError }}" hint-placeholder-val="{{ false }}">
+                      <span>{{ lg.errorText }}</span>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <sc-if value="{{ showLogsMore }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ loadMoreLogs }}" style="width:100%;cursor:pointer;font:inherit;font-size:13px;padding:12px;margin-top:6px;border-radius:999px;border:1px solid var(--color-divider);background:var(--color-surface);color:var(--color-neutral-800)">Show more</button>
+            </sc-if>
+          </div>
         </div>
       </div>
     </sc-if>
@@ -1097,6 +1129,16 @@ Melt butter with chili crisp" style="width:100%;height:130px;border-radius:26px;
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000,&quot;height&quot;:1000}}">
 class Component extends DCLogic {
   addDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+  LOG_SEED = [
+    { id: 1, time: '2026-09-04 17:12 CEST', title: 'Non-recipe content', ok: false, model: 'gemini-3.6-flash', link: 'https://www.instagram.com/reel/Dc3om_VPDMI' },
+    { id: 2, time: '2026-09-04 17:11 CEST', title: 'Malasana and Warm Water Morning Ritual', ok: true, model: 'gemini-3.6-flash', link: 'https://www.instagram.com/reel/Cx8fJ2QoP1s' },
+    { id: 3, time: '2026-09-04 16:50 CEST', title: 'Hot Honey Cilantro Lime Chicken', ok: true, model: 'gemini-3.6-flash', link: 'https://www.youtube.com/watch?v=hHc4x2s9zQw' },
+    { id: 4, time: '2026-09-04 16:40 CEST', title: 'Air Fried Crispy Moong Dal', ok: true, model: 'gemini-3.6-flash', link: 'https://www.instagram.com/reel/Dc1n2_MPXYZ' },
+    { id: 5, time: '2026-09-04 16:22 CEST', title: 'Sheet Pan Salmon and Broccoli', ok: true, model: 'gemini-3.6-flash', link: 'https://www.youtube.com/watch?v=jT9k3xR8pQe' },
+    { id: 6, time: '2026-09-04 15:58 CEST', title: 'Non-recipe content', ok: false, model: 'gemini-3.6-flash', link: 'https://www.tiktok.com/@user/video/7391028475' },
+    { id: 7, time: '2026-09-04 15:40 CEST', title: 'Miso Butter Roasted Cabbage', ok: true, model: 'gemini-3.6-flash', link: 'https://www.instagram.com/reel/Cy2mN8xQrTs' },
+    { id: 8, time: '2026-09-04 14:12 CEST', title: 'Weeknight Chana Masala', ok: true, model: 'gemini-3.6-flash', link: 'https://www.youtube.com/watch?v=q7Yx2kPz9Lm' },
+  ];
   PANTRY_SEED = [
     { id: 1, name: 'Salted butter', category: 'Dairy & eggs', amount: 150, unit: 'g', status: 'open', expiry: this.addDays(2), notes: '' },
     { id: 2, name: 'Paneer', category: 'Dairy & eggs', amount: 200, unit: 'g', status: 'unopened', expiry: this.addDays(6), notes: '' },
@@ -1119,7 +1161,7 @@ class Component extends DCLogic {
   state = {
     screen: 'list', query: '', have: [], favs: {2:true}, tags: [], favOnly: false, viewMode: 'list',
     sort: 'Recent', currentId: 1, step: 0, scale: 1, addSheet: false, sources: [], course: null, formCourse: 'Main course',
-    language: 'System', settingsServer: 'kaihkashan-recipe-box.vercel.app', settingsKey: '••••••••••••',
+    settingsServer: 'kaihkashan-recipe-box.vercel.app', settingsKey: '••••••••••••',
     link: '', linkPhase: 'idle', fetchIndex: 0, meal: 'Dinner',
     pantry: this.PANTRY_SEED, toBuy: this.TOBUY_SEED, pantryTab: 'items', pantryMatchMode: false, pantryMatchSelected: [], pantryAddSheet: false,
   };
@@ -1329,9 +1371,32 @@ class Component extends DCLogic {
         };
       }),
 
-      languageChips: ['System', 'English', 'Deutsch'].map(l => Object.assign(
-        { label: l, on: () => this.setState({ language: l }) }, chip((s.language || 'System') === l)
+      logFilterChips: ['All', 'Saved', 'Errors'].map(f => Object.assign(
+        { label: f, on: () => this.setState({ logFilter: f, logsShown: 5 }) }, chip((s.logFilter || 'All') === f)
       )),
+      noLogs: this.LOG_SEED.filter(lg => {
+        const f = s.logFilter || 'All';
+        return f === 'All' || (f === 'Saved' && lg.ok) || (f === 'Errors' && !lg.ok);
+      }).length === 0,
+      showLogsMore: this.LOG_SEED.filter(lg => {
+        const f = s.logFilter || 'All';
+        return f === 'All' || (f === 'Saved' && lg.ok) || (f === 'Errors' && !lg.ok);
+      }).length > (s.logsShown || 5),
+      loadMoreLogs: () => this.setState({ logsShown: (s.logsShown || 5) + 5 }),
+      logRows: this.LOG_SEED.filter(lg => {
+        const f = s.logFilter || 'All';
+        return f === 'All' || (f === 'Saved' && lg.ok) || (f === 'Errors' && !lg.ok);
+      }).slice(0, s.logsShown || 5).map(lg => ({
+        time: lg.time, title: lg.title,
+        iconColor: lg.ok ? 'var(--color-accent-2-600)' : 'var(--color-accent-700)',
+        iconPath: lg.ok ? 'M5 13l4 4L19 7' : 'M6 6l12 12M18 6L6 18',
+        open: !!(s.logsOpen || {})[lg.id],
+        chevronRotate: (s.logsOpen || {})[lg.id] ? '180deg' : '0deg',
+        toggle: () => this.setState({ logsOpen: Object.assign({}, s.logsOpen, { [lg.id]: !(s.logsOpen || {})[lg.id] }) }),
+        hasModel: !!lg.model, model: lg.model || '',
+        hasLink: !!lg.link, link: lg.link || '',
+        hasError: !!lg.error, errorText: lg.error || '',
+      })),
       devSettingsOpen: !!s.devSettingsOpen, devChevronRotate: s.devSettingsOpen ? '180deg' : '0deg',
       toggleDevSettings: () => this.setState({ devSettingsOpen: !s.devSettingsOpen }),
       settingsServer: s.settingsServer || '', onSettingsServer: (e) => this.setState({ settingsServer: e.target.value }),
@@ -1580,8 +1645,8 @@ class Component extends DCLogic {
         if (text) this.setState({ toBuy: (s.toBuy || []).concat({ id: Date.now(), text, qty: '', checked: false }), newToBuy: '' }); } },
 
       quotaRows: [
-        { label: 'Imports today', value: '6 of 20', pct: '30%' },
-        { label: 'Import cost this month', value: '$1.20 of $5', pct: '24%' },
+        { label: 'Imports today', value: '6 of 20', pct: '30%', resets: 'Resets around 9:00 AM CET' },
+        { label: 'Import cost this month', value: '$1.20 of $5', pct: '24%', resets: 'Resets 26 Sep' },
       ],
       skeletons: [{ w: '78%' }, { w: '62%' }, { w: '84%' }, { w: '55%' }],
     };

@@ -406,8 +406,11 @@ enum LinkIngestOutcome {
     case error(String)
 }
 
-/// Last 50 import attempts for Settings → Developer → Logs,
-/// from GET /api/import-log.
+/// Last 50 import attempts for Settings → Logs, from GET /api/import-log.
+enum ImportLogFilter {
+    case all, saved, errors
+}
+
 struct ImportLogResponse: Decodable {
     let imports: [ImportLogEntry]
 }
@@ -419,10 +422,36 @@ struct ImportLogEntry: Decodable, Identifiable {
     let status: String
     let reason: String
     let usedBackup: Bool
+    let model: String
+
+    var isError: Bool { status == "error" }
+
+    var displayTitle: String {
+        reason.replacingOccurrences(
+            of: #"\s*\((high|medium|low)\)\s*$"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        ).trimmingCharacters(in: .whitespaces)
+    }
+
+    var displayModel: String {
+        if !model.isEmpty { return model }
+        return usedBackup ? "gemini-3.5-flash-lite" : "gemini-3.6-flash"
+    }
 
     enum CodingKeys: String, CodingKey {
-        case timestamp, url, status, reason
+        case timestamp, url, status, reason, model
         case usedBackup = "used_backup"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp) ?? ""
+        url = try container.decodeIfPresent(String.self, forKey: .url) ?? ""
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
+        reason = try container.decodeIfPresent(String.self, forKey: .reason) ?? ""
+        usedBackup = try container.decodeIfPresent(Bool.self, forKey: .usedBackup) ?? false
+        model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
     }
 }
 

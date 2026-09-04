@@ -1,9 +1,11 @@
+import json
 from unittest import TestCase
 from unittest.mock import patch
 
 from google.genai.errors import APIError as GeminiAPIError
 
-from app.extract import _generate_with_retry
+from app.errors import NOT_A_RECIPE_MESSAGE
+from app.extract import _generate_with_retry, _parse_recipe_set
 
 
 class GenerateWithRetryTests(TestCase):
@@ -55,3 +57,134 @@ class GenerateWithRetryTests(TestCase):
         self.assertEqual(text, '{"ok": true}')
         self.assertFalse(used_backup)
         self.assertEqual(self.once.call_count, 1)
+
+
+def _pasta(**overrides):
+    recipe = {
+        "title": "Pasta",
+        "ingredients": [{"item": "spaghetti", "quantity": "200g"}],
+        "steps": ["Boil water."],
+        "confidence": "high",
+        "is_recipe": True,
+    }
+    recipe.update(overrides)
+    return recipe
+
+
+class ParseRecipeSetTests(TestCase):
+    def test_empty_placeholder_is_not_a_recipe(self):
+        payload = json.dumps(
+            {
+                "content_kind": "not_recipe",
+                "recipes": [
+                    {
+                        "title": "not a recipe",
+                        "ingredients": [],
+                        "steps": [],
+                        "confidence": "low",
+                        "is_recipe": False,
+                    }
+                ]
+            }
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            _parse_recipe_set(payload)
+        self.assertEqual(str(ctx.exception), NOT_A_RECIPE_MESSAGE)
+
+    def test_empty_recipe_list_is_not_a_recipe(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            _parse_recipe_set(json.dumps({"content_kind": "not_recipe", "recipes": []}))
+        self.assertEqual(str(ctx.exception), NOT_A_RECIPE_MESSAGE)
+
+    def test_rejects_invented_recipe_from_a_vlog(self):
+        payload = json.dumps(
+            {
+                "content_kind": "not_recipe",
+                "recipes": [
+                    _pasta(
+                        title="Meeting the Mayor",
+                        is_recipe=True,
+                    )
+                ],
+            }
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            _parse_recipe_set(payload)
+        self.assertEqual(str(ctx.exception), NOT_A_RECIPE_MESSAGE)
+
+    def test_rejects_when_model_marks_object_as_not_a_recipe(self):
+        payload = json.dumps({"content_kind": "recipe", "recipes": [_pasta(is_recipe=False)]})
+        with self.assertRaises(RuntimeError) as ctx:
+            _parse_recipe_set(payload)
+        self.assertEqual(str(ctx.exception), NOT_A_RECIPE_MESSAGE)
+
+    def test_rejects_title_only_or_steps_only(self):
+        with self.assertRaises(RuntimeError):
+            _parse_recipe_set(
+                json.dumps(
+                    {
+                        "content_kind": "recipe",
+                        "recipes": [_pasta(ingredients=[{"item": "spaghetti"}], steps=[])],
+                    }
+                )
+            )
+        with self.assertRaises(RuntimeError):
+            _parse_recipe_set(
+                json.dumps(
+                    {
+                        "content_kind": "recipe",
+                        "recipes": [_pasta(ingredients=[], steps=["Boil water."])],
+                    }
+                )
+            )
+
+    def test_drops_placeholder_when_a_real_recipe_is_also_present(self):
+        payload = json.dumps(
+            {
+                "content_kind": "recipe",
+                "recipes": [
+                    {
+                        "title": "not a recipe",
+                        "ingredients": [],
+                        "steps": [],
+                        "confidence": "low",
+                        "is_recipe": False,
+                    },
+                    _pasta(),
+                ],
+            }
+        )
+        recipes = _parse_recipe_set(payload)
+        self.assertEqual([item.title for item in recipes], ["Pasta"])
+
+    def test_keeps_recipes_with_ingredients_and_steps(self):
+        payload = json.dumps({"content_kind": "recipe", "recipes": [_pasta()]})
+        recipes = _parse_recipe_set(payload)
+        self.assertEqual(len(recipes), 1)
+        self.assertEqual(recipes[0].title, "Pasta")
+
+    def test_rejects_hallucinated_recipe_when_caption_is_not_cooking(self):
+        payload = json.dumps({"content_kind": "recipe", "recipes": [_pasta(title="Meeting the Mayor")]})
+        with self.assertRaises(RuntimeError) as ctx:
+            _parse_recipe_set(
+                payload,
+                source_text="Had a great time meeting the mayor downtown today with the team.",
+                require_grounding=True,
+            )
+        self.assertEqual(str(ctx.exception), NOT_A_RECIPE_MESSAGE)
+
+    def test_keeps_recipe_when_two_ingredients_appear_in_caption(self):
+        payload = json.dumps(
+            {
+                "content_kind": "recipe",
+                "recipes": [
+                    _pasta(ingredients=[{"item": "spaghetti"}, {"item": "garlic"}])
+                ],
+            }
+        )
+        recipes = _parse_recipe_set(
+            payload,
+            source_text="Making spaghetti with garlic tonight.",
+            require_grounding=True,
+        )
+        self.assertEqual(recipes[0].title, "Pasta")

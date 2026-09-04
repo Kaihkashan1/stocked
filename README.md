@@ -218,7 +218,7 @@ Browsing the box works well on Vercel. Ingest may run up to **300 seconds** on H
 - **Cupboard** (`GET`/`PUT /api/pantry-inventory`, `GET`/`PUT /api/to-buy`). Separate stock rows (amount, unit, open/unopened, expiry, notes) plus a to-buy checklist with optional **qty**. Expiry badges step from outline date → sage (4–7 days) → terracotta (≤3 days) → **Expired**. Match mode on Items suggests recipes from selected stock. Recipe detail **+** toggles a line onto to-buy (qty prefilled from the ingredient chip). Independent of the Cookbook ingredient filter and of ingest.
 - **Tags.** A small fixed set (mom's recipes, veg, non-veg, dessert, high protein, airfryer) shown as quick-pick chips when adding/editing a recipe — enforced at the model layer. Multi-select filtering on Cookbook.
 - **Course.** Every recipe is Main course, Appetizers, Desserts, or Dips — Sheet column, Cookbook filter row, detail pill. `/ingest` derives it from Gemini's meal classification; add/edit flows (including Edit recipe) set it directly.
-- **API usage.** Settings shows today's Gemini read count (self-tracked, combined across primary and fallback) against 520, and this month's Apify spend against live credit (when `APIFY_API_TOKEN` is set), each with when it resets. Developer → Logs lists the last 50 import attempts (including photos).
+- **API usage.** Settings shows today's Gemini read count (self-tracked, combined across primary and fallback) against 520, and this month's Apify spend against live credit (when `APIFY_API_TOKEN` is set), each with when it resets. Logs lists the last 50 import attempts (including photos).
 - **Design handoff.** Visual/interaction reference for the iOS redesign: [`design_handoff_recipe_box/`](design_handoff_recipe_box/).
 
 ## Layout

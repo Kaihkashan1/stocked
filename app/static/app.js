@@ -45,6 +45,7 @@ const INGREDIENT_UNITS = new Set([
   "piece", "pieces", "pc", "pcs", "handful", "handfuls",
 ]);
 
+const LOG_PAGE_SIZE = 5;
 const SECRET_KEY = "recipeBox.secret";
 const HAVE_KEY = "recipeBox.have";
 const RECIPES_CACHE_KEY = "recipeBox.recipesCache";
@@ -63,8 +64,9 @@ const state = {
   addingRecipe: false,
   usage: null,
   importLog: undefined,
+  logFilter: "all",
+  logShown: 5,
   devSettingsOpen: false,
-  logsOpen: false,
 };
 
 const els = {
@@ -207,19 +209,27 @@ function openSettings() {
   state.editingId = null;
   state.addingRecipe = false;
   state.devSettingsOpen = false;
-  state.logsOpen = false;
+  state.importLog = undefined;
   renderSettings();
   els.drawer.hidden = false;
+  const stillSettings = () =>
+    !els.drawer.hidden && state.addingRecipe === false && state.openRecipeId == null && state.editingId == null;
+  const rerenderSettings = () => {
+    if (!stillSettings()) return;
+    const typed = document.getElementById("settings-secret")?.value;
+    renderSettings();
+    if (typed != null) {
+      const again = document.getElementById("settings-secret");
+      if (again) again.value = typed;
+    }
+  };
   fetchUsage().then((usage) => {
     state.usage = usage;
-    if (!els.drawer.hidden && state.addingRecipe === false && state.openRecipeId == null && state.editingId == null) {
-      const typed = document.getElementById("settings-secret")?.value;
-      renderSettings();
-      if (typed != null) {
-        const again = document.getElementById("settings-secret");
-        if (again) again.value = typed;
-      }
-    }
+    rerenderSettings();
+  });
+  fetchImportLog().then((rows) => {
+    state.importLog = rows;
+    rerenderSettings();
   });
 }
 
@@ -273,42 +283,82 @@ async function fetchImportLog() {
   }
 }
 
+function logHeadline(row) {
+  return String(row.reason || "").replace(/\s*\((high|medium|low)\)\s*$/i, "").trim();
+}
+
+function logModelName(row) {
+  if (row.model) return String(row.model);
+  return row.used_backup ? "gemini-3.5-flash-lite" : "gemini-3.6-flash";
+}
+
+function importLogRowHtml(row) {
+  const isError = row.status === "error";
+  const mark = isError
+    ? `<span class="log-mark err" aria-label="${escapeAttr(t("errorLogs"))}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </span>`
+    : `<span class="log-mark ok" aria-label="${escapeAttr(t("savedLogs"))}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </span>`;
+  const headline = logHeadline(row) || (isError ? t("errorLogs") : t("savedLogs"));
+  const isPhoto = !row.url || row.url === "(photo)";
+  const linkBody = isPhoto
+    ? `<div class="import-log-url">${escapeHtml(t("photoImport"))}</div>`
+    : `<a class="import-log-url" href="${escapeAttr(row.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(row.url)}</a>`;
+  return `<li class="import-log-row">
+    <div class="import-log-meta">
+      ${mark}
+      <span>${escapeHtml(row.timestamp || "")}</span>
+    </div>
+    <div class="import-log-title">${escapeHtml(headline)}</div>
+    <details class="import-log-details">
+      <summary>${escapeHtml(t("additionalDetails"))}</summary>
+      <div class="import-log-model">${escapeHtml(logModelName(row))}</div>
+      ${linkBody}
+    </details>
+  </li>`;
+}
+
 function importLogHtml() {
-  const chevron = state.logsOpen ? "180deg" : "0deg";
-  let body = "";
-  if (state.logsOpen) {
-    if (state.importLog === undefined) {
-      body = "";
-    } else if (state.importLog === null) {
-      body = `<p class="field-note">${escapeHtml(t("couldntLoadLogs"))}</p>`;
-    } else if (!state.importLog.length) {
-      body = `<p class="field-note">${escapeHtml(t("noImportLogs"))}</p>`;
-    } else {
-      const rows = state.importLog
-        .map((row) => {
-          const url = row.url && row.url !== "(photo)" ? row.url : t("photoImport");
-          const backup = row.used_backup
-            ? `<span class="log-backup">${escapeHtml(t("backup"))}</span>`
-            : "";
-          return `<li class="import-log-row">
-            <div class="import-log-meta">
-              <span>${escapeHtml(row.timestamp || "")}</span>
-              ${backup}
-            </div>
-            <div class="import-log-url">${escapeHtml(url)}</div>
-            <div class="import-log-status">${escapeHtml(row.status || "")}${row.reason ? ` — ${escapeHtml(row.reason)}` : ""}</div>
-          </li>`;
-        })
-        .join("");
-      body = `<ul class="import-log">${rows}</ul>`;
-    }
+  const filter = state.logFilter || "all";
+  const chips = ["all", "saved", "errors"]
+    .map((key) => {
+      const label = key === "all" ? t("allLogs") : key === "saved" ? t("savedLogs") : t("errorLogs");
+      const action = key === "all" ? "all" : key;
+      return `<button class="chip${filter === action ? " active" : ""}" type="button" data-action="log-filter" data-filter="${action}">${escapeHtml(label)}</button>`;
+    })
+    .join("");
+  let body = `<div class="log-filters chips">${chips}</div>`;
+  if (state.importLog === undefined) {
+    body += "";
+  } else if (state.importLog === null) {
+    body += `<p class="field-note">${escapeHtml(t("couldntLoadLogs"))}</p>`;
+  } else {
+    const filtered = state.importLog.filter((row) => {
+      if (filter === "saved") return row.status !== "error";
+      if (filter === "errors") return row.status === "error";
+      return true;
+    });
+      if (!state.importLog.length) {
+        body += `<p class="field-note">${escapeHtml(t("noImportLogs"))}</p>`;
+      } else if (!filtered.length) {
+        body += `<p class="field-note">${escapeHtml(t("noMatchingLogs"))}</p>`;
+      } else {
+        const shown = Math.min(Number(state.logShown) || LOG_PAGE_SIZE, filtered.length);
+        state.logShown = shown;
+        const pageRows = filtered.slice(0, shown);
+        body += `<ul class="import-log">${pageRows.map(importLogRowHtml).join("")}</ul>`;
+        if (shown < filtered.length) {
+          body += `<button class="log-more" type="button" data-action="log-more">${escapeHtml(t("showMoreLogs"))}</button>`;
+        }
+      }
   }
   return `
-    <button class="dev-toggle nested" type="button" data-action="toggle-logs">
-      <span class="eyebrow">${escapeHtml(t("logs"))}</span>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${chevron})"><path d="M6 9l6 6 6-6"></path></svg>
-    </button>
-    ${body}`;
+    <div class="logs-section">
+      <div class="eyebrow">${escapeHtml(t("logs"))}</div>
+      ${body}
+    </div>`;
 }
 
 async function fetchUsage() {
@@ -354,7 +404,6 @@ function settingsFormHtml() {
           <p class="field-note">${escapeHtml(t("editKeyFootnote"))}</p>
         </label>
         <button class="pill-btn primary" type="button" data-action="save-settings">${escapeHtml(t("saveAndReload"))}</button>
-        ${importLogHtml()}
       </div>`
     : "";
   return `
@@ -372,6 +421,7 @@ function settingsFormHtml() {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${chevron})"><path d="M6 9l6 6 6-6"></path></svg>
       </button>
       ${devBody}
+      ${importLogHtml()}
     </div>`;
 }
 
@@ -1530,17 +1580,15 @@ document.addEventListener("click", (event) => {
       state.devSettingsOpen = !state.devSettingsOpen;
       renderSettings();
       break;
-    case "toggle-logs": {
-      state.logsOpen = !state.logsOpen;
+    case "log-filter":
+      state.logFilter = actionEl.dataset.filter || "all";
+      state.logShown = LOG_PAGE_SIZE;
       renderSettings();
-      if (state.logsOpen && state.importLog === undefined) {
-        fetchImportLog().then((rows) => {
-          state.importLog = rows;
-          if (state.logsOpen && state.devSettingsOpen) renderSettings();
-        });
-      }
       break;
-    }
+    case "log-more":
+      state.logShown = (Number(state.logShown) || LOG_PAGE_SIZE) + LOG_PAGE_SIZE;
+      renderSettings();
+      break;
     case "filter-tag":
       closeDrawer();
       state.tags = new Set([actionEl.dataset.tag]);

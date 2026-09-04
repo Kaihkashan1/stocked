@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app import notify
-from app.errors import friendly_message
+from app.errors import NOT_A_RECIPE_MESSAGE, friendly_message
 from app.extract import extract_recipe
 from app.fetch import extract_url, fetch_post
 from app.store import log_import, save_recipe, source_exists
@@ -33,7 +33,7 @@ def process_recipe(raw_content: str) -> dict:
             post = fetch_post(url, Path(tmp))
             recipes, used_backup = extract_recipe(post)
             if not recipes:
-                raise RuntimeError("Gemini returned no recipes.")
+                raise RuntimeError(NOT_A_RECIPE_MESSAGE)
             for recipe in recipes:
                 save_recipe(recipe, post)
 
@@ -77,9 +77,7 @@ def _record(**fields) -> None:
     if status == "duplicate":
         reason = "Already saved"
     elif status == "saved":
-        title = fields.get("title") or "Recipe"
-        confidence = fields.get("confidence") or ""
-        reason = f"{title} ({confidence})" if confidence else str(title)
+        reason = fields.get("title") or "Recipe"
     else:
         reason = fields.get("error") or "Import failed"
     log_import(url, status or "error", reason, used_backup=used_backup)

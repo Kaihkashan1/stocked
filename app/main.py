@@ -15,7 +15,7 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.auth import require_secret
 from app.config import ROOT, settings
-from app.errors import GEMINI_DAILY_QUOTA, friendly_message, gemini_is_busy
+from app.errors import GEMINI_DAILY_QUOTA, NOT_A_RECIPE_MESSAGE, friendly_message, gemini_is_busy
 from app.extract import extract_recipe
 from app.fetch import get_apify_usage
 from app.match import STAPLES, grouped_pantry
@@ -159,10 +159,10 @@ async def api_extract_photo(photo: UploadFile = File(...)):
         tmp_path.unlink(missing_ok=True)
 
     if not recipes:
-        log_import(None, "error", "Gemini returned no recipes.", used_backup=used_backup)
-        raise HTTPException(status_code=502, detail="Gemini returned no recipes.")
+        log_import(None, "error", NOT_A_RECIPE_MESSAGE, used_backup=used_backup)
+        raise HTTPException(status_code=502, detail=NOT_A_RECIPE_MESSAGE)
     recipe = recipes[0]
-    log_import(None, "saved", f"{recipe.title} ({recipe.confidence})", used_backup=used_backup)
+    log_import(None, "saved", recipe.title, used_backup=used_backup)
 
     ingredients = ingredient_strings(recipe.ingredients)
     return {

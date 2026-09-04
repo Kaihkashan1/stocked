@@ -13,7 +13,8 @@ import gspread
 from app.config import settings
 from app.fetch import normalize_url
 from app.match import pantry_items, split_ingredient_section
-from app.models import PANTRY_CATEGORIES, FetchedPost, Recipe
+from app.errors import NOT_A_RECIPE_MESSAGE
+from app.models import PANTRY_CATEGORIES, FetchedPost, Recipe, recipe_is_importable
 
 logger = logging.getLogger(__name__)
 
@@ -326,8 +327,18 @@ def get_gemini_reads_today() -> int:
 
 
 IMPORT_LOG_TITLE = "ImportLog"
-IMPORT_LOG_HEADERS = ["timestamp", "url", "status", "reason", "used_backup"]
+IMPORT_LOG_HEADERS = ["timestamp", "url", "status", "reason", "used_backup", "model"]
 _BERLIN = ZoneInfo("Europe/Berlin")
+_LOG_YMD = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(\s.*)$")
+_CONFIDENCE_SUFFIX = re.compile(r"\s*\((high|medium|low)\)\s*$", re.I)
+
+
+def _import_model_name(used_backup: bool, stored: str = "") -> str:
+    if stored.strip():
+        return stored.strip()
+    if used_backup:
+        return (settings.gemini_fallback_model or "").strip() or "gemini-3.5-flash-lite"
+    return (settings.gemini_model or "").strip() or "gemini-3.6-flash"
 
 
 @lru_cache(maxsize=1)
@@ -340,24 +351,43 @@ def _import_log_worksheet():
         worksheet.append_row(IMPORT_LOG_HEADERS, value_input_option="RAW")
         return worksheet
     existing = worksheet.row_values(1)
-    if existing[: len(IMPORT_LOG_HEADERS)] != IMPORT_LOG_HEADERS:
-        if not any(existing):
-            worksheet.append_row(IMPORT_LOG_HEADERS, value_input_option="RAW")
-        else:
-            logger.warning("ImportLog header row does not match %s", IMPORT_LOG_HEADERS)
+    if existing[: len(IMPORT_LOG_HEADERS)] == IMPORT_LOG_HEADERS:
+        return worksheet
+    if not any(existing):
+        worksheet.append_row(IMPORT_LOG_HEADERS, value_input_option="RAW")
+        return worksheet
+    if existing[:5] == IMPORT_LOG_HEADERS[:5] and (len(existing) < 6 or existing[5] != "model"):
+        worksheet.update_cell(1, 6, "model")
+        return worksheet
+    logger.warning("ImportLog header row does not match %s", IMPORT_LOG_HEADERS)
     return worksheet
+
+
+def _display_log_timestamp(raw: str) -> str:
+    """Sheet used to write YYYY-MM-DD; show DD-MM-YYYY, keep the time suffix."""
+    text = (raw or "").strip()
+    match = _LOG_YMD.match(text)
+    if match:
+        return f"{match.group(3)}-{match.group(2)}-{match.group(1)}{match.group(4)}"
+    return text
+
+
+def _log_headline(reason: str) -> str:
+    return _CONFIDENCE_SUFFIX.sub("", (reason or "").strip())
 
 
 def log_import(url: str | None, status: str, reason: str, used_backup: bool = False) -> None:
     """Append one ImportLog row. Best-effort — must never break an import."""
     try:
-        timestamp = datetime.now(_BERLIN).strftime("%Y-%m-%d %H:%M %Z")
+        timestamp = datetime.now(_BERLIN).strftime("%d-%m-%Y %H:%M %Z")
+        model = _import_model_name(used_backup)
         row = [
             timestamp,
             (url or "").strip() or "(photo)",
             status,
-            (reason or "")[:500],
+            _log_headline(reason or "")[:500],
             "TRUE" if used_backup else "FALSE",
+            model,
         ]
         _import_log_worksheet().append_row(row, value_input_option="RAW")
     except Exception:
@@ -373,13 +403,17 @@ def get_recent_imports(limit: int = 50) -> list[dict]:
     rows = []
     for record in records:
         url = str(record.get("url") or "").strip()
+        used_backup = str(record.get("used_backup") or "").strip().lower() in TRUE_VALUES
+        status = str(record.get("status") or "").strip()
+        stored_model = str(record.get("model") or "").strip()
         rows.append(
             {
-                "timestamp": str(record.get("timestamp") or "").strip(),
+                "timestamp": _display_log_timestamp(str(record.get("timestamp") or "")),
                 "url": url,
-                "status": str(record.get("status") or "").strip(),
-                "reason": str(record.get("reason") or "").strip(),
-                "used_backup": str(record.get("used_backup") or "").strip().lower() in TRUE_VALUES,
+                "status": status,
+                "reason": _log_headline(str(record.get("reason") or "")),
+                "used_backup": used_backup,
+                "model": _import_model_name(used_backup, stored_model),
             }
         )
     rows.reverse()
@@ -394,6 +428,12 @@ def source_exists(url: str) -> bool:
 
 
 def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
+    if not recipe_is_importable(
+        recipe,
+        post.caption or "",
+        require_grounding=bool((post.url or "").strip()),
+    ):
+        raise RuntimeError(NOT_A_RECIPE_MESSAGE)
     ingredients = format_ingredient_lines(recipe.ingredients)
     steps = "\n".join(f"{i}. {step}" for i, step in enumerate(recipe.steps, start=1))
     saved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")

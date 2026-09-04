@@ -438,18 +438,15 @@ private struct IngredientsCard: View {
                 ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                     switch row {
                     case .heading(let title):
-                        HStack(alignment: .center, spacing: 8) {
-                            Circle()
-                                .fill(Theme.sage500)
-                                .frame(width: 6, height: 6)
-                            Text(title)
-                                .font(Theme.display(13.5))
-                                .foregroundStyle(Theme.sage800)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, index == 0 ? 2 : 20)
-                        .padding(.bottom, 9)
+                        Text(title)
+                            .font(Theme.body(12, weight: .bold))
+                            .tracking(0.72)
+                            .textCase(.uppercase)
+                            .foregroundStyle(Theme.sage800)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, index == 0 ? 2 : 20)
+                            .padding(.bottom, 9)
                     case .item(let parsed):
                         HStack(alignment: .center, spacing: 12) {
                             if let quantity = parsed.quantity {

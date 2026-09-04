@@ -488,7 +488,10 @@ struct RecipeCard: View, Equatable {
                         .foregroundStyle(Theme.neutral600)
                 }
                 if let match {
-                    Text("\(Int((match.score * 100).rounded()))% \(L("FIT"))")
+                    let fit = match.score.formatted(
+                        .percent.precision(.fractionLength(0)).locale(Locale(identifier: "en"))
+                    )
+                    Text("\(fit) \(L("FIT"))")
                         .font(Theme.body(10, weight: .semibold))
                         .tracking(0.4)
                         .padding(.horizontal, 8)

@@ -28,6 +28,8 @@ GEMINI_BUSY_MESSAGE = (
     "Gemini is busy right now. Wait a few seconds and try again."
 )
 
+NOT_A_RECIPE_MESSAGE = "That didn't look like a recipe."
+
 
 def gemini_is_busy(exc: Exception) -> bool:
     """Capacity blips (503 / 'high demand' / 504 DEADLINE_EXCEEDED), not the

@@ -316,9 +316,9 @@ Import limits values come from the backend, not local state.
 ## Ingredient sections — NEW
 A recipe's ingredients can optionally be split into labeled parts (e.g. "For the sauce", "For the chicken",
 "For the rice") for multi-component recipes. On the detail screen, each section renders as a small header row
-above its items: a 6pt sage (accent-2-500) dot, then the label in Caprasimo 13.5pt, accent-2-800 — 20pt top
-padding to separate it from the previous group (2pt for the first section in the list), 9pt below before the
-first item. Sections are purely presentational grouping; scaling, buy-list add, and pantry-fit matching all
+above its items: the label in Figtree 12pt, 700 weight, uppercase, 0.06em letter-spacing, accent-2-800 —
+20pt top padding to separate it from the previous group (2pt for the first section in the list), 9pt below
+before the first item. Sections are purely presentational grouping; scaling, buy-list add, and pantry-fit matching all
 operate on the underlying flat ingredient list and skip section headers.
 In the Edit recipe textarea, a section header is written as its own line starting with `## ` (e.g.
 `## For the sauce`), interleaved with the normal `qty | item` lines beneath it. Recipes with no `##` lines
@@ -326,6 +326,14 @@ behave exactly as before — this is fully backward compatible with flat ingredi
 Data model: each ingredient entry is a 2-tuple `[qty, text]` as before; a section header reuses the same shape
 with `qty` set to the sentinel `'@section'` and `text` holding the label. Demonstrated live on the "Lemon
 Tahini Salmon Bowl" recipe (For the salmon / For the tahini sauce / For the bowl).
+
+## Logs — NEW
+Settings now has a Logs section (below Developer): All/Saved/Errors filter chips (same pill-chip pattern as
+elsewhere), then a list of import log entries. Each entry: a check (accent-2-600) or X (accent-700) icon +
+timestamp, title in Caprasimo 16pt, and an "Additional details" toggle (chevron rotates on open) revealing
+the model name and source link — shown for both successful and failed imports. Paginated 5 at a time with a
+"Show more" button (pill, outline) that appends 5 more; switching filters resets the count to 5. The
+Language setting was removed (app is English-only).
 
 ## Data model change
 Add a **course** value per recipe — "Main course", "Appetizers" or "Desserts" — shown as the pill on the detail
