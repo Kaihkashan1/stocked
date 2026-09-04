@@ -318,10 +318,9 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
     """
     token = settings.apify_api_token.strip()
     on_vercel = bool(os.environ.get("VERCEL"))
-    # Leave Gemini ~20s on Vercel (60s function cap). A 60s Apify wait
-    # plus a video download plus a Files upload is why Instagram saves
-    # time out there even when the post is public.
-    apify_timeout = 35 if on_vercel else 60
+    # Hobby Fluid allows 300s. Keep Apify short enough that a reel
+    # download + Gemini Files upload + generate_content still fit.
+    apify_timeout = 45 if on_vercel else 60
     try:
         response = httpx.post(
             f"{APIFY_API_BASE}/acts/{settings.apify_instagram_actor}/run-sync-get-dataset-items",
@@ -364,20 +363,21 @@ def _fetch_instagram_via_apify(url: str, out_dir: Path) -> FetchedPost | None:
         caption = f"{caption}\n\n{comments_text}".strip()
 
     video_url = item.get("videoUrl")
+    media_timeout = 40 if on_vercel else 60
+    video_path = (
+        _download_apify_media(video_url, out_dir, media_id, video=True, timeout=media_timeout)
+        if video_url
+        else None
+    )
+
     images = item.get("images")
     image_url = None
-    if isinstance(images, list) and images:
-        image_url = images[0]
-    image_url = image_url or item.get("displayUrl")
-
-    # Reels always have a videoUrl. Downloading and uploading that file to
-    # Gemini on Vercel regularly blows the 60s cap; caption + still is
-    # enough for recipe extraction and matches the photo-import path.
-    video_path = None
-    if video_url and not on_vercel:
-        video_path = _download_apify_media(video_url, out_dir, media_id, video=True)
+    if video_path is None:
+        if isinstance(images, list) and images:
+            image_url = images[0]
+        image_url = image_url or item.get("displayUrl")
     thumbnail_path = (
-        _download_apify_media(image_url, out_dir, media_id, video=False, timeout=15 if on_vercel else 60)
+        _download_apify_media(image_url, out_dir, media_id, video=False, timeout=media_timeout)
         if image_url
         else None
     )

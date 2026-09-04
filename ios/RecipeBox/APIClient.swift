@@ -61,12 +61,14 @@ struct APIClient {
     }()
 
     /// Photo extract and /ingest wait on Gemini with no bytes until the
-    /// function finishes (up to Vercel's 60s). The default session's 15s
-    /// between-packets timer otherwise fails those as "could not reach".
+    /// function finishes (Vercel Hobby Fluid: up to 300s). The default
+    /// session's 15s between-packets timer otherwise fails those as
+    /// "could not reach".
+    private static let longRequestTimeout: TimeInterval = 280
     private static let longSession: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 75
-        config.timeoutIntervalForResource = 75
+        config.timeoutIntervalForRequest = longRequestTimeout
+        config.timeoutIntervalForResource = longRequestTimeout
         config.waitsForConnectivity = true
         return URLSession(configuration: config)
     }()
@@ -85,7 +87,7 @@ struct APIClient {
 
         var request = URLRequest(url: url.absoluteURL)
         request.httpMethod = "POST"
-        request.timeoutInterval = 75
+        request.timeoutInterval = Self.longRequestTimeout
         let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedSecret.isEmpty {
             request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
@@ -207,8 +209,9 @@ struct APIClient {
 
     /// Posts a link to the same `/ingest` endpoint the Save Recipe Shortcut
     /// uses. On the hosted (Vercel) backend this runs the whole fetch →
-    /// Gemini → save pipeline in-request and can take close to 60s, so the
-    /// timeout here is set well past that rather than the usual 15s.
+    /// Gemini → save pipeline in-request (up to ~300s on Vercel Hobby).
+    /// Timeout sits just under that so the phone isn't the thing that
+    /// cuts the request off.
     func ingest(url: String, secret: String) async throws -> IngestResult {
         guard let base = URL(string: trimmedBase),
               let endpoint = URL(string: "/ingest", relativeTo: base)
@@ -216,7 +219,7 @@ struct APIClient {
 
         var request = URLRequest(url: endpoint.absoluteURL)
         request.httpMethod = "POST"
-        request.timeoutInterval = 75
+        request.timeoutInterval = Self.longRequestTimeout
         request.setValue("text/plain; charset=utf-8", forHTTPHeaderField: "Content-Type")
         let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedSecret.isEmpty {

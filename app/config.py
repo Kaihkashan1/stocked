@@ -20,11 +20,6 @@ class Settings(BaseSettings):
     # of the day. Leave unset to keep using just one key.
     gemini_api_key_2: str = ""
     gemini_model: str = "gemini-3.6-flash"
-    # Used when gemini_model reports itself overloaded (503/"high demand",
-    # not a daily-quota 429 — see errors.gemini_is_busy). A different,
-    # lighter model often has capacity when the primary doesn't, and
-    # unlike the quota fallback this needs no second key.
-    gemini_fallback_model: str = "gemini-2.5-flash"
     google_sheet_id: str = ""
     google_service_account_file: Path = ROOT / "service_account.json"
     google_service_account_json: str = ""
