@@ -77,7 +77,7 @@ const I18N = {
     editRecipe: "Edit recipe",
     title: "Title",
     servingsLabel: "Servings",
-    ingredientsOnePerLine: "Ingredients — one per line",
+    ingredientsOnePerLine: "Ingredients — one per line, or ## Section for parts",
     stepsOnePerLine: "Steps — one per line",
     tags: "Tags",
     newTag: "New tag",

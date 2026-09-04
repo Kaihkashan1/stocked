@@ -123,7 +123,8 @@ model same as before; the user adds their own tags afterward via Edit recipe.
   with accent-800 text at 1×, and accent with cream text at any other scale (so a scaled list is visibly
   scaled). Rows: surface card, 28pt radius, 13pt vertical padding per row, 1pt divider between rows, quantity
   chip (min width 62pt, centered) then ingredient text (14.5pt). Quantity-less lines render as plain text.
-  **No servings/time line.**
+  **No servings/time line.** Multi-component recipes may show section headers within this list — see
+  "Ingredient sections" below.
 - **Steps**: heading Caprasimo 23pt; rows 16pt apart — 28pt accent-200 circle with the number in
   Caprasimo 13pt accent-800, then the step text at 14.5pt / line height 1.55.
 - **Notes**: accent-100 card, 26pt radius, "NOTES" kicker, 14pt body.
@@ -211,17 +212,20 @@ with a divider border.
 
 ### 8. Settings (SettingsView)
 Close button; title "Settings". Reordered so the settings a normal user cares about are visible by default, and
-the ones only useful for debugging are tucked away. English only — Stocked does not ship in-app translations.
-- **Import limits** as its own labeled section, first on the page (no card/background — plain label + two 6pt
-  progress bars on neutral-200 tracks, accent fill): "Imports today — 6 of 20" (a count) and "Import cost this
-  month — $1.20 of $5" (a dollar figure; keep it as cost, not a count — these are two different kinds of
-  limit). User-facing because the user needs to know how many recipe imports they have left before hitting
-  the daily/monthly cap; the labels intentionally say nothing about which backend/model serves the import.
+the ones only useful for debugging are tucked away:
+- **Language** chip row, first on the page: System, English, Deutsch. Selecting one applies immediately —
+  no save step, no "reload" — since it's a live app preference, not a value round-tripping to the server.
+- Divider, then **Import limits** as its own labeled section (no card/background — plain label + two 6pt
+  progress bars on neutral-200 tracks, accent fill), separate from Language rather than nested under it:
+  "Imports today — 6 of 20" (a count) and "Import cost this month — $1.20 of $5" (a dollar figure; keep it
+  as cost, not a count — these are two different kinds of limit). User-facing because the user needs to know
+  how many recipe imports they have left before hitting the daily/monthly cap; the labels intentionally say
+  nothing about which backend/model serves the import.
 - **"Developer" disclosure row** below that: an uppercase label with a chevron that rotates 180° when open,
   collapsed by default. Expanding it reveals: Server field (pill, showing the hosted URL) with its
   explanatory footnote; Edit key field (masked, 0.22em tracking) with its footnote; and a "Save and reload"
   primary button, scoped only to those two fields (Import limits is display-only and sits outside this
-  section).
+  section; Language applies instantly and also sits outside it).
 The quota numbers backing Import limits need a small backend addition; if that is not wanted, drop the card
 rather than faking it, but keep it visible (not inside Developer) once real — recipe-import cadence is
 something end users plan around.
@@ -262,7 +266,7 @@ neutral-500 otherwise. This is the user's own inventory — it is not required t
   spices, Other) under 10.5pt uppercase kickers. Each row: surface card, 22pt radius, shadow-sm — name (14.5pt
   semibold) with a chip line below it: amount+unit (neutral-100 pill), Open/Unopened status (sage or neutral
   tint), and an **expiry badge** when set — neutral outline showing the date normally, a sage-200/800 tint for
-  "Expires in N days" between 4-7 days out, a solid accent-500 fill ("Expires in 2 days" / "Expires today") inside
+  "Expires in Nd" between 4-7 days out, a solid accent-500 fill ("Expires in 2d" / "Expires today") inside
   3 days, and accent-800 ("Expired") once past.
   Tapping a row (outside match mode) opens it in the same add/edit sheet, prefilled, for editing; a trash
   icon on the row deletes it directly.
@@ -303,10 +307,25 @@ and `editTagsList` (Edit recipe) each hold their own selected-tags array so pick
 touches the Filters selection. The app's global tag list (`ALL_TAGS`) grows whenever "Add tag" is used from
 any of the three add/edit surfaces.
 
-The Server/Edit key fields are Settings-only state; Import limits values come from the backend, not local state.
+`language: String` ("System" | "English" | "Deutsch") and the Server/Edit key fields are Settings-only state;
+Import limits values come from the backend, not local state.
 
 `pantry: [PantryItem]` (id, name, category, amount, unit, status: open|unopened, expiry: Date?, notes) and
 `toBuy: [{id, text, checked}]` are new, independent top-level stores — no foreign key to `RecipeStore`.
+
+## Ingredient sections — NEW
+A recipe's ingredients can optionally be split into labeled parts (e.g. "For the sauce", "For the chicken",
+"For the rice") for multi-component recipes. On the detail screen, each section renders as a small header row
+above its items: a 6pt sage (accent-2-500) dot, then the label in Caprasimo 13.5pt, accent-2-800 — 20pt top
+padding to separate it from the previous group (2pt for the first section in the list), 9pt below before the
+first item. Sections are purely presentational grouping; scaling, buy-list add, and pantry-fit matching all
+operate on the underlying flat ingredient list and skip section headers.
+In the Edit recipe textarea, a section header is written as its own line starting with `## ` (e.g.
+`## For the sauce`), interleaved with the normal `qty | item` lines beneath it. Recipes with no `##` lines
+behave exactly as before — this is fully backward compatible with flat ingredient lists.
+Data model: each ingredient entry is a 2-tuple `[qty, text]` as before; a section header reuses the same shape
+with `qty` set to the sentinel `'@section'` and `text` holding the label. Demonstrated live on the "Lemon
+Tahini Salmon Bowl" recipe (For the salmon / For the tahini sauce / For the bowl).
 
 ## Data model change
 Add a **course** value per recipe — "Main course", "Appetizers" or "Desserts" — shown as the pill on the detail

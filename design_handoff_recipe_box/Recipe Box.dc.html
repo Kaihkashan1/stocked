@@ -401,7 +401,7 @@ a:hover{color:var(--color-accent-800)}
               <div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
                   <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-600)">Ingredients</span>
-                  <span style="font-size:11.5px;color:var(--color-neutral-600)">one per line, "qty | item"</span>
+                  <span style="font-size:11.5px;color:var(--color-neutral-600)">"qty | item", or "## Section" for parts</span>
                 </div>
                 <textarea value="{{ editIngredients }}" onChange="{{ onEditIngredients }}" style="width:100%;height:130px;border-radius:22px;border:1px solid var(--color-divider);background:var(--color-surface);padding:12px 16px;font:inherit;font-size:13.5px;line-height:1.7;outline:none;resize:none;color:var(--color-text);box-sizing:border-box"></textarea>
               </div>
@@ -465,6 +465,13 @@ a:hover{color:var(--color-accent-800)}
           </div>
           <div style="background:var(--color-surface);border-radius:28px;padding:6px 20px;margin-bottom:28px">
             <sc-for list="{{ detailIngredients }}" as="i" hint-placeholder-count="6">
+              <sc-if value="{{ i.isHeader }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:8px;padding:{{ i.headerPad }} 0 9px">
+                  <span style="width:6px;height:6px;border-radius:50%;background:var(--color-accent-2-500);flex:none"></span>
+                  <span style="font-family:var(--font-heading);font-size:13.5px;color:var(--color-accent-2-800)">{{ i.label }}</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{ i.isItem }}" hint-placeholder-val="{{ true }}">
               <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--color-divider)">
                 <sc-if value="{{ i.hasQty }}" hint-placeholder-val="{{ true }}">
                   <span style="flex:none;min-width:62px;text-align:center;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;background:{{ i.qtyBg }};color:{{ i.qtyFg }}">{{ i.qty }}</span>
@@ -479,6 +486,7 @@ a:hover{color:var(--color-accent-800)}
                   </sc-if>
                 </button>
               </div>
+              </sc-if>
             </sc-for>
           </div>
 
@@ -1135,7 +1143,9 @@ class Component extends DCLogic {
       notes:'', ingredients:[['3','very ripe bananas'],['115 g','butter, browned'],['150 g','brown sugar'],['2','eggs'],['220 g','flour'],['1 tsp','baking soda']],
       steps:['Brown the butter and let it cool slightly.','Mash the bananas, then beat in butter, sugar and eggs.','Fold in the dry ingredients — stop while it still looks rough.','Bake at 175°C for 55 minutes.'] },
     { id:6, title:'Lemon Tahini Salmon Bowl', source:'Link', course:'Main course', time:'30 min', servings:2, tags:['high protein','non-veg'], saved:'a month ago',
-      notes:'', ingredients:[['2','salmon fillets'],['3 tbsp','tahini'],['1','lemon, juiced'],['150 g','rice'],['1','cucumber, sliced']],
+      notes:'', ingredients:[['@section','For the salmon'],['2','salmon fillets'],['1 tbsp','olive oil'],[null,'Salt and pepper'],
+        ['@section','For the tahini sauce'],['3 tbsp','tahini'],['1','lemon, juiced'],['2 tbsp','water, to loosen'],
+        ['@section','For the bowl'],['150 g','rice'],['1','cucumber, sliced']],
       steps:['Roast the salmon at 200°C for 12 minutes.','Loosen the tahini with lemon and cold water until pourable.','Build the bowls, spoon the sauce over everything.'] },
   ];
 
@@ -1148,7 +1158,7 @@ class Component extends DCLogic {
 
   fitFor(r) {
     if (!this.state.have.length) return null;
-    const text = r.ingredients.map(i => i[1].toLowerCase()).join(' | ');
+    const text = r.ingredients.filter(i => i[0] !== '@section').map(i => i[1].toLowerCase()).join(' | ');
     const hits = this.state.have.filter(h => text.includes(h.toLowerCase())).length;
     return Math.round((hits / this.state.have.length) * 100);
   }
@@ -1171,6 +1181,7 @@ class Component extends DCLogic {
       ? { bg: 'var(--color-accent)', fg: 'var(--color-bg)', bd: 'var(--color-accent)' }
       : { bg: 'var(--color-surface)', fg: 'var(--color-neutral-800)', bd: 'var(--color-divider)' };
 
+    const isHeaderIng = (i) => i[0] === '@section';
     const q = s.query.trim().toLowerCase();
     let list = this.RECIPES.filter(r => {
       if (s.favOnly && !s.favs[r.id]) return false;
@@ -1178,7 +1189,7 @@ class Component extends DCLogic {
       if (s.course && r.course !== s.course) return false;
       if (s.tags.length && !s.tags.some(t => r.tags.includes(t))) return false;
       if (!q) return true;
-      return (r.title + ' ' + r.tags.join(' ') + ' ' + r.ingredients.map(i => i[1]).join(' ')).toLowerCase().includes(q);
+      return (r.title + ' ' + r.tags.join(' ') + ' ' + r.ingredients.filter(i => i[0] !== '@section').map(i => i[1]).join(' ')).toLowerCase().includes(q);
     });
     if (s.have.length) list = list.slice().sort((a, b) => this.fitFor(b) - this.fitFor(a));
     else if (s.sort === 'A–Z') list = list.slice().sort((a, b) => a.title.localeCompare(b.title));
@@ -1193,7 +1204,7 @@ class Component extends DCLogic {
       return (Math.round(n * 100) / 100) + m[2];
     };
     const missing = current.ingredients
-      .filter(i => !s.have.some(h => i[1].toLowerCase().includes(h.toLowerCase())))
+      .filter(i => i[0] !== '@section' && !s.have.some(h => i[1].toLowerCase().includes(h.toLowerCase())))
       .map(i => i[1].split(',')[0]);
 
     const pantryPool = ['paneer','chickpeas','butter','noodles','salmon','cauliflower','bananas','tahini','onions','lemon'];
@@ -1263,8 +1274,9 @@ class Component extends DCLogic {
     const matchNames = pantrySel.map(id => (s.pantry.find(p => p.id === id) || {}).name).filter(Boolean);
     const matchWordSets = matchNames.map(wordsOf);
     const matchResults = matchNames.length ? this.RECIPES.map(r => {
-      const total = r.ingredients.length;
-      const hits = r.ingredients.filter(i => {
+      const realIng = r.ingredients.filter(i => i[0] !== '@section');
+      const total = realIng.length;
+      const hits = realIng.filter(i => {
         const iw = wordsOf(i[1]);
         return matchWordSets.some(nw => nw.some(w => iw.includes(w)));
       }).length;
@@ -1359,7 +1371,7 @@ class Component extends DCLogic {
       openOriginalPost: () => { this.setState({ moreMenuOpen: false }); window.open('https://example.com', '_blank'); },
       openEditRecipe: () => this.setState({ moreMenuOpen: false, editSheetOpen: true,
         editTitle: current.title, editCourse: current.course, editTagsList: current.tags.slice(), editNewTag: '',
-        editIngredients: current.ingredients.map(([qty, text]) => (qty ? qty + ' | ' + text : text)).join('\n'),
+        editIngredients: current.ingredients.map(([qty, text]) => qty === '@section' ? '## ' + text : (qty ? qty + ' | ' + text : text)).join('\n'),
         editSteps: current.steps.join('\n\n'), editNotes: current.notes || '' }),
       closeEditRecipe: () => this.setState({ editSheetOpen: false }),
       editSheetOpen: !!s.editSheetOpen,
@@ -1384,6 +1396,7 @@ class Component extends DCLogic {
       saveEditRecipe: () => {
         const title = (s.editTitle || '').trim(); if (!title) return;
         const ingredients = (s.editIngredients || '').split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+          if (/^##\s*/.test(line)) return ['@section', line.replace(/^##\s*/, '')];
           const parts = line.split('|');
           return parts.length > 1 ? [parts[0].trim(), parts.slice(1).join('|').trim()] : [null, line];
         });
@@ -1402,9 +1415,13 @@ class Component extends DCLogic {
         this.setState({ deleteConfirmOpen: false, screen: 'list' });
       },
       detailPantryLine: missing.length === 0 ? 'You have everything for this.' : 'Missing ' + missing.length + ': ' + missing.slice(0, 3).join(', '),
-      detailIngredients: current.ingredients.map(([qty, text]) => {
+      detailIngredients: current.ingredients.map(([qty, text], idx) => {
+        if (qty === '@section') {
+          return { isHeader: true, isItem: false, label: text, headerPad: idx === 0 ? '2px' : '20px' };
+        }
         const inList = (s.toBuy || []).some(b => b.text.toLowerCase() === text.toLowerCase());
         return {
+          isHeader: false, isItem: true,
           hasQty: !!qty, qty: scaleQty(qty), text,
           qtyBg: s.scale === 1 ? 'var(--color-accent-200)' : 'var(--color-accent)',
           qtyFg: s.scale === 1 ? 'var(--color-accent-800)' : 'var(--color-bg)',

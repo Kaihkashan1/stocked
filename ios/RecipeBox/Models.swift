@@ -658,7 +658,7 @@ struct IngredientLine {
 private let ingredientUnits: Set<String> = [
     "cup", "cups", "tbsp", "tsp", "teaspoon", "teaspoons", "tablespoon", "tablespoons",
     "g", "gram", "grams", "kg", "ml", "l", "litre", "litres", "liter", "liters",
-    "oz", "ounce", "ounces", "lb", "lbs", "pound", "pounds",
+    "oz", "ounce", "ounces", "floz", "lb", "lbs", "pound", "pounds",
     "clove", "cloves", "slice", "slices", "pinch", "pinches",
     "can", "cans", "pack", "packs", "packet", "packets",
     "piece", "pieces", "pc", "pcs", "handful", "handfuls",
@@ -679,6 +679,14 @@ func looksLikeSectionName(_ name: String) -> Bool {
 func splitIngredientSection(_ line: String) -> (section: String?, item: String?) {
     let text = line.trimmingCharacters(in: .whitespaces)
     guard !text.isEmpty else { return (nil, "") }
+    if let hash = text.range(of: "^#{1,3}\\s+(.+)$", options: .regularExpression) {
+        let name = String(text[hash])
+            .replacingOccurrences(of: "^#{1,3}\\s+", with: "", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ": ").union(.whitespaces))
+        if !name.isEmpty {
+            return (name, nil)
+        }
+    }
     if text.hasSuffix(":"), !text.dropLast().contains(":") {
         let name = String(text.dropLast()).trimmingCharacters(in: .whitespaces)
         if looksLikeSectionName(name) {
@@ -729,7 +737,11 @@ func groupedIngredientDisplayRows(_ lines: [String]) -> [IngredientDisplayRow] {
 
 func splitIngredientQuantity(_ line: String) -> IngredientLine {
     let trimmed = line.trimmingCharacters(in: .whitespaces)
-    let words = trimmed.split(separator: " ").map(String.init)
+    var words = trimmed.split(separator: " ").map(String.init)
+    if let first = words.first, let glued = peelGluedAmountUnit(first) {
+        words.removeFirst()
+        words.insert(contentsOf: [glued.amount, glued.unit], at: 0)
+    }
     guard let first = words.first, looksLikeQuantityToken(first) else {
         return IngredientLine(quantity: nil, text: trimmed)
     }
@@ -738,7 +750,10 @@ func splitIngredientQuantity(_ line: String) -> IngredientLine {
     var consumed = 1
     if words.count > 1 {
         let second = words[1].trimmingCharacters(in: .punctuationCharacters).lowercased()
-        if ingredientUnits.contains(second) {
+        if isFluidOuncePrefix(second), words.count > 2, isOunceUnit(words[2]) {
+            quantityParts.append(contentsOf: [words[1], words[2]])
+            consumed = 3
+        } else if ingredientUnits.contains(second) {
             quantityParts.append(words[1])
             consumed = 2
         }
@@ -751,6 +766,26 @@ func splitIngredientQuantity(_ line: String) -> IngredientLine {
         return IngredientLine(quantity: nil, text: trimmed)
     }
     return IngredientLine(quantity: quantityParts.joined(separator: " "), text: rest)
+}
+
+/// "2oz" / "1½oz" / "2floz" — the unit stuck to the number.
+private func peelGluedAmountUnit(_ token: String) -> (amount: String, unit: String)? {
+    let cleaned = token.trimmingCharacters(in: CharacterSet(charactersIn: ",;"))
+    let pattern = "^([0-9¼½¾⅓⅔⅛⅜]+(?:[/.][0-9]+)?)(fl\\.?oz|floz|ounces?|oz)$"
+    guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return nil }
+    let ns = cleaned as NSString
+    let full = NSRange(location: 0, length: ns.length)
+    guard let match = regex.firstMatch(in: cleaned, range: full), match.numberOfRanges == 3 else { return nil }
+    return (ns.substring(with: match.range(at: 1)), ns.substring(with: match.range(at: 2)))
+}
+
+private func isFluidOuncePrefix(_ token: String) -> Bool {
+    token == "fl" || token == "fl." || token == "fluid"
+}
+
+private func isOunceUnit(_ token: String) -> Bool {
+    let unit = token.trimmingCharacters(in: .punctuationCharacters).lowercased()
+    return unit == "oz" || unit == "ounce" || unit == "ounces" || unit == "floz"
 }
 
 private func looksLikeQuantityToken(_ token: String) -> Bool {
@@ -840,6 +875,41 @@ func scaledQuantity(_ quantity: String, by scale: Double) -> String {
     let rest = words.dropFirst().joined(separator: " ")
     let formatted = formatQuantityNumber(value * scale)
     return rest.isEmpty ? formatted : "\(formatted) \(rest)"
+}
+
+/// Display oz as grams, and fl oz (or oz of a liquid) as millilitres.
+/// Leaves cups, tbsp, and already-metric amounts alone. Does not rewrite
+/// the stored recipe — only the chip the cook sees.
+func metricFromOunces(_ quantity: String, ingredient: String) -> String {
+    let words = quantity.split(separator: " ").map(String.init)
+    guard let first = words.first, let value = parseQuantityNumber(first), words.count >= 2 else {
+        return quantity
+    }
+    let unit = words.dropFirst()
+        .map { $0.trimmingCharacters(in: .punctuationCharacters).lowercased() }
+        .joined(separator: " ")
+        .replacingOccurrences(of: ".", with: "")
+    if metricIngredientUnits.contains(unit) { return quantity }
+
+    let fluid = unit == "floz" || unit.hasPrefix("fl ") || unit.hasPrefix("fluid ")
+    let ounce = unit == "oz" || unit == "ounce" || unit == "ounces"
+    guard fluid || ounce else { return quantity }
+
+    if fluid || ingredientUsesVolumeOunces(ingredient) {
+        let ml = value * 29.5735295625
+        let rounded = ml >= 10 ? (ml / 5).rounded() * 5 : ml.rounded()
+        return "\(Int(rounded)) ml"
+    }
+    return "\(Int((value * 28.349523125).rounded())) g"
+}
+
+private let metricIngredientUnits: Set<String> = [
+    "g", "gram", "grams", "kg", "ml", "l", "litre", "litres", "liter", "liters",
+]
+
+private func ingredientUsesVolumeOunces(_ text: String) -> Bool {
+    let pattern = #"\b(water|milk|buttermilk|oil|juice|stock|broth|vinegar|wine|beer|vodka|rum|gin|whiskey|whisky|brandy|liqueur|espresso|coconut milk|soy sauce|fish sauce|hot sauce|worcestershire|heavy cream|whipping cream|half[- ]and[- ]half|maple syrup)\b"#
+    return text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
 }
 
 func stem(_ name: String) -> String {

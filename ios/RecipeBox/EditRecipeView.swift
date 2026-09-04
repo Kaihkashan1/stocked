@@ -56,7 +56,7 @@ struct EditRecipeView: View {
                         TagPicker(selected: $selectedTags, extraTags: store.tags)
                     }
 
-                    field(kicker: L("Ingredients"), hint: L("one per line as qty | item (blank qty allowed)")) {
+                    field(kicker: L("Ingredients"), hint: L("qty | item, or \"## Section\" for parts")) {
                         TextEditor(text: $ingredientsText)
                             .font(Theme.body(14.5))
                             .lineSpacing(14.5 * 0.9)
@@ -165,23 +165,28 @@ struct EditRecipeView: View {
 
 /// Formats a stored ingredient line for the edit sheet's `qty | item` rows.
 func formatIngredientForEdit(_ line: String) -> String {
-    if splitIngredientSection(line).item == nil {
-        return line.trimmingCharacters(in: .whitespaces)
+    let parsed = splitIngredientSection(line)
+    if let section = parsed.section, parsed.item == nil {
+        return "## \(section)"
     }
-    let parsed = splitIngredientQuantity(line)
-    if let quantity = parsed.quantity {
-        return "\(quantity) | \(parsed.text)"
+    let qtyLine = splitIngredientQuantity(line)
+    if let quantity = qtyLine.quantity {
+        return "\(quantity) | \(qtyLine.text)"
     }
-    return "| \(parsed.text)"
+    return "| \(qtyLine.text)"
 }
 
 /// Turns an edit-sheet `qty | item` line back into a normal ingredient string.
 func parseIngredientFromEdit(_ line: String) -> String {
-    guard let bar = line.firstIndex(of: "|") else {
-        return line.trimmingCharacters(in: .whitespaces)
+    let trimmed = line.trimmingCharacters(in: .whitespaces)
+    if trimmed.range(of: "^#{1,3}\\s+", options: .regularExpression) != nil {
+        return trimmed
     }
-    let qty = line[..<bar].trimmingCharacters(in: .whitespaces)
-    let item = line[line.index(after: bar)...].trimmingCharacters(in: .whitespaces)
+    guard let bar = trimmed.firstIndex(of: "|") else {
+        return trimmed
+    }
+    let qty = trimmed[..<bar].trimmingCharacters(in: .whitespaces)
+    let item = trimmed[trimmed.index(after: bar)...].trimmingCharacters(in: .whitespaces)
     if qty.isEmpty { return item }
     if item.isEmpty { return qty }
     return "\(qty) \(item)"

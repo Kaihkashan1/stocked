@@ -438,16 +438,21 @@ private struct IngredientsCard: View {
                 ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                     switch row {
                     case .heading(let title):
-                        Text(title)
-                            .font(Theme.display(15))
-                            .foregroundStyle(Theme.neutral700)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, index == 0 ? 4 : 18)
-                            .padding(.bottom, 6)
+                        HStack(alignment: .center, spacing: 8) {
+                            Circle()
+                                .fill(Theme.sage500)
+                                .frame(width: 6, height: 6)
+                            Text(title)
+                                .font(Theme.display(13.5))
+                                .foregroundStyle(Theme.sage800)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.top, index == 0 ? 2 : 20)
+                        .padding(.bottom, 9)
                     case .item(let parsed):
                         HStack(alignment: .center, spacing: 12) {
                             if let quantity = parsed.quantity {
-                                Text(scaledQuantity(quantity, by: scale))
+                                Text(metricFromOunces(scaledQuantity(quantity, by: scale), ingredient: parsed.text))
                                     .font(Theme.body(12.5, weight: .semibold))
                                     .foregroundStyle(scale == 1.0 ? Theme.accent800 : .white)
                                     .frame(minWidth: 62)
@@ -489,7 +494,8 @@ private struct IngredientsCard: View {
     private func toBuyButton(for line: IngredientLine) -> some View {
         let inList = pantry.isInToBuy(line.text)
         return Button {
-            pantry.toggleToBuy(text: line.text, qty: line.quantity ?? "")
+            let qty = line.quantity.map { metricFromOunces($0, ingredient: line.text) } ?? ""
+            pantry.toggleToBuy(text: line.text, qty: qty)
         } label: {
             Image(systemName: inList ? "checkmark" : "plus")
                 .font(.system(size: 12, weight: .bold))

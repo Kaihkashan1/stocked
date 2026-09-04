@@ -582,21 +582,36 @@ button { font-family: inherit; }
 
 .recipe h3:first-of-type { margin-top: 0; }
 
-.recipe h4.ingredient-section {
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  margin: 1.2rem 0 0.2rem;
+ul.ingredients li.ingredient-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 0 9px;
+  border-bottom: none;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--accent);
 }
 
-.recipe h3 + h4.ingredient-section {
-  margin-top: 0;
+ul.ingredients li.ingredient-section.first {
+  padding-top: 2px;
 }
 
-.recipe ul.ingredients + h4.ingredient-section {
-  margin-top: 1.15rem;
+ul.ingredients li.ingredient-section::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+ul.ingredients li:has(+ li.ingredient-section) {
+  border-bottom: none;
 }
 
 .notes-box {

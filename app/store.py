@@ -596,7 +596,7 @@ def _iter_formatted_ingredient_lines(items):
         parsed_section, parsed_item = split_ingredient_section(name)
         if parsed_item is None and parsed_section:
             if parsed_section.casefold() != last.casefold():
-                yield f"- {parsed_section}:"
+                yield f"- ## {parsed_section}"
                 last = parsed_section
             continue
         if not section and parsed_section:
@@ -610,7 +610,7 @@ def _iter_formatted_ingredient_lines(items):
         ):
             name = parsed_item
         if section and section.casefold() != last.casefold():
-            yield f"- {section}:"
+            yield f"- ## {section}"
             last = section
         if not name:
             continue

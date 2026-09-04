@@ -65,7 +65,7 @@ struct AddRecipeView: View {
                             .clipShape(Capsule())
                     }
 
-                    field(kicker: L("Ingredients"), hint: isFromPhoto ? nil : L("one per line")) {
+                    field(kicker: L("Ingredients"), hint: isFromPhoto ? nil : L("one per line, or ## Section for parts")) {
                         TextEditor(text: $ingredientsText)
                             .font(Theme.body(14.5))
                             .lineSpacing(14.5 * 0.9)

@@ -39,7 +39,7 @@ function setCourseSelection(which, course) {
 const INGREDIENT_UNITS = new Set([
   "cup", "cups", "tbsp", "tsp", "teaspoon", "teaspoons", "tablespoon", "tablespoons",
   "g", "gram", "grams", "kg", "ml", "l", "litre", "litres", "liter", "liters",
-  "oz", "ounce", "ounces", "lb", "lbs", "pound", "pounds",
+  "oz", "ounce", "ounces", "floz", "lb", "lbs", "pound", "pounds",
   "clove", "cloves", "slice", "slices", "pinch", "pinches",
   "can", "cans", "pack", "packs", "packet", "packets",
   "piece", "pieces", "pc", "pcs", "handful", "handfuls",
@@ -336,6 +336,72 @@ function looksLikeQuantityToken(token) {
   return /^[0-9¼½¾⅓⅔⅛⅜]+([/.-][0-9]+)?$/.test(cleaned);
 }
 
+function peelGluedAmountUnit(token) {
+  const cleaned = token.replace(/^[,;]+|[,;]+$/g, "");
+  const match = cleaned.match(/^([0-9¼½¾⅓⅔⅛⅜]+(?:[/.][0-9]+)?)(fl\.?oz|floz|ounces?|oz)$/i);
+  if (!match) return null;
+  return { amount: match[1], unit: match[2] };
+}
+
+function isFluidOuncePrefix(token) {
+  return token === "fl" || token === "fl." || token === "fluid";
+}
+
+function isOunceUnit(token) {
+  const unit = token.replace(/[.,;]+$/g, "").toLowerCase();
+  return unit === "oz" || unit === "ounce" || unit === "ounces" || unit === "floz";
+}
+
+const FRACTION_GLYPHS = { "¼": 0.25, "½": 0.5, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3, "⅛": 0.125, "⅜": 0.375 };
+
+function parseQuantityNumber(token) {
+  const cleaned = token.replace(/^[,;]+|[,;]+$/g, "");
+  if (!cleaned || cleaned.includes("-")) return null;
+  if (cleaned.includes("/")) {
+    const parts = cleaned.split("/");
+    if (parts.length !== 2) return null;
+    const numerator = Number(parts[0]);
+    const denominator = Number(parts[1]);
+    if (!numerator || !denominator) return null;
+    return numerator / denominator;
+  }
+  let i = 0;
+  let numStr = "";
+  while (i < cleaned.length && /[0-9.]/.test(cleaned[i])) {
+    numStr += cleaned[i];
+    i += 1;
+  }
+  const whole = numStr ? Number(numStr) : 0;
+  const glyph = cleaned[i];
+  if (glyph && FRACTION_GLYPHS[glyph] != null) return whole + FRACTION_GLYPHS[glyph];
+  return numStr ? whole : null;
+}
+
+const VOLUME_OUNCE_INGREDIENT = /\b(water|milk|buttermilk|oil|juice|stock|broth|vinegar|wine|beer|vodka|rum|gin|whiskey|whisky|brandy|liqueur|espresso|coconut milk|soy sauce|fish sauce|hot sauce|worcestershire|heavy cream|whipping cream|half[- ]and[- ]half|maple syrup)\b/i;
+const METRIC_UNITS = new Set(["g", "gram", "grams", "kg", "ml", "l", "litre", "litres", "liter", "liters"]);
+
+function metricFromOunces(quantity, ingredient) {
+  const words = (quantity || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return quantity;
+  const value = parseQuantityNumber(words[0]);
+  if (value == null) return quantity;
+  const unit = words
+    .slice(1)
+    .map((word) => word.replace(/[.,;]+$/g, "").toLowerCase())
+    .join(" ")
+    .replace(/\./g, "");
+  if (METRIC_UNITS.has(unit)) return quantity;
+  const fluid = unit === "floz" || unit.startsWith("fl ") || unit.startsWith("fluid ");
+  const ounce = unit === "oz" || unit === "ounce" || unit === "ounces";
+  if (!fluid && !ounce) return quantity;
+    if (fluid || VOLUME_OUNCE_INGREDIENT.test(ingredient || "")) {
+      const ml = value * 29.5735295625;
+      const rounded = ml >= 10 ? Math.round(ml / 5) * 5 : Math.round(ml);
+      return `${rounded} ml`;
+    }
+  return `${Math.round(value * 28.349523125)} g`;
+}
+
 function looksLikeSectionName(name) {
   const text = (name || "").trim();
   if (!text || text.length > 40) return false;
@@ -347,6 +413,11 @@ function looksLikeSectionName(name) {
 function splitIngredientSection(line) {
   const text = (line || "").trim();
   if (!text) return { section: null, item: "" };
+  const markdown = text.match(/^#{1,3}\s+(.+)$/);
+  if (markdown) {
+    const name = markdown[1].trim().replace(/:+$/, "");
+    if (name) return { section: name, item: null };
+  }
   const heading = text.match(/^([^:]{1,40}):\s*$/);
   if (heading && looksLikeSectionName(heading[1])) {
     return { section: heading[1].trim(), item: null };
@@ -361,7 +432,8 @@ function splitIngredientSection(line) {
 function ingredientItemLi(line) {
   const { quantity, text } = splitIngredientQuantity(line);
   if (quantity) {
-    return `<li><span class="qty">${escapeHtml(quantity)}</span><span>${escapeHtml(text)}</span></li>`;
+    const shown = metricFromOunces(quantity, text);
+    return `<li><span class="qty">${escapeHtml(shown)}</span><span>${escapeHtml(text)}</span></li>`;
   }
   return `<li class="ingredient-plain"><span>${escapeHtml(text)}</span></li>`;
 }
@@ -373,41 +445,38 @@ function ingredientsHtml(lines) {
   }
   const parts = [];
   let heading = null;
-  let items = [];
   const sameHeading = (a, b) => (a || "").toLowerCase() === (b || "").toLowerCase();
-  const flush = () => {
-    if (heading) {
-      parts.push(`<h4 class="ingredient-section">${escapeHtml(heading)}</h4>`);
-    }
-    if (items.length) {
-      parts.push(`<ul class="ingredients">${items.join("")}</ul>`);
-    }
-    items = [];
+  const pushHeading = (label) => {
+    const first = parts.length === 0;
+    parts.push(`<li class="ingredient-section${first ? " first" : ""}">${escapeHtml(label)}</li>`);
   };
   for (const line of list) {
     const parsed = splitIngredientSection(line);
     if (parsed.item === null && parsed.section) {
-      flush();
       heading = parsed.section;
+      pushHeading(parsed.section);
       continue;
     }
     if (parsed.section) {
       if (!sameHeading(heading, parsed.section)) {
-        flush();
         heading = parsed.section;
+        pushHeading(parsed.section);
       }
-      items.push(ingredientItemLi(parsed.item));
+      parts.push(ingredientItemLi(parsed.item));
       continue;
     }
-    items.push(ingredientItemLi(parsed.item));
+    parts.push(ingredientItemLi(parsed.item));
   }
-  flush();
-  return parts.join("") || `<ul class="ingredients"><li>${escapeHtml(t("noneListed"))}</li></ul>`;
+  return `<ul class="ingredients">${parts.join("") || `<li>${escapeHtml(t("noneListed"))}</li>`}</ul>`;
 }
 
 function splitIngredientQuantity(line) {
   const trimmed = line.trim();
   const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length && peelGluedAmountUnit(words[0])) {
+    const glued = peelGluedAmountUnit(words[0]);
+    words.splice(0, 1, glued.amount, glued.unit);
+  }
   if (!words.length || !looksLikeQuantityToken(words[0])) {
     return { quantity: null, text: trimmed };
   }
@@ -415,7 +484,10 @@ function splitIngredientQuantity(line) {
   let consumed = 1;
   if (words.length > 1) {
     const second = words[1].replace(/[.,;]+$/, "").toLowerCase();
-    if (INGREDIENT_UNITS.has(second)) {
+    if (isFluidOuncePrefix(second) && words.length > 2 && isOunceUnit(words[2])) {
+      quantityParts.push(words[1], words[2]);
+      consumed = 3;
+    } else if (INGREDIENT_UNITS.has(second)) {
       quantityParts.push(words[1]);
       consumed = 2;
     }

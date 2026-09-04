@@ -555,7 +555,13 @@
     "one per line" : {
       "extractionState" : "manual"
     },
+    "one per line, or ## Section for parts" : {
+      "extractionState" : "manual"
+    },
     "one per line as qty | item (blank qty allowed)" : {
+      "extractionState" : "manual"
+    },
+    "qty | item, or \"## Section\" for parts" : {
       "extractionState" : "manual"
     },
     "one per line, in order" : {

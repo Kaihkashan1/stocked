@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import re
 
-# Heading-only line ("Sauce:") or "Sauce: yogurt" — used so the UI can
-# show a section title above the items without counting the heading as
-# an ingredient for pantry matching.
+# Heading-only line: "## For the sauce" (edit format), "Sauce:", or
+# "Sauce: yogurt" — so the UI can show a section title without counting
+# the heading as an ingredient for pantry matching.
+_MARKDOWN_HEADING = re.compile(r"^#{1,3}\s+(.+)$")
 _SECTION_HEADING = re.compile(r"^([^:]{1,40}):\s*$")
 _SECTION_PREFIX = re.compile(r"^([^:]{1,40}):\s+(.+)$")
 
@@ -26,6 +27,11 @@ def split_ingredient_section(line: str) -> tuple[str | None, str | None]:
     text = (line or "").strip()
     if not text:
         return None, ""
+    markdown = _MARKDOWN_HEADING.match(text)
+    if markdown:
+        name = markdown.group(1).strip().rstrip(":")
+        if name:
+            return name, None
     heading = _SECTION_HEADING.match(text)
     if heading and looks_like_section_name(heading.group(1)):
         return heading.group(1).strip(), None
