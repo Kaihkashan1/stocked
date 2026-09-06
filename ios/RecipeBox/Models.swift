@@ -22,25 +22,64 @@ struct PantryGroup: Codable, Hashable, Identifiable {
     let items: [String]
 }
 
-/// Fixed category order for the Pantry tab inventory (handoff §11).
-enum PantryCategory: String, CaseIterable, Identifiable, Codable {
-    case produce = "Produce"
-    case dairyEggs = "Dairy & eggs"
-    case meatSeafood = "Meat & seafood"
-    case grainsPantry = "Grains & cupboard"
-    case condimentsSpices = "Condiments & spices"
-    case other = "Other"
+/// Default Cupboard categories until Settings saves a custom list.
+let defaultPantryCategories = [
+    "Grains",
+    "Canned Goods",
+    "Baking Supplies",
+    "Snacks",
+    "Breakfast Items",
+    "Condiments & Sauces",
+    "Spices & Seasonings",
+    "Pantry Staples",
+    "Supplements / Vitamins",
+    "Plant-Based Proteins",
+    "Other",
+]
+let maxPantryCategoryLength = 40
+let maxPantryCategories = 32
 
-    var id: String { rawValue }
+func isLockedPantryCategory(_ name: String) -> Bool {
+    name.trimmingCharacters(in: .whitespacesAndNewlines)
+        .caseInsensitiveCompare("Other") == .orderedSame
+}
 
-    var localizedName: String {
-        L(String.LocalizationValue(rawValue))
+func canonicalPantryCategory(_ raw: String) -> String {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    switch trimmed {
+    case "Grains & pantry", "Grains & cupboard": return "Grains"
+    case "Condiments & spices": return "Condiments & Sauces"
+    case "Produce", "Dairy & eggs", "Meat & seafood": return "Other"
+    case "": return "Other"
+    default: return trimmed
     }
+}
 
-    static func resolve(_ raw: String) -> PantryCategory {
-        if raw == "Grains & pantry" { return .grainsPantry }
-        return Self(rawValue: raw) ?? .other
+func normalizePantryCategoryName(_ raw: String) -> String? {
+    let collapsed = raw
+        .split(separator: " ")
+        .joined(separator: " ")
+    guard !collapsed.isEmpty else { return nil }
+    let clipped = collapsed.count > maxPantryCategoryLength
+        ? String(collapsed.prefix(maxPantryCategoryLength)).trimmingCharacters(in: .whitespaces)
+        : collapsed
+    guard !clipped.isEmpty else { return nil }
+    return canonicalPantryCategory(clipped)
+}
+
+func mergePantryCategories(stored: [String], itemCategories: [String]) -> [String] {
+    var names: [String] = []
+    var seen = Set<String>()
+    let source = stored.isEmpty ? defaultPantryCategories : stored
+    for raw in source + itemCategories {
+        guard let name = normalizePantryCategoryName(raw) else { continue }
+        let key = name.lowercased()
+        guard !seen.contains(key) else { continue }
+        seen.insert(key)
+        names.append(name)
+        if names.count >= maxPantryCategories { break }
     }
+    return names.isEmpty ? ["Other"] : names
 }
 
 enum PantryUnit: String, CaseIterable, Identifiable, Codable {
@@ -77,12 +116,12 @@ struct PantryItem: Codable, Hashable, Identifiable {
     var expiry: String?
     var notes: String
 
-    var pantryCategory: PantryCategory { PantryCategory.resolve(category) }
+    var pantryCategory: String { canonicalPantryCategory(category) }
 
     init(
         id: String = UUID().uuidString,
         name: String,
-        category: PantryCategory = .other,
+        category: String = "Other",
         amount: Double = 1,
         unit: PantryUnit = .pcs,
         status: PantryItemStatus = .unopened,
@@ -91,7 +130,7 @@ struct PantryItem: Codable, Hashable, Identifiable {
     ) {
         self.id = id
         self.name = name
-        self.category = category.rawValue
+        self.category = canonicalPantryCategory(category)
         self.amount = amount
         self.unit = unit
         self.status = status
@@ -105,12 +144,15 @@ struct ToBuyItem: Codable, Hashable, Identifiable {
     var text: String
     /// Free-text amount from a recipe ("200 g") or typed in on the To buy row.
     var qty: String
+    /// Optional extra reminder on the To buy row ("brand", "from the market").
+    var notes: String
     var checked: Bool
 
-    init(id: String = UUID().uuidString, text: String, qty: String = "", checked: Bool = false) {
+    init(id: String = UUID().uuidString, text: String, qty: String = "", notes: String = "", checked: Bool = false) {
         self.id = id
         self.text = text
         self.qty = qty
+        self.notes = notes
         self.checked = checked
     }
 
@@ -119,16 +161,48 @@ struct ToBuyItem: Codable, Hashable, Identifiable {
         id = try container.decode(String.self, forKey: .id)
         text = try container.decode(String.self, forKey: .text)
         qty = try container.decodeIfPresent(String.self, forKey: .qty) ?? ""
+        if let value = try? container.decode(String.self, forKey: .notes) {
+            notes = value
+        } else {
+            notes = ""
+        }
         checked = try container.decodeIfPresent(Bool.self, forKey: .checked) ?? false
     }
 
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(text, forKey: .text)
+        try container.encode(qty, forKey: .qty)
+        try container.encode(notes, forKey: .notes)
+        try container.encode(checked, forKey: .checked)
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case id, text, qty, checked
+        case id, text, qty, notes, checked
+    }
+}
+
+/// Older backends omit `notes` on to-buy rows. Keep whatever was typed locally
+/// so a successful save does not look like a failure and wipe the field.
+func mergeToBuyNotes(server: [ToBuyItem], local: [ToBuyItem]) -> [ToBuyItem] {
+    let localNotes = Dictionary(uniqueKeysWithValues: local.map { ($0.id, $0.notes) })
+    return server.map { item in
+        guard item.notes.isEmpty, let kept = localNotes[item.id], !kept.isEmpty else { return item }
+        var merged = item
+        merged.notes = kept
+        return merged
     }
 }
 
 struct PantryInventoryResponse: Codable {
     let items: [PantryItem]
+    var categories: [String]?
+
+    init(items: [PantryItem], categories: [String]? = nil) {
+        self.items = items
+        self.categories = categories
+    }
 }
 
 struct ToBuyResponse: Codable {
@@ -374,7 +448,7 @@ struct RecipePatch: Encodable {
 /// user can review/fix it before it's actually created, since a single
 /// still photo (no caption text to fall back on) is more error-prone than
 /// a normal capture.
-struct RecipeExtraction: Decodable {
+struct RecipeExtraction: Decodable, Equatable {
     let title: String
     let servings: String?
     let ingredients: [String]
@@ -404,6 +478,31 @@ struct IngestResult: Decodable {
 enum LinkIngestOutcome {
     case saved(Recipe)
     case error(String)
+}
+
+/// In-flight paste-link / photo import that keeps running after the sheet
+/// or camera overlay is closed.
+struct BackgroundImportJob: Identifiable, Equatable {
+    let id: UUID
+    let kind: Kind
+    var status: Status
+
+    enum Kind: Equatable {
+        case link(String)
+        case photo
+    }
+
+    enum Status: Equatable {
+        case running
+        case saved(recipeID: Int, title: String)
+        case photoReady(RecipeExtraction)
+        case failed(String)
+    }
+
+    var isRunning: Bool {
+        if case .running = status { return true }
+        return false
+    }
 }
 
 /// Last 50 import attempts for Settings → Logs, from GET /api/import-log.
@@ -594,7 +693,7 @@ enum DeepLinkRoute: Equatable {
 
 /// Suggested chips on Add/Edit. People can type extra tags; those join the
 /// Filters list once a recipe actually carries them.
-let recipeTags = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"]
+let recipeTags = ["mom's recipes", "veg", "non-veg", "my recipes", "high protein", "airfryer"]
 
 let maxRecipeTagLength = 32
 let maxRecipeTags = 24

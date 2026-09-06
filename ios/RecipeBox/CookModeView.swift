@@ -70,8 +70,7 @@ struct CookModeView: View {
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
+                LucideIcon(.xmark, size: 16)
                     .foregroundStyle(Theme.cookForeground)
                     .frame(width: 40, height: 40)
                     .background(Theme.cookForeground.opacity(0.14))
@@ -87,8 +86,7 @@ struct CookModeView: View {
             Button {
                 goBack()
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
+                LucideIcon(.chevronLeft, size: 16)
                     .foregroundStyle(Theme.cookForeground)
                     .frame(width: 40, height: 40)
                     .background(Theme.cookForeground.opacity(0.14))

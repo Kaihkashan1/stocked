@@ -272,3 +272,51 @@ class ImportLogPresentTests(TestCase):
         presented = _present_import_rows(rows)
         self.assertEqual([row["status"] for row in presented], ["saved", "error"])
         self.assertEqual(presented[1]["reason"], REQUEST_TIMEOUT_MESSAGE)
+
+    def test_keeps_separate_photo_imports(self):
+        rows = [
+            {
+                "timestamp": "04-09-2026 17:10 CEST",
+                "url": "(photo)",
+                "status": "saved",
+                "reason": "Pancakes",
+                "used_backup": False,
+                "model": "x",
+            },
+            {
+                "timestamp": "04-09-2026 17:00 CEST",
+                "url": "(photo)",
+                "status": "saved",
+                "reason": "Curry",
+                "used_backup": False,
+                "model": "x",
+            },
+        ]
+        presented = _present_import_rows(rows)
+        self.assertEqual([row["reason"] for row in presented], ["Pancakes", "Curry"])
+
+
+class PantryCategoryTests(TestCase):
+    def test_maps_legacy_cupboard_categories(self):
+        from app.store import _normalize_pantry_item
+
+        rice = _normalize_pantry_item({"name": "Rice", "category": "Grains & cupboard"})
+        self.assertEqual(rice["category"], "Grains")
+        soy = _normalize_pantry_item({"name": "Soy sauce", "category": "Condiments & spices"})
+        self.assertEqual(soy["category"], "Condiments & Sauces")
+        lemon = _normalize_pantry_item({"name": "Lemon", "category": "Produce"})
+        self.assertEqual(lemon["category"], "Other")
+
+    def test_keeps_new_cupboard_categories(self):
+        from app.store import _normalize_pantry_item
+
+        tofu = _normalize_pantry_item({"name": "Tofu", "category": "Plant-Based Proteins"})
+        self.assertEqual(tofu["category"], "Plant-Based Proteins")
+        oats = _normalize_pantry_item({"name": "Oats", "category": "Breakfast Items"})
+        self.assertEqual(oats["category"], "Breakfast Items")
+
+    def test_keeps_custom_cupboard_categories(self):
+        from app.store import _normalize_pantry_item
+
+        ice = _normalize_pantry_item({"name": "Peas", "category": "Frozen"})
+        self.assertEqual(ice["category"], "Frozen")

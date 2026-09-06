@@ -11,6 +11,11 @@ final class PantryStore {
             if oldValue != items { rebuildGroups() }
         }
     }
+    var categories: [String] = defaultPantryCategories {
+        didSet {
+            if oldValue != categories { rebuildGroups() }
+        }
+    }
     var toBuy: [ToBuyItem] = []
     var isLoading = false
     var actionError: String?
@@ -38,15 +43,16 @@ final class PantryStore {
         return "\(itemPart) · \(buyPart)"
     }
 
-    /// Items grouped in handoff category order; empty categories omitted.
-    /// Rebuilt when `items` changes rather than on every Cupboard body.
-    private(set) var groupedItems: [(category: PantryCategory, items: [PantryItem])] = []
+    /// Items grouped in saved category order; empty categories omitted.
+    /// Rebuilt when `items` or `categories` change rather than on every Cupboard body.
+    private(set) var groupedItems: [(category: String, items: [PantryItem])] = []
 
     private func rebuildGroups() {
-        groupedItems = PantryCategory.allCases.compactMap { category in
-            let rows = items.filter { $0.pantryCategory == category }
+        groupedItems = mergePantryCategories(stored: categories, itemCategories: items.map(\.category)).compactMap { name in
+            let rows = items.filter { $0.pantryCategory.caseInsensitiveCompare(name) == .orderedSame }
+                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             guard !rows.isEmpty else { return nil }
-            return (category, rows)
+            return (name, rows)
         }
     }
 
@@ -87,9 +93,15 @@ final class PantryStore {
             let client = APIClient(baseURLString: serverURL)
             async let inventory = client.fetchPantryInventory()
             async let buyList = client.fetchToBuy()
-            let nextItems = try await inventory
-            let nextBuy = try await buyList
+            let payload = try await inventory
+            let nextItems = payload.items
+            let nextCategories = mergePantryCategories(
+                stored: payload.categories ?? categories,
+                itemCategories: nextItems.map(\.category)
+            )
+            let nextBuy = mergeToBuyNotes(server: try await buyList, local: toBuy)
             if items != nextItems { items = nextItems }
+            if categories != nextCategories { categories = nextCategories }
             if toBuy != nextBuy { toBuy = nextBuy }
             lastSuccessfulRefresh = Date()
             persistCache()
@@ -116,26 +128,89 @@ final class PantryStore {
         replaceInventory(items.filter { $0.id != id })
     }
 
-    func replaceInventory(_ next: [PantryItem]) {
-        let previous = items
+    func replaceInventory(_ next: [PantryItem], categories nextCategories: [String]? = nil) {
+        let previousItems = items
+        let previousCategories = categories
         items = next
+        if let nextCategories {
+            categories = mergePantryCategories(stored: nextCategories, itemCategories: next.map(\.category))
+        }
         persistCache()
+        let snapshotItems = items
+        let snapshotCategories = categories
         Task {
             do {
                 let confirmed = try await APIClient(baseURLString: serverURL)
-                    .updatePantryInventory(items: next, secret: serverSecret)
-                if items == next {
-                    items = confirmed
+                    .updatePantryInventory(items: snapshotItems, categories: snapshotCategories, secret: serverSecret)
+                if items == snapshotItems, categories == snapshotCategories {
+                    items = confirmed.items
+                    if let remote = confirmed.categories {
+                        categories = mergePantryCategories(stored: remote, itemCategories: confirmed.items.map(\.category))
+                    }
                     persistCache()
                 }
             } catch {
-                if items == next {
-                    items = previous
+                if items == snapshotItems, categories == snapshotCategories {
+                    items = previousItems
+                    categories = previousCategories
                     persistCache()
                 }
                 actionError = error.localizedDescription
             }
         }
+    }
+
+    func addCategory(_ raw: String) {
+        guard let name = normalizePantryCategoryName(raw) else { return }
+        if categories.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+            return
+        }
+        guard categories.count < maxPantryCategories else { return }
+        var next = categories
+        if let other = next.firstIndex(where: { $0.caseInsensitiveCompare("Other") == .orderedSame }) {
+            next.insert(name, at: other)
+        } else {
+            next.append(name)
+        }
+        replaceInventory(items, categories: next)
+    }
+
+    func renameCategory(_ from: String, to raw: String) {
+        guard !isLockedPantryCategory(from) else { return }
+        guard let name = normalizePantryCategoryName(raw) else { return }
+        guard let index = categories.firstIndex(where: { $0.caseInsensitiveCompare(from) == .orderedSame }) else { return }
+        if categories.contains(where: {
+            $0.caseInsensitiveCompare(name) == .orderedSame
+                && $0.caseInsensitiveCompare(from) != .orderedSame
+        }) {
+            return
+        }
+        var next = categories
+        next[index] = name
+        let nextItems = items.map { item -> PantryItem in
+            guard item.pantryCategory.caseInsensitiveCompare(from) == .orderedSame else { return item }
+            var moved = item
+            moved.category = name
+            return moved
+        }
+        replaceInventory(nextItems, categories: next)
+    }
+
+    func deleteCategory(_ name: String) {
+        guard !isLockedPantryCategory(name) else { return }
+        let remaining = categories.filter { $0.caseInsensitiveCompare(name) != .orderedSame }
+        guard remaining != categories else { return }
+        let fallback = remaining.first(where: { $0.caseInsensitiveCompare("Other") == .orderedSame })
+            ?? remaining.first
+            ?? "Other"
+        let nextCategories = remaining.isEmpty ? ["Other"] : remaining
+        let nextItems = items.map { item -> PantryItem in
+            guard item.pantryCategory.caseInsensitiveCompare(name) == .orderedSame else { return item }
+            var moved = item
+            moved.category = fallback
+            return moved
+        }
+        replaceInventory(nextItems, categories: nextCategories)
     }
 
     func addToBuy(_ text: String, qty: String = "") {
@@ -189,14 +264,25 @@ final class PantryStore {
         scheduleToBuySync()
     }
 
+    func setToBuyNotes(id: String, notes: String) {
+        guard let index = toBuy.firstIndex(where: { $0.id == id }) else { return }
+        if toBuy[index].notes == notes { return }
+        toBuy[index].notes = notes
+        persistCache()
+        scheduleToBuySync()
+    }
+
     func replaceToBuy(_ next: [ToBuyItem]) {
         let previous = toBuy
         toBuy = next
         persistCache()
         Task {
             do {
-                let confirmed = try await APIClient(baseURLString: serverURL)
-                    .updateToBuy(items: next, secret: serverSecret)
+                let confirmed = mergeToBuyNotes(
+                    server: try await APIClient(baseURLString: serverURL)
+                        .updateToBuy(items: next, secret: serverSecret),
+                    local: next
+                )
                 if toBuy == next {
                     toBuy = confirmed
                     persistCache()
@@ -218,8 +304,11 @@ final class PantryStore {
             try? await Task.sleep(for: .milliseconds(450))
             guard !Task.isCancelled else { return }
             do {
-                let confirmed = try await APIClient(baseURLString: serverURL)
-                    .updateToBuy(items: snapshot, secret: serverSecret)
+                let confirmed = mergeToBuyNotes(
+                    server: try await APIClient(baseURLString: serverURL)
+                        .updateToBuy(items: snapshot, secret: serverSecret),
+                    local: snapshot
+                )
                 // Only apply if the user hasn't typed further since this snapshot.
                 if toBuy == snapshot {
                     toBuy = confirmed
@@ -244,11 +333,14 @@ final class PantryStore {
         else { return }
         items = payload.items
         toBuy = payload.toBuy
+        if let stored = payload.categories, !stored.isEmpty {
+            categories = mergePantryCategories(stored: stored, itemCategories: payload.items.map(\.category))
+        }
     }
 
     private func persistCache() {
         guard let url = cacheURL() else { return }
-        let payload = PantryCache(serverURL: serverURL, items: items, toBuy: toBuy)
+        let payload = PantryCache(serverURL: serverURL, items: items, toBuy: toBuy, categories: categories)
         Task.detached(priority: .utility) {
             guard let data = try? Self.encoder.encode(payload) else { return }
             try? data.write(to: url, options: .atomic)
@@ -260,4 +352,5 @@ private struct PantryCache: Codable {
     let serverURL: String
     let items: [PantryItem]
     let toBuy: [ToBuyItem]
+    var categories: [String]?
 }

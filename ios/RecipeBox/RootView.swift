@@ -52,6 +52,8 @@ struct RootView: View {
     @State private var showPhotoPicker = false
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var extracting = false
+    @State private var photoOverlayDismissed = false
+    @State private var photoJobID: UUID?
     @State private var extractError: String?
     @State private var recipesPath = NavigationPath()
 
@@ -73,8 +75,13 @@ struct RootView: View {
         .toolbarBackground(Theme.surface, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if connectivity.isOffline {
-                OfflineBanner()
+            VStack(spacing: 0) {
+                if connectivity.isOffline {
+                    OfflineBanner()
+                }
+                if let job = importBannerJob {
+                    importBanner(job)
+                }
             }
         }
         .onAppear {
@@ -116,17 +123,30 @@ struct RootView: View {
             }
         }
         .overlay {
-            if extracting {
+            if extracting && !photoOverlayDismissed {
                 ZStack {
                     Theme.neutral900.opacity(0.42).ignoresSafeArea()
-                    VStack(spacing: 12) {
+                    VStack(spacing: 14) {
                         ProgressView()
                             .tint(Theme.accent)
                         Text("Reading the recipe…")
                             .font(Theme.body(13, weight: .semibold))
                             .foregroundStyle(Theme.ink)
+                        Text("You can close this. Import continues in the background.")
+                            .font(Theme.body(12.5))
+                            .foregroundStyle(Theme.neutral700)
+                            .multilineTextAlignment(.center)
+                        Button("Close") {
+                            photoOverlayDismissed = true
+                            extracting = false
+                        }
+                        .font(Theme.body(14, weight: .bold))
+                        .foregroundStyle(Theme.accent700)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L("Close"))
                     }
                     .padding(24)
+                    .frame(maxWidth: 320)
                     .cardBackground(radius: 20)
                 }
             }
@@ -160,6 +180,140 @@ struct RootView: View {
         }
         .onChange(of: store.pendingRoute) { _, route in
             handle(route)
+        }
+        .onChange(of: photoImportStatus) { _, _ in
+            handlePhotoImportUpdate()
+        }
+    }
+
+    private var photoImportStatus: BackgroundImportJob.Status? {
+        guard let photoJobID else { return nil }
+        return store.importJobs.first(where: { $0.id == photoJobID })?.status
+    }
+
+    private var importBannerJob: BackgroundImportJob? {
+        store.importJobs.last { job in
+            if store.dismissedImportBannerIDs.contains(job.id) { return false }
+            switch job.kind {
+            case .link:
+                if activeSheet == .pasteLink { return false }
+            case .photo:
+                if extracting && !photoOverlayDismissed { return false }
+                if activeSheet == .addRecipe, case .photoReady = job.status { return false }
+            }
+            return true
+        }
+    }
+
+    private func importBanner(_ job: BackgroundImportJob) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            bannerIcon(for: job.status)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(bannerTitle(for: job))
+                    .font(Theme.body(12.5, weight: .semibold))
+                if let detail = bannerDetail(for: job) {
+                    Text(detail)
+                        .font(Theme.body(11.5))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                store.dismissImportBanner(id: job.id)
+            } label: {
+                LucideIcon(.xmark, size: 11)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L("Close"))
+        }
+        .foregroundStyle(isFailedImport(job) ? Theme.accent800 : Theme.sage800)
+        .padding(.vertical, 10)
+        .padding(.horizontal, Theme.screenPadding)
+        .background(isFailedImport(job) ? Theme.accent100 : Theme.sage100)
+        .contentShape(Rectangle())
+        .onTapGesture { handleBannerTap(job) }
+    }
+
+    private func isFailedImport(_ job: BackgroundImportJob) -> Bool {
+        if case .failed = job.status { return true }
+        return false
+    }
+
+    @ViewBuilder
+    private func bannerIcon(for status: BackgroundImportJob.Status) -> some View {
+        switch status {
+        case .running:
+            ProgressView()
+                .controlSize(.mini)
+                .tint(Theme.sage800)
+        case .saved, .photoReady:
+            LucideIcon(.check, size: 12)
+        case .failed:
+            LucideIcon(.xmark, size: 12)
+        }
+    }
+
+    private func bannerTitle(for job: BackgroundImportJob) -> String {
+        switch job.status {
+        case .running:
+            L("Importing in the background…")
+        case .saved(_, let title):
+            title.isEmpty ? L("Saved to your box") : title
+        case .photoReady:
+            L("Recipe ready to review")
+        case .failed:
+            L("Couldn't import that recipe")
+        }
+    }
+
+    private func bannerDetail(for job: BackgroundImportJob) -> String? {
+        switch job.status {
+        case .running:
+            L("You can keep using the app.")
+        case .saved:
+            L("Saved to your box")
+        case .photoReady:
+            L("Tap to check it over before it goes in the box.")
+        case .failed(let message):
+            message
+        }
+    }
+
+    private func handleBannerTap(_ job: BackgroundImportJob) {
+        switch job.status {
+        case .running:
+            break
+        case .saved(let recipeID, _):
+            store.consumeImportJob(id: job.id)
+            selectedTab = .recipes
+            recipesPath = NavigationPath()
+            recipesPath.append(recipeID)
+        case .photoReady(let extraction):
+            store.consumeImportJob(id: job.id)
+            addRecipePrefill = extraction
+            activeSheet = .addRecipe
+        case .failed:
+            store.dismissImportBanner(id: job.id)
+        }
+    }
+
+    private func handlePhotoImportUpdate() {
+        guard let photoJobID, let job = store.importJobs.first(where: { $0.id == photoJobID }) else { return }
+        switch job.status {
+        case .running:
+            break
+        case .photoReady(let extraction):
+            extracting = false
+            guard !photoOverlayDismissed else { return }
+            addRecipePrefill = extraction
+            activeSheet = .addRecipe
+            store.consumeImportJob(id: job.id)
+        case .failed(let message):
+            extracting = false
+            guard !photoOverlayDismissed else { return }
+            extractError = message
+            store.consumeImportJob(id: job.id)
+        case .saved:
+            extracting = false
         }
     }
 
@@ -251,6 +405,7 @@ struct RootView: View {
         // ever got a chance to render, so tapping camera/library visibly
         // hung for a beat with no feedback at all.
         extracting = true
+        photoOverlayDismissed = false
         Task {
             let data = await Task.detached(priority: .userInitiated) {
                 image.recipePhotoJPEGData()
@@ -260,14 +415,7 @@ struct RootView: View {
                 extractError = L("Could not process that photo.")
                 return
             }
-            let (extraction, error) = await store.extractRecipePhoto(data)
-            extracting = false
-            if let extraction {
-                addRecipePrefill = extraction
-                activeSheet = .addRecipe
-            } else {
-                extractError = error ?? L("Something went wrong.")
-            }
+            photoJobID = store.startPhotoImport(data)
         }
     }
 

@@ -7,7 +7,12 @@ import SwiftUI
 /// The 40–42pt circular buttons used in every toolbar-equivalent: back,
 /// settings, add, favorite, ellipsis, close.
 struct CircleIconButton: View {
-    let systemImage: String
+    private enum Glyph {
+        case system(String)
+        case lucide(LucideIcon.Kind, filled: Bool)
+    }
+
+    private let glyph: Glyph
     var size: CGFloat = 42
     var background: Color = Theme.surface
     var foreground: Color = Theme.neutral800
@@ -19,14 +24,62 @@ struct CircleIconButton: View {
     var highlighted: Bool = false
     let action: () -> Void
 
+    init(
+        systemImage: String,
+        size: CGFloat = 42,
+        background: Color = Theme.surface,
+        foreground: Color = Theme.neutral800,
+        bordered: Bool = true,
+        insetRing: Bool = false,
+        highlighted: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.glyph = .system(systemImage)
+        self.size = size
+        self.background = background
+        self.foreground = foreground
+        self.bordered = bordered
+        self.insetRing = insetRing
+        self.highlighted = highlighted
+        self.action = action
+    }
+
+    init(
+        lucide: LucideIcon.Kind,
+        size: CGFloat = 42,
+        background: Color = Theme.surface,
+        foreground: Color = Theme.neutral800,
+        bordered: Bool = true,
+        insetRing: Bool = false,
+        highlighted: Bool = false,
+        filled: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.glyph = .lucide(lucide, filled: filled)
+        self.size = size
+        self.background = background
+        self.foreground = foreground
+        self.bordered = bordered
+        self.insetRing = insetRing
+        self.highlighted = highlighted
+        self.action = action
+    }
+
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: size * 0.4, weight: .semibold))
-                .foregroundStyle(foreground)
-                .frame(width: size, height: size)
-                .background(background)
-                .clipShape(Circle())
+            Group {
+                switch glyph {
+                case .system(let name):
+                    Image(systemName: name)
+                        .font(.system(size: size * 0.4, weight: .semibold))
+                case .lucide(let kind, let filled):
+                    LucideIcon(kind, size: size * 0.45, filled: filled)
+                }
+            }
+            .foregroundStyle(foreground)
+            .frame(width: size, height: size)
+            .background(background)
+            .clipShape(Circle())
         }
         .buttonStyle(CircleIconButtonStyle(bordered: bordered, insetRing: insetRing, highlighted: highlighted))
     }
@@ -217,6 +270,190 @@ private struct FadeInOnAppear: ViewModifier {
 extension View {
     func fadeInOnAppear() -> some View {
         modifier(FadeInOnAppear())
+    }
+}
+
+/// Strokes from `Recipe Box.dc.html` — Lucide-style, 24pt grid, round caps.
+struct LucideIcon: View {
+    enum Kind {
+        case trash, gear, plus, search, sliders, grid, list
+        case cookbook, cupboard, xmark, check, star, chevronLeft, chevronDown, ellipsis
+    }
+
+    let kind: Kind
+    var size: CGFloat = 17
+    /// Design uses 2.75 on toolbar glyphs and 2.5 on the small trash.
+    var stroke: CGFloat = 2.75
+    var filled: Bool = false
+
+    init(_ kind: Kind, size: CGFloat = 17, stroke: CGFloat = 2.75, filled: Bool = false) {
+        self.kind = kind
+        self.size = size
+        self.stroke = stroke
+        self.filled = filled
+    }
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let scale = min(canvasSize.width, canvasSize.height) / 24
+            var strokePath = Path()
+            var fillPath = Path()
+            switch kind {
+            case .trash:
+                strokePath.move(to: CGPoint(x: 5, y: 6))
+                strokePath.addLine(to: CGPoint(x: 19, y: 6))
+                strokePath.move(to: CGPoint(x: 9, y: 6))
+                strokePath.addLine(to: CGPoint(x: 9, y: 4.5))
+                strokePath.addQuadCurve(to: CGPoint(x: 10.5, y: 3), control: CGPoint(x: 9, y: 3))
+                strokePath.addLine(to: CGPoint(x: 13.5, y: 3))
+                strokePath.addQuadCurve(to: CGPoint(x: 15, y: 4.5), control: CGPoint(x: 15, y: 3))
+                strokePath.addLine(to: CGPoint(x: 15, y: 6))
+                strokePath.move(to: CGPoint(x: 17, y: 6))
+                strokePath.addLine(to: CGPoint(x: 16.2, y: 19))
+                strokePath.addQuadCurve(to: CGPoint(x: 14.2, y: 20.9), control: CGPoint(x: 16.2, y: 20.9))
+                strokePath.addLine(to: CGPoint(x: 9.8, y: 20.9))
+                strokePath.addQuadCurve(to: CGPoint(x: 7.8, y: 19), control: CGPoint(x: 7.8, y: 20.9))
+                strokePath.addLine(to: CGPoint(x: 7, y: 6))
+            case .gear:
+                strokePath.addEllipse(in: CGRect(x: 8.8, y: 8.8, width: 6.4, height: 6.4))
+                strokePath.move(to: CGPoint(x: 12, y: 2.5))
+                strokePath.addLine(to: CGPoint(x: 12, y: 4.5))
+                strokePath.move(to: CGPoint(x: 12, y: 19.5))
+                strokePath.addLine(to: CGPoint(x: 12, y: 21.5))
+                strokePath.move(to: CGPoint(x: 2.5, y: 12))
+                strokePath.addLine(to: CGPoint(x: 4.5, y: 12))
+                strokePath.move(to: CGPoint(x: 19.5, y: 12))
+                strokePath.addLine(to: CGPoint(x: 21.5, y: 12))
+                strokePath.move(to: CGPoint(x: 5.2, y: 5.2))
+                strokePath.addLine(to: CGPoint(x: 6.7, y: 6.7))
+                strokePath.move(to: CGPoint(x: 17.3, y: 17.3))
+                strokePath.addLine(to: CGPoint(x: 18.8, y: 18.8))
+                strokePath.move(to: CGPoint(x: 18.8, y: 5.2))
+                strokePath.addLine(to: CGPoint(x: 17.3, y: 6.7))
+                strokePath.move(to: CGPoint(x: 6.7, y: 17.3))
+                strokePath.addLine(to: CGPoint(x: 5.2, y: 18.8))
+            case .plus:
+                strokePath.move(to: CGPoint(x: 12, y: 5))
+                strokePath.addLine(to: CGPoint(x: 12, y: 19))
+                strokePath.move(to: CGPoint(x: 5, y: 12))
+                strokePath.addLine(to: CGPoint(x: 19, y: 12))
+            case .search:
+                strokePath.addEllipse(in: CGRect(x: 4, y: 4, width: 14, height: 14))
+                strokePath.move(to: CGPoint(x: 21, y: 21))
+                strokePath.addLine(to: CGPoint(x: 16.7, y: 16.7))
+            case .sliders:
+                strokePath.move(to: CGPoint(x: 4, y: 7))
+                strokePath.addLine(to: CGPoint(x: 20, y: 7))
+                strokePath.move(to: CGPoint(x: 7, y: 12))
+                strokePath.addLine(to: CGPoint(x: 17, y: 12))
+                strokePath.move(to: CGPoint(x: 10, y: 17))
+                strokePath.addLine(to: CGPoint(x: 14, y: 17))
+            case .grid:
+                strokePath.addPath(Self.roundedRect(x: 3.5, y: 3.5, w: 7.5, h: 7.5, r: 1.8))
+                strokePath.addPath(Self.roundedRect(x: 13, y: 3.5, w: 7.5, h: 7.5, r: 1.8))
+                strokePath.addPath(Self.roundedRect(x: 3.5, y: 13, w: 7.5, h: 7.5, r: 1.8))
+                strokePath.addPath(Self.roundedRect(x: 13, y: 13, w: 7.5, h: 7.5, r: 1.8))
+            case .list:
+                strokePath.move(to: CGPoint(x: 4, y: 6.5))
+                strokePath.addLine(to: CGPoint(x: 20, y: 6.5))
+                strokePath.move(to: CGPoint(x: 4, y: 12))
+                strokePath.addLine(to: CGPoint(x: 20, y: 12))
+                strokePath.move(to: CGPoint(x: 4, y: 17.5))
+                strokePath.addLine(to: CGPoint(x: 20, y: 17.5))
+            case .cookbook:
+                strokePath.move(to: CGPoint(x: 4, y: 5.5))
+                strokePath.addQuadCurve(to: CGPoint(x: 6, y: 3.5), control: CGPoint(x: 4, y: 3.5))
+                strokePath.addLine(to: CGPoint(x: 11, y: 3.5))
+                strokePath.addQuadCurve(to: CGPoint(x: 14, y: 6.5), control: CGPoint(x: 14, y: 3.5))
+                strokePath.addLine(to: CGPoint(x: 14, y: 20))
+                strokePath.addQuadCurve(to: CGPoint(x: 11.5, y: 17.5), control: CGPoint(x: 14, y: 17.5))
+                strokePath.addLine(to: CGPoint(x: 4, y: 17.5))
+                strokePath.closeSubpath()
+                strokePath.move(to: CGPoint(x: 20, y: 5.5))
+                strokePath.addQuadCurve(to: CGPoint(x: 18, y: 3.5), control: CGPoint(x: 20, y: 3.5))
+                strokePath.addLine(to: CGPoint(x: 13, y: 3.5))
+                strokePath.addQuadCurve(to: CGPoint(x: 10, y: 6.5), control: CGPoint(x: 10, y: 3.5))
+                strokePath.addLine(to: CGPoint(x: 10, y: 20))
+                strokePath.addQuadCurve(to: CGPoint(x: 12.5, y: 17.5), control: CGPoint(x: 10, y: 17.5))
+                strokePath.addLine(to: CGPoint(x: 20, y: 17.5))
+                strokePath.closeSubpath()
+            case .cupboard:
+                strokePath.addPath(Self.roundedRect(x: 4.5, y: 3, w: 15, h: 18, r: 2))
+                strokePath.move(to: CGPoint(x: 12, y: 3))
+                strokePath.addLine(to: CGPoint(x: 12, y: 21))
+                fillPath.addEllipse(in: CGRect(x: 9.3, y: 11.1, width: 1.8, height: 1.8))
+                fillPath.addEllipse(in: CGRect(x: 12.9, y: 11.1, width: 1.8, height: 1.8))
+            case .xmark:
+                strokePath.move(to: CGPoint(x: 18, y: 6))
+                strokePath.addLine(to: CGPoint(x: 6, y: 18))
+                strokePath.move(to: CGPoint(x: 6, y: 6))
+                strokePath.addLine(to: CGPoint(x: 18, y: 18))
+            case .check:
+                strokePath.move(to: CGPoint(x: 20, y: 6))
+                strokePath.addLine(to: CGPoint(x: 9, y: 17))
+                strokePath.addLine(to: CGPoint(x: 4, y: 12))
+            case .star:
+                strokePath.move(to: CGPoint(x: 12, y: 3.2))
+                strokePath.addLine(to: CGPoint(x: 14.7, y: 8.7))
+                strokePath.addLine(to: CGPoint(x: 20.7, y: 9.6))
+                strokePath.addLine(to: CGPoint(x: 16.35, y: 13.84))
+                strokePath.addLine(to: CGPoint(x: 17.38, y: 19.84))
+                strokePath.addLine(to: CGPoint(x: 12, y: 17.01))
+                strokePath.addLine(to: CGPoint(x: 6.62, y: 19.84))
+                strokePath.addLine(to: CGPoint(x: 7.65, y: 13.84))
+                strokePath.addLine(to: CGPoint(x: 3.3, y: 9.6))
+                strokePath.addLine(to: CGPoint(x: 9.3, y: 8.7))
+                strokePath.closeSubpath()
+            case .chevronLeft:
+                strokePath.move(to: CGPoint(x: 15, y: 5))
+                strokePath.addLine(to: CGPoint(x: 8, y: 12))
+                strokePath.addLine(to: CGPoint(x: 15, y: 19))
+            case .chevronDown:
+                strokePath.move(to: CGPoint(x: 6, y: 9))
+                strokePath.addLine(to: CGPoint(x: 12, y: 15))
+                strokePath.addLine(to: CGPoint(x: 18, y: 9))
+            case .ellipsis:
+                fillPath.addEllipse(in: CGRect(x: 3.1, y: 10.1, width: 3.8, height: 3.8))
+                fillPath.addEllipse(in: CGRect(x: 10.1, y: 10.1, width: 3.8, height: 3.8))
+                fillPath.addEllipse(in: CGRect(x: 17.1, y: 10.1, width: 3.8, height: 3.8))
+            }
+            let t = CGAffineTransform(scaleX: scale, y: scale)
+            let scaledStroke = strokePath.applying(t)
+            if filled {
+                context.fill(scaledStroke, with: .foreground)
+            }
+            context.stroke(
+                scaledStroke,
+                with: .foreground,
+                style: StrokeStyle(lineWidth: stroke * scale, lineCap: .round, lineJoin: .round)
+            )
+            if !fillPath.isEmpty {
+                context.fill(fillPath.applying(t), with: .foreground)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+
+    private static func roundedRect(x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, r: CGFloat) -> Path {
+        Path(roundedRect: CGRect(x: x, y: y, width: w, height: h), cornerRadius: r)
+    }
+}
+
+/// 30pt hit target around the design's 15pt trash glyph.
+struct LucideTrashButton: View {
+    let accessibilityLabel: String
+    var frame: CGFloat = 30
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            LucideIcon(.trash, size: 15, stroke: 2.5)
+                .foregroundStyle(Theme.neutral500)
+                .frame(width: frame, height: frame)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 

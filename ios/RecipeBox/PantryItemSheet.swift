@@ -5,10 +5,11 @@ struct PantryItemSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let item: PantryItem?
+    var categories: [String]
     var onSave: (PantryItem) -> Void
 
     @State private var name: String
-    @State private var category: PantryCategory
+    @State private var category: String
     @State private var amountText: String
     @State private var unit: PantryUnit
     @State private var status: PantryItemStatus
@@ -16,11 +17,18 @@ struct PantryItemSheet: View {
     @State private var expiryDate: Date
     @State private var notes: String
 
-    init(item: PantryItem?, onSave: @escaping (PantryItem) -> Void) {
+    init(item: PantryItem?, categories: [String], onSave: @escaping (PantryItem) -> Void) {
+        let names = categories.isEmpty ? defaultPantryCategories : categories
         self.item = item
         self.onSave = onSave
+        if let current = item?.pantryCategory,
+           !names.contains(where: { $0.caseInsensitiveCompare(current) == .orderedSame }) {
+            self.categories = names + [current]
+        } else {
+            self.categories = names
+        }
         _name = State(initialValue: item?.name ?? "")
-        _category = State(initialValue: item?.pantryCategory ?? .other)
+        _category = State(initialValue: item?.pantryCategory ?? (names.first ?? "Other"))
         if let amount = item?.amount {
             _amountText = State(initialValue: amount.rounded() == amount
                 ? String(Int(amount.rounded()))
@@ -72,8 +80,8 @@ struct PantryItemSheet: View {
 
                     field(kicker: L("Category")) {
                         FlowLayout(spacing: 7) {
-                            ForEach(PantryCategory.allCases) { option in
-                                compactChip(option.localizedName, selected: category == option) {
+                            ForEach(categories, id: \.self) { option in
+                                compactChip(option, selected: category.caseInsensitiveCompare(option) == .orderedSame) {
                                     category = option
                                 }
                             }

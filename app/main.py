@@ -27,6 +27,7 @@ from app.store import (
     delete_recipe,
     get_gemini_reads_today,
     get_have_items,
+    get_pantry_categories,
     get_pantry_inventory,
     get_recent_imports,
     get_recipe,
@@ -210,12 +211,13 @@ async def api_put_pantry(body: PantryUpdate):
 async def api_get_pantry_inventory():
     """Full Pantry-tab inventory (amount, unit, expiry, …). Separate from
     /api/pantry, which remains the flat "What I have" fit-filter list."""
-    return {"items": get_pantry_inventory()}
+    items = get_pantry_inventory()
+    return {"items": items, "categories": get_pantry_categories(items)}
 
 
 @app.put("/api/pantry-inventory", dependencies=[Depends(require_secret)])
 async def api_put_pantry_inventory(body: PantryInventoryUpdate):
-    return {"items": save_pantry_inventory(body.items)}
+    return save_pantry_inventory(body.items, categories=body.categories)
 
 
 @app.get("/api/to-buy")

@@ -9,7 +9,7 @@ Meal = Literal["breakfast", "lunch", "dinner", "snack", "dessert", "drink", "oth
 
 # Suggested chips in the apps. Gemini still picks only from this list;
 # people can add their own tags when creating or editing a recipe.
-RECIPE_TAGS = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"]
+RECIPE_TAGS = ["mom's recipes", "veg", "non-veg", "my recipes", "high protein", "airfryer"]
 _RECIPE_TAGS_LOWER = {tag.lower(): tag for tag in RECIPE_TAGS}
 _MAX_TAG_LEN = 32
 _MAX_TAGS = 24
@@ -156,13 +156,28 @@ class PantryUpdate(BaseModel):
 # Inventory on the Cupboard tab — distinct from PantryUpdate/`have`, which is
 # still the list-screen "What I have" fit filter (a flat string list).
 PANTRY_CATEGORIES = (
-    "Produce",
-    "Dairy & eggs",
-    "Meat & seafood",
-    "Grains & cupboard",
-    "Condiments & spices",
+    "Grains",
+    "Canned Goods",
+    "Baking Supplies",
+    "Snacks",
+    "Breakfast Items",
+    "Condiments & Sauces",
+    "Spices & Seasonings",
+    "Pantry Staples",
+    "Supplements / Vitamins",
+    "Plant-Based Proteins",
     "Other",
 )
+PANTRY_CATEGORY_ALIASES = {
+    "Grains & pantry": "Grains",
+    "Grains & cupboard": "Grains",
+    "Condiments & spices": "Condiments & Sauces",
+    "Produce": "Other",
+    "Dairy & eggs": "Other",
+    "Meat & seafood": "Other",
+}
+MAX_PANTRY_CATEGORY_LENGTH = 40
+MAX_PANTRY_CATEGORIES = 32
 PantryUnit = Literal["pcs", "g", "kg"]
 PantryStatus = Literal["open", "unopened"]
 
@@ -180,12 +195,14 @@ class PantryItem(BaseModel):
 
 class PantryInventoryUpdate(BaseModel):
     items: list[PantryItem] = Field(default_factory=list)
+    categories: list[str] | None = None
 
 
 class ToBuyItem(BaseModel):
     id: str
     text: str
     qty: str = ""
+    notes: str = ""
     checked: bool = False
 
 

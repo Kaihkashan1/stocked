@@ -68,6 +68,11 @@ final class RecipeStore {
     var actionError: String?
     /// Set by RecipeBoxApp's onOpenURL; consumed once by RootView.
     var pendingRoute: DeepLinkRoute?
+    /// Link and photo imports that outlive the add sheet / camera overlay.
+    var importJobs: [BackgroundImportJob] = []
+    /// Banners the user dismissed; a later status change (saved / error)
+    /// is shown again so they still find out how it ended.
+    var dismissedImportBannerIDs: Set<UUID> = []
 
     private(set) var visibleRecipes: [Recipe] = []
     private(set) var matchesByID: [Int: RecipeMatch] = [:]
@@ -113,6 +118,7 @@ final class RecipeStore {
     /// Nothing reads this, so there's no reason to pay for tracking it.
     @ObservationIgnored private var refreshTask: Task<Bool, Never>?
     @ObservationIgnored private var lastSuccessfulRefresh: Date?
+    @ObservationIgnored private var importTasks: [UUID: Task<Void, Never>] = [:]
     private static let staleInterval: TimeInterval = 90
 
     init() {
@@ -271,6 +277,63 @@ final class RecipeStore {
 
     func fetchImportLog() async -> [ImportLogEntry]? {
         try? await APIClient(baseURLString: serverURL).fetchImportLog(secret: serverSecret)
+    }
+
+    func startLinkImport(_ urlString: String) -> UUID {
+        let id = UUID()
+        importJobs.append(BackgroundImportJob(id: id, kind: .link(urlString), status: .running))
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let outcome = await self.ingestLink(urlString)
+            self.finishImport(id: id) { job in
+                switch outcome {
+                case .saved(let recipe):
+                    job.status = .saved(recipeID: recipe.id, title: recipe.title)
+                case .error(let message):
+                    job.status = .failed(message)
+                }
+            }
+        }
+        importTasks[id] = task
+        return id
+    }
+
+    func startPhotoImport(_ imageData: Data) -> UUID {
+        let id = UUID()
+        importJobs.append(BackgroundImportJob(id: id, kind: .photo, status: .running))
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let (extraction, error) = await self.extractRecipePhoto(imageData)
+            self.finishImport(id: id) { job in
+                if let extraction {
+                    job.status = .photoReady(extraction)
+                } else {
+                    job.status = .failed(error ?? L("Something went wrong."))
+                }
+            }
+        }
+        importTasks[id] = task
+        return id
+    }
+
+    func dismissImportBanner(id: UUID) {
+        dismissedImportBannerIDs.insert(id)
+        if let job = importJobs.first(where: { $0.id == id }), !job.isRunning {
+            importJobs.removeAll { $0.id == id }
+        }
+    }
+
+    func consumeImportJob(id: UUID) {
+        importJobs.removeAll { $0.id == id }
+        dismissedImportBannerIDs.remove(id)
+        importTasks[id] = nil
+    }
+
+    private func finishImport(id: UUID, update: (inout BackgroundImportJob) -> Void) {
+        guard let index = importJobs.firstIndex(where: { $0.id == id }) else { return }
+        update(&importJobs[index])
+        dismissedImportBannerIDs.remove(id)
+        importTasks[id] = nil
     }
 
     /// Optimistic: flips the star immediately, then confirms with the server.

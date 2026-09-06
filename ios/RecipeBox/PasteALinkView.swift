@@ -17,6 +17,7 @@ struct PasteALinkView: View {
     @State private var phase: LinkPhase = .idle
     @State private var fetchStep = 0
     @State private var fetchStepTask: Task<Void, Never>?
+    @State private var importJobID: UUID?
 
     private var fetchingMessages: [String] {
         [
@@ -46,6 +47,7 @@ struct PasteALinkView: View {
     }
 
     var body: some View {
+        let _ = currentImportStatus
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -65,6 +67,9 @@ struct PasteALinkView: View {
 
                     if phase == .fetching {
                         fetchingCard
+                        Text("You can close this. Import continues in the background.")
+                            .font(Theme.body(12.5))
+                            .foregroundStyle(Theme.neutral700)
                     }
 
                     if case .done(let recipe) = phase {
@@ -89,11 +94,14 @@ struct PasteALinkView: View {
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .background(Theme.bg.ignoresSafeArea())
         .onDisappear { fetchStepTask?.cancel() }
+        .onChange(of: currentImportStatus) { _, _ in
+            syncPhase(from: store.importJobs)
+        }
     }
 
     private var header: some View {
         HStack {
-            Button("Cancel") { dismiss() }
+            Button(phase == .fetching ? L("Close") : L("Cancel")) { dismiss() }
                 .font(Theme.body(14, weight: .semibold))
                 .foregroundStyle(Theme.neutral700)
             Spacer()
@@ -235,6 +243,11 @@ struct PasteALinkView: View {
         }
     }
 
+    private var currentImportStatus: BackgroundImportJob.Status? {
+        guard let importJobID else { return nil }
+        return store.importJobs.first(where: { $0.id == importJobID })?.status
+    }
+
     /// Drives the three fetching-card rows through their messages on a
     /// timer while the real POST /ingest request is in flight — the
     /// endpoint gives no incremental progress of its own, and the spec
@@ -252,15 +265,25 @@ struct PasteALinkView: View {
                 fetchStep = step
             }
         }
-        Task {
-            let outcome = await store.ingestLink(url.absoluteString)
+        importJobID = store.startLinkImport(url.absoluteString)
+    }
+
+    private func syncPhase(from jobs: [BackgroundImportJob]) {
+        guard let importJobID, let job = jobs.first(where: { $0.id == importJobID }) else { return }
+        switch job.status {
+        case .running:
+            break
+        case .saved(let recipeID, _):
             fetchStepTask?.cancel()
-            switch outcome {
-            case .saved(let recipe):
+            if let recipe = store.recipe(id: recipeID) {
                 phase = .done(recipe)
-            case .error(let message):
-                phase = .error(message)
+                store.consumeImportJob(id: importJobID)
             }
+        case .failed(let message):
+            fetchStepTask?.cancel()
+            phase = .error(message)
+        case .photoReady:
+            break
         }
     }
 }

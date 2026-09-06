@@ -276,11 +276,11 @@ struct APIClient {
         return try Self.decoder.decode(PantryResponse.self, from: data).items
     }
 
-    func fetchPantryInventory() async throws -> [PantryItem] {
-        try await decodeJSON(PantryInventoryResponse.self, from: get("/api/pantry-inventory")).items
+    func fetchPantryInventory() async throws -> PantryInventoryResponse {
+        try await decodeJSON(PantryInventoryResponse.self, from: get("/api/pantry-inventory"))
     }
 
-    func updatePantryInventory(items: [PantryItem], secret: String) async throws -> [PantryItem] {
+    func updatePantryInventory(items: [PantryItem], categories: [String], secret: String) async throws -> PantryInventoryResponse {
         guard let base = URL(string: trimmedBase),
               let url = URL(string: "/api/pantry-inventory", relativeTo: base)
         else { throw APIError.badURL }
@@ -293,7 +293,7 @@ struct APIClient {
         if !trimmedSecret.isEmpty {
             request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
         }
-        request.httpBody = try JSONEncoder().encode(PantryInventoryResponse(items: items))
+        request.httpBody = try JSONEncoder().encode(PantryInventoryResponse(items: items, categories: categories))
 
         let data: Data
         let response: URLResponse
@@ -307,7 +307,7 @@ struct APIClient {
         guard (200 ..< 300).contains(status) else {
             try throwForStatus(status, data: data)
         }
-        return try Self.decoder.decode(PantryInventoryResponse.self, from: data).items
+        return try Self.decoder.decode(PantryInventoryResponse.self, from: data)
     }
 
     func fetchToBuy() async throws -> [ToBuyItem] {
@@ -322,6 +322,7 @@ struct APIClient {
         var request = URLRequest(url: url.absoluteURL)
         request.httpMethod = "PUT"
         request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedSecret.isEmpty {

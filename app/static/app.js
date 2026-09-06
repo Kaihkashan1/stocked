@@ -1,7 +1,7 @@
 const STAPLES = new Set(["salt", "water", "oil", "pepper", "black pepper", "sugar"]);
 
 // Suggested chips. Gemini still picks from this list; add/edit can type more.
-const RECIPE_TAGS = ["mom's recipes", "veg", "non-veg", "dessert", "high protein", "airfryer"];
+const RECIPE_TAGS = ["mom's recipes", "veg", "non-veg", "my recipes", "high protein", "airfryer"];
 const MAX_RECIPE_TAG_LENGTH = 32;
 const MAX_RECIPE_TAGS = 24;
 const COURSES = ["Main course", "Appetizers", "Desserts", "Dips"];

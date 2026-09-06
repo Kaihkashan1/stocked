@@ -14,7 +14,15 @@ from app.config import settings
 from app.fetch import normalize_url
 from app.match import pantry_items, split_ingredient_section
 from app.errors import NOT_A_RECIPE_MESSAGE, REQUEST_TIMEOUT_MESSAGE
-from app.models import PANTRY_CATEGORIES, FetchedPost, Recipe, recipe_is_importable
+from app.models import (
+    MAX_PANTRY_CATEGORIES,
+    MAX_PANTRY_CATEGORY_LENGTH,
+    PANTRY_CATEGORIES,
+    PANTRY_CATEGORY_ALIASES,
+    FetchedPost,
+    Recipe,
+    recipe_is_importable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -201,11 +209,7 @@ def _normalize_pantry_item(raw: dict) -> dict | None:
     if not name:
         return None
     item_id = str(raw.get("id") or "").strip() or str(uuid.uuid4())
-    category = str(raw.get("category") or "Other").strip()
-    if category == "Grains & pantry":
-        category = "Grains & cupboard"
-    if category not in PANTRY_CATEGORIES:
-        category = "Other"
+    category = _normalize_category_name(raw.get("category") or "Other") or "Other"
     unit = str(raw.get("unit") or "pcs").strip().lower()
     if unit not in ("pcs", "g", "kg"):
         unit = "pcs"
@@ -231,6 +235,36 @@ def _normalize_pantry_item(raw: dict) -> dict | None:
     }
 
 
+def _normalize_category_name(raw) -> str | None:
+    text = " ".join(str(raw or "").split())
+    if not text:
+        return None
+    text = PANTRY_CATEGORY_ALIASES.get(text, text)
+    if len(text) > MAX_PANTRY_CATEGORY_LENGTH:
+        text = text[:MAX_PANTRY_CATEGORY_LENGTH].rstrip()
+    return text or None
+
+
+def _normalize_category_list(raw, extra: list[str] | None = None) -> list[str]:
+    names: list[str] = []
+    seen: set[str] = set()
+    source = list(raw) if isinstance(raw, list) and raw else list(PANTRY_CATEGORIES)
+    if extra:
+        source.extend(extra)
+    for item in source:
+        name = _normalize_category_name(item)
+        if not name:
+            continue
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append(name)
+        if len(names) >= MAX_PANTRY_CATEGORIES:
+            break
+    return names or ["Other"]
+
+
 def get_pantry_inventory() -> list[dict]:
     raw_items = _read_app_state().get("pantry_inventory") or []
     cleaned: list[dict] = []
@@ -243,7 +277,14 @@ def get_pantry_inventory() -> list[dict]:
     return cleaned
 
 
-def save_pantry_inventory(items: list) -> list[dict]:
+def get_pantry_categories(items: list[dict] | None = None) -> list[str]:
+    state = _read_app_state()
+    inventory = items if items is not None else get_pantry_inventory()
+    extras = [str(row.get("category") or "") for row in inventory if isinstance(row, dict)]
+    return _normalize_category_list(state.get("pantry_categories"), extra=extras)
+
+
+def save_pantry_inventory(items: list, categories: list[str] | None = None) -> dict:
     cleaned: list[dict] = []
     seen_ids: set[str] = set()
     for raw in items:
@@ -256,8 +297,14 @@ def save_pantry_inventory(items: list) -> list[dict]:
             continue
         seen_ids.add(item["id"])
         cleaned.append(item)
-    _write_app_state(pantry_inventory=cleaned)
-    return cleaned
+    extras = [row["category"] for row in cleaned]
+    if categories is None:
+        names = get_pantry_categories(cleaned)
+        _write_app_state(pantry_inventory=cleaned)
+    else:
+        names = _normalize_category_list(categories, extra=extras)
+        _write_app_state(pantry_inventory=cleaned, pantry_categories=names)
+    return {"items": cleaned, "categories": names}
 
 
 def _normalize_to_buy_item(raw: dict) -> dict | None:
@@ -269,6 +316,7 @@ def _normalize_to_buy_item(raw: dict) -> dict | None:
         "id": item_id,
         "text": text,
         "qty": str(raw.get("qty") or "").strip(),
+        "notes": str(raw.get("notes") or "").strip()[:200],
         "checked": bool(raw.get("checked", False)),
     }
 

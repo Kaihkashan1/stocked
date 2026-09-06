@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @Environment(RecipeStore.self) private var store
@@ -15,6 +16,7 @@ struct SettingsView: View {
     @State private var logFilter: ImportLogFilter = .all
     @State private var logShown = 5
     @State private var revealedLogIDs: Set<UUID> = []
+    @State private var copiedLogID: UUID?
     /// nil while loading or if the fetch failed — the section is omitted
     /// rather than showing a stale/fake number (same rule the backend
     /// follows for a missing Apify token, see GET /api/usage).
@@ -75,8 +77,7 @@ struct SettingsView: View {
                 HStack {
                     Kicker(text: L("Developer settings"), color: Theme.neutral600)
                     Spacer()
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
+                    LucideIcon(.chevronDown, size: 12)
                         .foregroundStyle(Theme.neutral800)
                         .rotationEffect(.degrees(developerOpen ? 180 : 0))
                 }
@@ -243,14 +244,22 @@ struct SettingsView: View {
         let detailsOpen = revealedLogIDs.contains(row.id)
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 8) {
-                Image(systemName: row.isError ? "xmark" : "checkmark")
-                    .font(.system(size: 12, weight: .bold))
+                LucideIcon(row.isError ? .xmark : .check, size: 12)
                     .foregroundStyle(row.isError ? Theme.accent700 : Theme.sage500)
                     .frame(width: 16, height: 16)
                     .accessibilityLabel(row.isError ? L("Errors") : L("Saved"))
                 Text(row.timestamp)
                     .font(Theme.body(12.5))
                     .foregroundStyle(Theme.neutral600)
+                if isPhoto {
+                    Text(L("Photo"))
+                        .font(Theme.body(10.5, weight: .semibold))
+                        .foregroundStyle(Theme.neutral700)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Theme.neutral100)
+                        .clipShape(Capsule())
+                }
                 Spacer(minLength: 0)
             }
             .padding(.bottom, 9)
@@ -270,8 +279,7 @@ struct SettingsView: View {
                     Text(L("Additional details"))
                         .font(Theme.body(12.5))
                         .foregroundStyle(Theme.neutral600)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .semibold))
+                    LucideIcon(.chevronDown, size: 9)
                         .foregroundStyle(Theme.neutral600)
                         .rotationEffect(.degrees(detailsOpen ? 180 : 0))
                 }
@@ -296,20 +304,48 @@ struct SettingsView: View {
     @ViewBuilder
     private func importLogLink(_ row: ImportLogEntry, isPhoto: Bool) -> some View {
         if isPhoto {
-            Text("(photo)")
+            Text(L("Photo"))
                 .font(Theme.body(13))
                 .foregroundStyle(Theme.neutral600)
-        } else if let link = URL(string: row.url) {
-            Button {
-                openURL(link)
-            } label: {
-                Text(row.url)
-                    .font(Theme.body(13))
-                    .foregroundStyle(Theme.accent700)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+        } else {
+            HStack(alignment: .top, spacing: 10) {
+                if let link = URL(string: row.url) {
+                    Button {
+                        openURL(link)
+                    } label: {
+                        Text(row.url)
+                            .font(Theme.body(13))
+                            .foregroundStyle(Theme.accent700)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(row.url)
+                        .font(Theme.body(13))
+                        .foregroundStyle(Theme.neutral600)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Button {
+                    UIPasteboard.general.string = row.url
+                    copiedLogID = row.id
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.6))
+                        if copiedLogID == row.id { copiedLogID = nil }
+                    }
+                } label: {
+                    Text(copiedLogID == row.id ? L("Copied") : L("Copy"))
+                        .font(Theme.body(12, weight: .semibold))
+                        .foregroundStyle(Theme.accent700)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Theme.accent100)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Copy link"))
             }
-            .buttonStyle(.plain)
         }
     }
 

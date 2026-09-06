@@ -12,8 +12,7 @@ struct PantryView: View {
     @State private var segment: PantrySegment = .items
     @State private var matchMode = false
     @State private var matchSelectedIDs: Set<String> = []
-    @State private var editingItem: PantryItem?
-    @State private var showAddSheet = false
+    @State private var presentedSheet: CupboardPresentedSheet?
     @State private var newToBuyText = ""
     /// Independent of each other and of the Cookbook search; switching
     /// Items ↔ To buy keeps both queries (handoff §11).
@@ -21,11 +20,25 @@ struct PantryView: View {
     @State private var buyQuery = ""
 
     private enum PantrySegment: String, CaseIterable, Identifiable {
-        case items = "Items"
+        case items = "In stock"
         case toBuy = "To buy"
         var id: String { rawValue }
         var localizedName: String {
             L(String.LocalizationValue(rawValue))
+        }
+    }
+
+    private enum CupboardPresentedSheet: Identifiable {
+        case addItem
+        case editItem(PantryItem)
+        case categories
+
+        var id: String {
+            switch self {
+            case .addItem: "addItem"
+            case .editItem(let item): "edit-\(item.id)"
+            case .categories: "categories"
+            }
         }
     }
 
@@ -64,14 +77,8 @@ struct PantryView: View {
         .scrollIndicators(.hidden)
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await pantry.refresh() }
-        .sheet(isPresented: $showAddSheet) {
-            PantryItemSheet(item: nil) { pantry.upsertItem($0) }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.hidden)
-                .presentationCornerRadius(34)
-        }
-        .sheet(item: $editingItem) { item in
-            PantryItemSheet(item: item) { pantry.upsertItem($0) }
+        .sheet(item: $presentedSheet) { sheet in
+            sheetContent(for: sheet)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.hidden)
                 .presentationCornerRadius(34)
@@ -93,18 +100,40 @@ struct PantryView: View {
         }
     }
 
+    @ViewBuilder
+    private func sheetContent(for sheet: CupboardPresentedSheet) -> some View {
+        switch sheet {
+        case .addItem:
+            PantryItemSheet(item: nil, categories: pantry.categories) { pantry.upsertItem($0) }
+        case .editItem(let item):
+            PantryItemSheet(item: item, categories: pantry.categories) { pantry.upsertItem($0) }
+        case .categories:
+            CupboardCategoriesSheet()
+                .environment(pantry)
+        }
+    }
+
     // MARK: - Header / segments
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Cupboard")
-                .font(Theme.display(36))
-                .foregroundStyle(Theme.ink)
-            Text(pantry.kickerLine)
-                .font(Theme.body(10.5, weight: .semibold))
-                .tracking(1.47)
-                .textCase(.uppercase)
-                .foregroundStyle(Theme.accent700)
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Cupboard")
+                    .font(Theme.display(36))
+                    .foregroundStyle(Theme.ink)
+                Text(pantry.kickerLine)
+                    .font(Theme.body(10.5, weight: .semibold))
+                    .tracking(1.47)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.accent700)
+            }
+            Spacer()
+            if segment == .items {
+                CircleIconButton(lucide: .gear) {
+                    presentedSheet = .categories
+                }
+                .accessibilityLabel(L("Cupboard categories"))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 66)
@@ -122,8 +151,7 @@ struct PantryView: View {
 
     private func cupboardSearchField(placeholder: String, text: Binding<String>) -> some View {
         HStack(spacing: 9) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .semibold))
+            LucideIcon(.search, size: 17)
                 .foregroundStyle(Theme.neutral600)
             TextField(placeholder, text: text)
                 .font(Theme.body(14.5))
@@ -137,13 +165,13 @@ struct PantryView: View {
         .clipShape(Capsule())
     }
 
-    private var filteredGroupedItems: [(category: PantryCategory, items: [PantryItem])] {
+    private var filteredGroupedItems: [(category: String, items: [PantryItem])] {
         let q = stockQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return pantry.groupedItems }
         return pantry.groupedItems.compactMap { group in
             let rows = group.items.filter {
                 $0.name.lowercased().contains(q)
-                    || group.category.rawValue.lowercased().contains(q)
+                    || group.category.lowercased().contains(q)
             }
             guard !rows.isEmpty else { return nil }
             return (group.category, rows)
@@ -152,8 +180,12 @@ struct PantryView: View {
 
     private var filteredToBuy: [ToBuyItem] {
         let q = buyQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return pantry.toBuy }
-        return pantry.toBuy.filter { $0.text.lowercased().contains(q) }
+        let rows = q.isEmpty
+            ? pantry.toBuy
+            : pantry.toBuy.filter {
+                $0.text.lowercased().contains(q) || $0.notes.lowercased().contains(q)
+            }
+        return rows.sorted { $0.text.localizedCaseInsensitiveCompare($1.text) == .orderedAscending }
     }
 
     private var stockFilterActive: Bool {
@@ -211,10 +243,9 @@ struct PantryView: View {
             .buttonStyle(.plain)
 
             Button {
-                showAddSheet = true
+                presentedSheet = .addItem
             } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 17, weight: .semibold))
+                LucideIcon(.plus, size: 19)
                     .foregroundStyle(Theme.bg)
                     .frame(width: 44, height: 44)
                     .background(Theme.accent)
@@ -247,7 +278,7 @@ struct PantryView: View {
         } else {
             ForEach(filteredGroupedItems, id: \.category) { group in
                 VStack(alignment: .leading, spacing: 9) {
-                    Text(group.category.localizedName.uppercased(with: Locale(identifier: "en")))
+                    Text(group.category.uppercased(with: Locale(identifier: "en")))
                         .font(Theme.body(10.5, weight: .semibold))
                         .tracking(1.26)
                         .foregroundStyle(Theme.neutral600)
@@ -276,36 +307,29 @@ struct PantryView: View {
                     .font(Theme.body(14.5, weight: .semibold))
                     .foregroundStyle(Theme.neutral900)
                     .multilineTextAlignment(.leading)
-                FlowLayout(spacing: 6) {
-                    metaChip(item.amountLabel, fill: Theme.neutral100, foreground: Theme.neutral700)
-                    metaChip(
-                        item.status.label,
-                        fill: item.status == .open ? Theme.sage100 : Theme.neutral100,
-                        foreground: item.status == .open ? Theme.sage800 : Theme.neutral700
-                    )
-                    if let expiry = item.expiryBadge {
-                        metaChip(
-                            expiry.label,
-                            fill: expiry.fill,
-                            foreground: expiry.foreground,
-                            border: expiry.border
-                        )
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 6) {
+                        amountAndStatusChips(item)
+                        if let expiry = item.expiryBadge {
+                            expiryChip(expiry)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            amountAndStatusChips(item)
+                        }
+                        if let expiry = item.expiryBadge {
+                            expiryChip(expiry)
+                        }
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if !matchMode {
-                Button {
+                LucideTrashButton(accessibilityLabel: L("Remove \(item.name)")) {
                     pantry.deleteItem(id: item.id)
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.neutral500)
-                        .frame(width: 30, height: 30)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(L("Remove \(item.name)"))
             }
         }
         .padding(.horizontal, 16)
@@ -320,11 +344,30 @@ struct PantryView: View {
                     matchSelectedIDs.insert(item.id)
                 }
             } else {
-                editingItem = item
+                presentedSheet = .editItem(item)
             }
         }
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(item.name)
+    }
+
+    @ViewBuilder
+    private func amountAndStatusChips(_ item: PantryItem) -> some View {
+        metaChip(item.amountLabel, fill: Theme.neutral100, foreground: Theme.neutral700)
+        metaChip(
+            item.status.label,
+            fill: item.status == .open ? Theme.sage100 : Theme.neutral100,
+            foreground: item.status == .open ? Theme.sage800 : Theme.neutral700
+        )
+    }
+
+    private func expiryChip(_ expiry: PantryItem.ExpiryBadge) -> some View {
+        metaChip(
+            expiry.label,
+            fill: expiry.fill,
+            foreground: expiry.foreground,
+            border: expiry.border
+        )
     }
 
     private func metaChip(
@@ -408,8 +451,7 @@ struct PantryView: View {
                 .onSubmit(addToBuyFromField)
 
             Button(action: addToBuyFromField) {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .semibold))
+                LucideIcon(.plus, size: 18)
                     .foregroundStyle(Theme.bg)
                     .frame(width: 46, height: 46)
                     .background(Theme.accent)
@@ -423,6 +465,68 @@ struct PantryView: View {
     private func addToBuyFromField() {
         pantry.addToBuy(newToBuyText)
         newToBuyText = ""
+    }
+
+    private func toBuyRow(_ item: ToBuyItem) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .center, spacing: 12) {
+                Button {
+                    pantry.toggleChecked(id: item.id)
+                } label: {
+                    Circle()
+                        .strokeBorder(item.checked ? Theme.sage500 : Theme.neutral400, lineWidth: 2)
+                        .background(Circle().fill(item.checked ? Theme.sage500 : .clear))
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(item.checked ? L("Uncheck \(item.text)") : L("Check \(item.text)"))
+
+                Text(item.text)
+                    .font(Theme.body(14.5, weight: .semibold))
+                    .strikethrough(item.checked)
+                    .foregroundStyle(item.checked ? Theme.neutral500 : Theme.neutral900)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                LucideTrashButton(accessibilityLabel: L("Remove \(item.text)")) {
+                    pantry.removeToBuy(id: item.id)
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("qty", text: Binding(
+                    get: { pantry.toBuy.first(where: { $0.id == item.id })?.qty ?? "" },
+                    set: { pantry.setToBuyQty(id: item.id, qty: $0) }
+                ))
+                .font(Theme.body(12.5, weight: .semibold))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+                .frame(width: 76, height: 34)
+                .background(Theme.bg)
+                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                .clipShape(Capsule())
+                .accessibilityLabel(L("Quantity for \(item.text)"))
+
+                TextField(
+                    L("Notes"),
+                    text: Binding(
+                        get: { pantry.toBuy.first(where: { $0.id == item.id })?.notes ?? "" },
+                        set: { pantry.setToBuyNotes(id: item.id, notes: $0) }
+                    )
+                )
+                .font(Theme.body(12.5, weight: .semibold))
+                .padding(.horizontal, 14)
+                .frame(height: 34)
+                .background(Theme.bg)
+                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                .clipShape(Capsule())
+                .accessibilityLabel(L("Notes for \(item.text)"))
+            }
+            .padding(.leading, 34)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .cardBackground(radius: 22)
     }
 
     @ViewBuilder
@@ -440,55 +544,195 @@ struct PantryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 44)
         } else {
-            ForEach(filteredToBuy) { item in
-                HStack(spacing: 12) {
-                    Button {
-                        pantry.toggleChecked(id: item.id)
-                    } label: {
-                        Circle()
-                            .strokeBorder(item.checked ? Theme.sage500 : Theme.neutral400, lineWidth: 2)
-                            .background(Circle().fill(item.checked ? Theme.sage500 : .clear))
-                            .frame(width: 24, height: 24)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(item.checked ? L("Uncheck \(item.text)") : L("Check \(item.text)"))
-
-                    Text(item.text)
-                        .font(Theme.body(14.5))
-                        .strikethrough(item.checked)
-                        .foregroundStyle(item.checked ? Theme.neutral500 : Theme.ink)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    TextField("qty", text: Binding(
-                        get: { pantry.toBuy.first(where: { $0.id == item.id })?.qty ?? "" },
-                        set: { pantry.setToBuyQty(id: item.id, qty: $0) }
-                    ))
-                    .font(Theme.body(12.5))
-                    .multilineTextAlignment(.center)
-                    .frame(width: 64, height: 34)
-                    .background(Theme.bg)
-                    .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
-                    .clipShape(Capsule())
-                    .accessibilityLabel(L("Quantity for \(item.text)"))
-
-                    Button {
-                        pantry.removeToBuy(id: item.id)
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Theme.neutral500)
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(L("Remove \(item.text)"))
+            VStack(alignment: .leading, spacing: 9) {
+                ForEach(filteredToBuy) { item in
+                    toBuyRow(item)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 13)
-                .background(Theme.surface)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .padding(.bottom, 9)
             }
         }
+    }
+}
+
+/// Add, rename, and delete cupboard groups — opened from the Cupboard gear.
+struct CupboardCategoriesSheet: View {
+    @Environment(PantryStore.self) private var pantry
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var newCategory = ""
+    @State private var categoryToDelete: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(Theme.neutral300)
+                .frame(width: 44, height: 5)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Categories")
+                        .font(Theme.display(22))
+                        .foregroundStyle(Theme.ink)
+
+                    VStack(alignment: .leading, spacing: 9) {
+                        ForEach(pantry.categories, id: \.self) { name in
+                            CategoryRenameRow(
+                                name: name,
+                                locked: isLockedPantryCategory(name),
+                                onRename: { pantry.renameCategory(name, to: $0) },
+                                onDelete: { categoryToDelete = name }
+                            )
+                        }
+                    }
+
+                    Text("Deleting a category moves its items to \"Other\".")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.neutral600)
+
+                    HStack(spacing: 9) {
+                        TextField(L("New category"), text: $newCategory)
+                            .font(Theme.body(14.5))
+                            .textInputAutocapitalization(.words)
+                            .padding(.horizontal, 18)
+                            .frame(height: 48)
+                            .background(Theme.surface)
+                            .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                            .clipShape(Capsule())
+                            .onSubmit(addCategoryFromField)
+
+                        Button(action: addCategoryFromField) {
+                            LucideIcon(.plus, size: 18)
+                                .foregroundStyle(Theme.bg)
+                                .frame(width: 48, height: 48)
+                                .background(canAddCategory ? Theme.accent : Theme.neutral400)
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canAddCategory)
+                        .accessibilityLabel(L("Add category"))
+                    }
+
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("Done")
+                            .font(Theme.display(15))
+                            .foregroundStyle(Theme.bg)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(Theme.accent)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
+                    .accessibilityLabel(L("Done"))
+                }
+                .padding(.horizontal, Theme.screenPadding)
+                .padding(.bottom, 36)
+            }
+        }
+        .background(Theme.bg.ignoresSafeArea())
+        .alert(
+            L("Delete \(categoryToDelete ?? "")?"),
+            isPresented: Binding(
+                get: { categoryToDelete != nil },
+                set: { shown in if !shown { categoryToDelete = nil } }
+            )
+        ) {
+            Button(L("Cancel"), role: .cancel) { categoryToDelete = nil }
+            Button(L("Delete"), role: .destructive) {
+                if let name = categoryToDelete {
+                    pantry.deleteCategory(name)
+                }
+                categoryToDelete = nil
+            }
+        } message: {
+            Text(L("Items in this category will move to \(deleteFallbackName)."))
+        }
+    }
+
+    private var deleteFallbackName: String {
+        let removing = categoryToDelete ?? ""
+        return pantry.categories.first {
+            $0.caseInsensitiveCompare(removing) != .orderedSame
+                && $0.caseInsensitiveCompare("Other") == .orderedSame
+        }
+            ?? pantry.categories.first { $0.caseInsensitiveCompare(removing) != .orderedSame }
+            ?? "Other"
+    }
+
+    private var canAddCategory: Bool {
+        normalizePantryCategoryName(newCategory) != nil
+            && pantry.categories.count < maxPantryCategories
+    }
+
+    private func addCategoryFromField() {
+        pantry.addCategory(newCategory)
+        newCategory = ""
+    }
+}
+
+private struct CategoryRenameRow: View {
+    let name: String
+    let locked: Bool
+    var onRename: (String) -> Void
+    var onDelete: () -> Void
+
+    @State private var draft: String
+    @FocusState private var focused: Bool
+
+    init(
+        name: String,
+        locked: Bool,
+        onRename: @escaping (String) -> Void,
+        onDelete: @escaping () -> Void
+    ) {
+        self.name = name
+        self.locked = locked
+        self.onRename = onRename
+        self.onDelete = onDelete
+        _draft = State(initialValue: name)
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TextField(L("Category"), text: $draft)
+                .font(Theme.body(14))
+                .foregroundStyle(Theme.ink)
+                .disabled(locked)
+                .focused($focused)
+                .textInputAutocapitalization(.words)
+                .submitLabel(.done)
+                .onSubmit(commitRename)
+                .onChange(of: focused) { _, isFocused in
+                    if !isFocused { commitRename() }
+                }
+                .onChange(of: name) { _, newName in
+                    draft = newName
+                }
+                .padding(.horizontal, 18)
+                .frame(height: 46)
+                .background(Theme.surface)
+                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
+                .clipShape(Capsule())
+
+            if !locked {
+                LucideTrashButton(accessibilityLabel: L("Remove \(name)"), frame: 40) {
+                    onDelete()
+                }
+            }
+        }
+    }
+
+    private func commitRename() {
+        guard !locked else { return }
+        if draft.caseInsensitiveCompare(name) == .orderedSame { return }
+        if normalizePantryCategoryName(draft) == nil {
+            draft = name
+            return
+        }
+        onRename(draft)
     }
 }
 

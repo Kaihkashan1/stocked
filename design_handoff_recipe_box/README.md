@@ -335,6 +335,19 @@ the model name and source link — shown for both successful and failed imports.
 "Show more" button (pill, outline) that appends 5 more; switching filters resets the count to 5. The
 Language setting was removed (app is English-only).
 
+## To buy screen — aligned with Items tab
+To-buy rows now match the Items tab's card language: a `--color-surface` card, 22px radius, `--shadow-sm`,
+instead of the old flat row. Row 1: check circle (accent-2-500 ring/fill) + item name (600 weight) + trash
+icon. Row 2: a qty pill input and a Notes pill input side by side, indented under the name. Added a `notes`
+field to to-buy items.
+
+## Cupboard categories
+A gear icon sits top-right of "Cupboard" (Items tab only — categories don't apply to To buy, so it's hidden
+there). Opens a bottom sheet listing categories as inline-editable rows (rename by typing, delete via trash —
+deleting reassigns that category's items to "Other", which itself can't be deleted/renamed). An input + add
+button appends a new category. Categories are now state (`pantryCategories`) instead of a fixed constant, so
+the Add-item sheet's category chips and the Items list grouping both reflect edits live.
+
 ## Data model change
 Add a **course** value per recipe — "Main course", "Appetizers" or "Desserts" — shown as the pill on the detail
 screen and driven by the new top filter row. Options: derive it from the existing `meal` column

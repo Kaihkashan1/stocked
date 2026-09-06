@@ -119,10 +119,10 @@ private struct ListHeader: View {
             }
             Spacer()
             HStack(spacing: 8) {
-                CircleIconButton(systemImage: "gearshape", action: onSettings)
+                CircleIconButton(lucide: .gear, action: onSettings)
                     .accessibilityLabel(L("Settings"))
                 CircleIconButton(
-                    systemImage: "plus",
+                    lucide: .plus,
                     background: Theme.accent,
                     foreground: .white,
                     bordered: false,
@@ -170,7 +170,7 @@ private struct SearchBlock: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
+                    LucideIcon(.search, size: 17)
                         .foregroundStyle(Theme.neutral600)
                     DebouncedTextField(placeholder: L("Search recipes"), text: $store.query)
                         .font(Theme.body(14.5))
@@ -184,8 +184,7 @@ private struct SearchBlock: View {
                 Button {
                     showFilters = true
                 } label: {
-                    Image(systemName: "line.3.horizontal.decrease")
-                        .font(.system(size: 17, weight: .semibold))
+                    LucideIcon(.sliders, size: 19)
                         .foregroundStyle(activeFilterCount > 0 ? .white : Theme.neutral800)
                         .frame(width: 46, height: 46)
                         .background(activeFilterCount > 0 ? Theme.accent : Theme.surface)
@@ -205,8 +204,7 @@ private struct SearchBlock: View {
                     // Shows the glyph for the *other* mode — a grid icon
                     // while in list view (to switch to grid), a list icon
                     // while in grid view (to switch back).
-                    Image(systemName: store.viewMode == .grid ? "list.bullet" : "square.grid.2x2")
-                        .font(.system(size: 17, weight: .semibold))
+                    LucideIcon(store.viewMode == .grid ? .list : .grid, size: 18)
                         .foregroundStyle(Theme.neutral800)
                         .frame(width: 46, height: 46)
                         .background(Theme.surface)
@@ -337,8 +335,7 @@ private struct ClearFiltersRow: View {
                 store.clearFilters()
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
+                    LucideIcon(.xmark, size: 10, stroke: 2.75)
                     Text("Clear all filters")
                         .font(Theme.body(12.5, weight: .semibold))
                 }
@@ -425,8 +422,7 @@ private struct EmptyState: View {
             VStack(alignment: .leading, spacing: 18) {
                 ZStack {
                     Circle().fill(Theme.accent).frame(width: 78, height: 78)
-                    Image(systemName: "plus")
-                        .font(.system(size: 28, weight: .semibold))
+                    LucideIcon(.plus, size: 28)
                         .foregroundStyle(.white)
                 }
                 Text("Add your first recipe")
@@ -502,8 +498,7 @@ struct RecipeCard: View, Equatable {
                 }
                 Spacer()
                 Button(action: onToggleFavorite) {
-                    Image(systemName: recipe.favorite ? "star.fill" : "star")
-                        .font(.system(size: 18))
+                    LucideIcon(.star, size: 18, stroke: 2.4, filled: recipe.favorite)
                         .foregroundStyle(recipe.favorite ? Theme.accent : Theme.neutral400)
                 }
                 .buttonStyle(.plain)
@@ -595,7 +590,7 @@ struct FiltersSheet: View {
                         store.favoritesOnly.toggle()
                     } label: {
                         HStack {
-                            Image(systemName: store.favoritesOnly ? "star.fill" : "star")
+                            LucideIcon(.star, size: 16, stroke: 2.4, filled: store.favoritesOnly)
                             Text("Favorites only")
                             Spacer()
                         }

@@ -93,7 +93,7 @@ struct RecipeDetailView: View {
     /// replaces the inset back ring and detaches the ⋯ menu from the button.
     private var detailHeader: some View {
         HStack(spacing: 8) {
-            CircleIconButton(systemImage: "chevron.left", size: 40, insetRing: true) { dismiss() }
+            CircleIconButton(lucide: .chevronLeft, size: 40, insetRing: true) { dismiss() }
                 .accessibilityLabel(L("Back"))
             Spacer(minLength: 0)
             if let recipe {
@@ -108,9 +108,10 @@ struct RecipeDetailView: View {
 
     private func favoriteButton(for recipe: Recipe) -> some View {
         CircleIconButton(
-            systemImage: recipe.favorite ? "star.fill" : "star",
+            lucide: .star,
             size: 40,
-            foreground: recipe.favorite ? Theme.accent : Theme.neutral800
+            foreground: recipe.favorite ? Theme.accent : Theme.neutral800,
+            filled: recipe.favorite
         ) {
             Task { await store.toggleFavorite(recipe) }
         }
@@ -118,7 +119,7 @@ struct RecipeDetailView: View {
     }
 
     private var moreButton: some View {
-        CircleIconButton(systemImage: "ellipsis", size: 40, highlighted: showMoreMenu) {
+        CircleIconButton(lucide: .ellipsis, size: 40, highlighted: showMoreMenu) {
             showMoreMenu.toggle()
         }
         .disabled(deleting)
@@ -489,8 +490,7 @@ private struct IngredientsCard: View {
             let qty = line.quantity.map { metricFromOunces($0, ingredient: line.text) } ?? ""
             pantry.toggleToBuy(text: line.text, qty: qty)
         } label: {
-            Image(systemName: inList ? "checkmark" : "plus")
-                .font(.system(size: 12, weight: .bold))
+            LucideIcon(inList ? .check : .plus, size: 12)
                 .foregroundStyle(inList ? Theme.bg : Theme.neutral700)
                 .frame(width: 30, height: 30)
                 .background(inList ? Theme.sage500 : Theme.neutral100)
