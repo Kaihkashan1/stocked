@@ -102,6 +102,8 @@ UNITS = {
     "g",
     "gram",
     "grams",
+    "gm",
+    "gms",
     "kg",
     "ml",
     "l",
@@ -111,6 +113,7 @@ UNITS = {
     "ounce",
     "ounces",
     "lb",
+    "lbs",
     "pound",
     "clove",
     "cloves",
@@ -158,6 +161,16 @@ PREP = {
     "of",
     "into",
     "with",
+    "in",
+    "on",
+    "cut",
+    "raw",
+    "inch",
+    "inches",
+    "size",
+    "halved",
+    "mini",
+    "protein",
 }
 # Cuts and shapes of a grocery item, not their own pantry entries.
 # "chicken lollipop" and "chicken breast" should both be "chicken".
@@ -198,12 +211,19 @@ FORMS = {
     "bites",
     "boneless",
     "skinless",
+    "bone",
+    "skin",
     "ground",
     "whole",
     "leg",
     "legs",
 }
 STAPLES = {"salt", "water", "oil", "pepper", "black pepper", "sugar"}
+
+# "protein" is filler in "protein chicken meatballs" but the actual noun in
+# these — protect them (fuse to one token) before the generic word filter
+# below, which would otherwise strip "protein" as PREP in both cases.
+_PROTECTED_PHRASES = ("protein powder", "protein bar", "protein shake")
 
 
 def canonical_ingredient(line: str) -> str:
@@ -212,13 +232,15 @@ def canonical_ingredient(line: str) -> str:
     text = re.split(r"\bor\b", text, maxsplit=1)[0]
     text = text.replace(",", " ")
     text = re.sub(r"[\d¼½¾⅓⅔⅛⅜/.\-]+", " ", text)
-    words = [word for word in re.findall(r"[a-z]+", text) if word not in UNITS and word not in PREP]
+    for phrase in _PROTECTED_PHRASES:
+        text = text.replace(phrase, phrase.replace(" ", "_"))
+    words = [word for word in re.findall(r"[a-z_]+", text) if word not in UNITS and word not in PREP]
     core = [word for word in words if word not in FORMS]
     if core:
         words = core
     if not words:
         return ""
-    return _singularize(" ".join(words))
+    return _singularize(" ".join(words)).replace("_", " ")
 
 
 def pantry_items(ingredients: list[str]) -> list[str]:
