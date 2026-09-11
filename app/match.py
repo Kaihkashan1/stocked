@@ -554,6 +554,13 @@ _CATEGORY_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ),
 ]
 
+# Canonical cupboard / to-buy aisle order — same names `_CATEGORY_KEYWORDS`
+# classifies into, plus Other last. Inventory and shopping lists import this
+# instead of maintaining a second taxonomy.
+AISLE_CATEGORIES: tuple[str, ...] = tuple(
+    [category for category, _ in _CATEGORY_KEYWORDS] + ["Other"]
+)
+
 
 def pantry_category(name: str) -> str:
     text = (name or "").strip().lower()
@@ -570,9 +577,8 @@ def grouped_pantry(items: list[str]) -> list[dict]:
     buckets: dict[str, list[str]] = {}
     for item in items:
         buckets.setdefault(pantry_category(item), []).append(item)
-    order = [category for category, _ in _CATEGORY_KEYWORDS] + ["Other"]
     groups = []
-    for category in order:
+    for category in AISLE_CATEGORIES:
         names = sorted(buckets.get(category) or [], key=str.lower)
         if names:
             groups.append({"category": category, "items": names})

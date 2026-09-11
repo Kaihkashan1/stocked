@@ -183,9 +183,31 @@ struct PantryView: View {
         let rows = q.isEmpty
             ? pantry.toBuy
             : pantry.toBuy.filter {
-                $0.text.lowercased().contains(q) || $0.notes.lowercased().contains(q)
+                $0.text.lowercased().contains(q)
+                    || $0.notes.lowercased().contains(q)
+                    || $0.category.lowercased().contains(q)
             }
-        return rows.sorted { $0.text.localizedCaseInsensitiveCompare($1.text) == .orderedAscending }
+        return rows
+    }
+
+    private var groupedToBuy: [(category: String, items: [ToBuyItem])] {
+        var order: [String] = []
+        var seen = Set<String>()
+        for name in pantry.categories + filteredToBuy.map(\.category) {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = trimmed.lowercased()
+            guard !trimmed.isEmpty, !seen.contains(key) else { continue }
+            seen.insert(key)
+            order.append(trimmed)
+        }
+        return order.compactMap { name in
+            let rows = filteredToBuy.filter {
+                $0.category.caseInsensitiveCompare(name) == .orderedSame
+            }
+            .sorted { $0.text.localizedCaseInsensitiveCompare($1.text) == .orderedAscending }
+            guard !rows.isEmpty else { return nil }
+            return (name, rows)
+        }
     }
 
     private var stockFilterActive: Bool {
@@ -488,6 +510,13 @@ struct PantryView: View {
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
+                if item.recipeSourceCount > 1 {
+                    Text(L("\(item.recipeSourceCount) recipes"))
+                        .font(Theme.body(10.5, weight: .semibold))
+                        .foregroundStyle(Theme.neutral500)
+                        .fixedSize()
+                }
+
                 LucideTrashButton(accessibilityLabel: L("Remove \(item.text)")) {
                     pantry.removeToBuy(id: item.id)
                 }
@@ -544,10 +573,17 @@ struct PantryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 44)
         } else {
-            VStack(alignment: .leading, spacing: 9) {
-                ForEach(filteredToBuy) { item in
-                    toBuyRow(item)
+            ForEach(groupedToBuy, id: \.category) { group in
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(group.category.uppercased(with: Locale(identifier: "en")))
+                        .font(Theme.body(10.5, weight: .semibold))
+                        .tracking(1.26)
+                        .foregroundStyle(Theme.neutral600)
+                    ForEach(group.items) { item in
+                        toBuyRow(item)
+                    }
                 }
+                .padding(.bottom, 18)
             }
         }
     }

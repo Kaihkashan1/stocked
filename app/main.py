@@ -20,9 +20,18 @@ from app.errors import GEMINI_DAILY_QUOTA, NOT_A_RECIPE_MESSAGE, REQUEST_TIMEOUT
 from app.extract import extract_recipe
 from app.fetch import extract_url, get_apify_usage
 from app.match import STAPLES, grouped_pantry
-from app.models import FetchedPost, PantryInventoryUpdate, PantryUpdate, RecipeCreate, RecipeUpdate, ToBuyUpdate
+from app.models import (
+    FetchedPost,
+    PantryInventoryUpdate,
+    PantryUpdate,
+    RecipeCreate,
+    RecipeUpdate,
+    ToBuySourceChange,
+    ToBuyUpdate,
+)
 from app.pipeline import jobs, process_recipe
 from app.store import (
+    add_to_buy_source,
     create_recipe,
     delete_recipe,
     get_gemini_reads_today,
@@ -35,6 +44,7 @@ from app.store import (
     ingredient_strings,
     list_recipes,
     log_import,
+    remove_to_buy_source,
     save_have_items,
     save_pantry_inventory,
     save_to_buy_items,
@@ -228,6 +238,16 @@ async def api_get_to_buy():
 @app.put("/api/to-buy", dependencies=[Depends(require_secret)])
 async def api_put_to_buy(body: ToBuyUpdate):
     return {"items": save_to_buy_items(body.items)}
+
+
+@app.post("/api/to-buy/source", dependencies=[Depends(require_secret)])
+async def api_add_to_buy_source(body: ToBuySourceChange):
+    return {"items": add_to_buy_source(body.text, qty=body.qty, recipe_id=body.recipe_id)}
+
+
+@app.post("/api/to-buy/source/remove", dependencies=[Depends(require_secret)])
+async def api_remove_to_buy_source(body: ToBuySourceChange):
+    return {"items": remove_to_buy_source(body.text, recipe_id=body.recipe_id)}
 
 
 @app.get("/api/usage", dependencies=[Depends(require_secret)])

@@ -298,24 +298,35 @@ private struct PantryBanner: View {
         }
     }
 
-    /// Handoff-style sage pill: active ingredient filters + Clear.
+    /// One removable chip per ingredient filter, same × pattern as the
+    /// Filters sheet's what-I-have card, plus a compact Clear all.
     private var banner: some View {
-        HStack(spacing: 8) {
-            Circle().fill(Theme.sage500).frame(width: 8, height: 8)
-            Text(L("Filtered by \(store.have.joined(separator: ", "))"))
-                .font(Theme.body(12.5, weight: .semibold))
-                .foregroundStyle(Theme.sage800)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            Button("Clear") { store.setHave([]) }
+        FlowLayout(spacing: 8) {
+            ForEach(store.have, id: \.self) { item in
+                Button {
+                    store.toggleIngredient(item)
+                } label: {
+                    Text("\(item) ×")
+                        .font(Theme.body(12.5, weight: .semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Theme.sage500)
+                        .foregroundStyle(.white)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Remove \(item)"))
+            }
+            Button(L("Clear all")) { store.setHave([]) }
                 .font(Theme.body(12.5, weight: .semibold))
                 .foregroundStyle(Theme.sage800)
                 .buttonStyle(.plain)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(Theme.sage100)
-        .clipShape(Capsule())
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusCard, style: .continuous))
         .padding(.horizontal, Theme.screenPadding)
         .padding(.top, 14)
     }

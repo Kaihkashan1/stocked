@@ -214,37 +214,78 @@ final class PantryStore {
     }
 
     func addToBuy(_ text: String, qty: String = "") {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        if toBuy.contains(where: { $0.text.caseInsensitiveCompare(trimmed) == .orderedSame }) {
-            return
-        }
-        let qtyTrimmed = qty.trimmingCharacters(in: .whitespacesAndNewlines)
-        replaceToBuy(toBuy + [ToBuyItem(text: trimmed, qty: qtyTrimmed)])
+        addToBuySource(text: text, qty: qty, recipeID: nil)
     }
 
     func removeToBuy(id: String) {
         replaceToBuy(toBuy.filter { $0.id != id })
     }
 
-    /// Toggle by ingredient text (case-insensitive) — used from recipe detail.
-    /// `qty` is applied when adding; ignored when removing.
-    func toggleToBuy(text: String, qty: String = "") {
+    func addToBuySource(text: String, qty: String = "", recipeID: Int?) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        if let index = toBuy.firstIndex(where: { $0.text.caseInsensitiveCompare(trimmed) == .orderedSame }) {
-            var next = toBuy
-            next.remove(at: index)
-            replaceToBuy(next)
-        } else {
-            let qtyTrimmed = qty.trimmingCharacters(in: .whitespacesAndNewlines)
-            replaceToBuy(toBuy + [ToBuyItem(text: trimmed, qty: qtyTrimmed)])
+        let qtyTrimmed = qty.trimmingCharacters(in: .whitespacesAndNewlines)
+        let previous = toBuy
+        let optimistic = applyingSource(to: previous, text: trimmed, qty: qtyTrimmed, recipeID: recipeID)
+        toBuy = optimistic
+        persistCache()
+        Task {
+            do {
+                let confirmed = try await APIClient(baseURLString: serverURL)
+                    .addToBuySource(text: trimmed, qty: qtyTrimmed, recipeID: recipeID, secret: serverSecret)
+                if toBuy == optimistic {
+                    toBuy = confirmed
+                    persistCache()
+                }
+            } catch {
+                if toBuy == optimistic {
+                    toBuy = previous
+                    persistCache()
+                }
+                actionError = error.localizedDescription
+            }
         }
     }
 
-    func isInToBuy(_ text: String) -> Bool {
+    func removeToBuySource(text: String, recipeID: Int?) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return toBuy.contains { $0.text.caseInsensitiveCompare(trimmed) == .orderedSame }
+        guard !trimmed.isEmpty else { return }
+        let previous = toBuy
+        let optimistic = removingSource(from: previous, text: trimmed, recipeID: recipeID)
+        toBuy = optimistic
+        persistCache()
+        Task {
+            do {
+                let confirmed = try await APIClient(baseURLString: serverURL)
+                    .removeToBuySource(text: trimmed, recipeID: recipeID, secret: serverSecret)
+                if toBuy == optimistic {
+                    toBuy = confirmed
+                    persistCache()
+                }
+            } catch {
+                if toBuy == optimistic {
+                    toBuy = previous
+                    persistCache()
+                }
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    func toggleToBuy(text: String, qty: String = "", recipeID: Int?) {
+        if isInToBuy(text: text, recipeID: recipeID) {
+            removeToBuySource(text: text, recipeID: recipeID)
+        } else {
+            addToBuySource(text: text, qty: qty, recipeID: recipeID)
+        }
+    }
+
+    func isInToBuy(text: String, recipeID: Int?) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let row = toBuy.first(where: { toBuyMatchKey($0.text) == toBuyMatchKey(trimmed) }) else {
+            return false
+        }
+        return row.sources.contains { $0.recipeID == recipeID }
     }
 
     func toggleChecked(id: String) {
@@ -254,12 +295,18 @@ final class PantryStore {
         replaceToBuy(next)
     }
 
-    /// Updates quantity locally immediately; syncs to the server after a short
-    /// idle so typing "200 g" doesn't fire a PUT per keystroke.
+    /// Updates the manual (`recipeID == nil`) source; derived qty follows.
     func setToBuyQty(id: String, qty: String) {
         guard let index = toBuy.firstIndex(where: { $0.id == id }) else { return }
-        if toBuy[index].qty == qty { return }
-        toBuy[index].qty = qty
+        var item = toBuy[index]
+        if let sourceIndex = item.sources.firstIndex(where: { $0.recipeID == nil }) {
+            if item.sources[sourceIndex].qty == qty { return }
+            item.sources[sourceIndex].qty = qty
+        } else {
+            item.sources.append(ToBuySource(recipeID: nil, qty: qty))
+        }
+        item.qty = mergeToBuyQty(item.sources)
+        toBuy[index] = item
         persistCache()
         scheduleToBuySync()
     }
@@ -345,6 +392,32 @@ final class PantryStore {
             guard let data = try? Self.encoder.encode(payload) else { return }
             try? data.write(to: url, options: .atomic)
         }
+    }
+}
+
+private func applyingSource(to items: [ToBuyItem], text: String, qty: String, recipeID: Int?) -> [ToBuyItem] {
+    var next = items
+    let source = ToBuySource(recipeID: recipeID, qty: qty)
+    if let index = next.firstIndex(where: { toBuyMatchKey($0.text) == toBuyMatchKey(text) }) {
+        var item = next[index]
+        item.sources.removeAll { $0.recipeID == recipeID }
+        item.sources.append(source)
+        item.qty = mergeToBuyQty(item.sources)
+        item.checked = false
+        next[index] = item
+        return next
+    }
+    return next + [ToBuyItem(text: text, qty: qty, sources: [source])]
+}
+
+private func removingSource(from items: [ToBuyItem], text: String, recipeID: Int?) -> [ToBuyItem] {
+    items.compactMap { item in
+        guard toBuyMatchKey(item.text) == toBuyMatchKey(text) else { return item }
+        var next = item
+        next.sources.removeAll { $0.recipeID == recipeID }
+        guard !next.sources.isEmpty else { return nil }
+        next.qty = mergeToBuyQty(next.sources)
+        return next
     }
 }
 

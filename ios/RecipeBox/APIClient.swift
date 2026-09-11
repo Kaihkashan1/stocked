@@ -345,6 +345,51 @@ struct APIClient {
         return try Self.decoder.decode(ToBuyResponse.self, from: data).items
     }
 
+    func addToBuySource(text: String, qty: String, recipeID: Int?, secret: String) async throws -> [ToBuyItem] {
+        try await postToBuySource("/api/to-buy/source", text: text, qty: qty, recipeID: recipeID, secret: secret)
+    }
+
+    func removeToBuySource(text: String, recipeID: Int?, secret: String) async throws -> [ToBuyItem] {
+        try await postToBuySource("/api/to-buy/source/remove", text: text, qty: "", recipeID: recipeID, secret: secret)
+    }
+
+    private func postToBuySource(
+        _ path: String,
+        text: String,
+        qty: String,
+        recipeID: Int?,
+        secret: String
+    ) async throws -> [ToBuyItem] {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: path, relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+        request.httpBody = try JSONEncoder().encode(ToBuySourceChange(text: text, qty: qty, recipeID: recipeID))
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(ToBuyResponse.self, from: data).items
+    }
+
     /// Backs the Settings screen's "API usage" card.
     func fetchUsage(secret: String) async throws -> UsageStats {
         guard let base = URL(string: trimmedBase),

@@ -297,26 +297,81 @@ class ImportLogPresentTests(TestCase):
 
 
 class PantryCategoryTests(TestCase):
-    def test_maps_legacy_cupboard_categories(self):
+    def test_honors_explicit_aisle_override(self):
         from app.store import _normalize_pantry_item
 
-        rice = _normalize_pantry_item({"name": "Rice", "category": "Grains & cupboard"})
-        self.assertEqual(rice["category"], "Grains")
-        soy = _normalize_pantry_item({"name": "Soy sauce", "category": "Condiments & spices"})
-        self.assertEqual(soy["category"], "Condiments & Sauces")
+        rice = _normalize_pantry_item({"name": "Rice", "category": "Vegetables"})
+        self.assertEqual(rice["category"], "Vegetables")
+
+    def test_classifies_when_category_missing(self):
+        from app.store import _normalize_pantry_item, _normalize_to_buy_item
+
+        rice = _normalize_pantry_item({"name": "Rice"})
+        self.assertEqual(rice["category"], "Grains & pasta")
+        soy = _normalize_to_buy_item({"text": "Soy sauce"})
+        self.assertEqual(soy["category"], "Sauces & condiments")
+
+    def test_rebuckets_old_taxonomy_one_way(self):
+        from app.store import _normalize_pantry_item
+
+        oats = _normalize_pantry_item({"name": "Oats", "category": "Baking Supplies"})
+        self.assertEqual(oats["category"], "Grains & pasta")
         lemon = _normalize_pantry_item({"name": "Lemon", "category": "Produce"})
-        self.assertEqual(lemon["category"], "Other")
-
-    def test_keeps_new_cupboard_categories(self):
-        from app.store import _normalize_pantry_item
-
+        self.assertEqual(lemon["category"], "Fruit")
         tofu = _normalize_pantry_item({"name": "Tofu", "category": "Plant-Based Proteins"})
-        self.assertEqual(tofu["category"], "Plant-Based Proteins")
-        oats = _normalize_pantry_item({"name": "Oats", "category": "Breakfast Items"})
-        self.assertEqual(oats["category"], "Breakfast Items")
+        self.assertEqual(tofu["category"], "Legumes")
 
-    def test_keeps_custom_cupboard_categories(self):
-        from app.store import _normalize_pantry_item
+    def test_pantry_categories_follow_aisle_order(self):
+        from app.match import AISLE_CATEGORIES
+        from app.store import get_pantry_categories
 
-        ice = _normalize_pantry_item({"name": "Peas", "category": "Frozen"})
-        self.assertEqual(ice["category"], "Frozen")
+        self.assertEqual(get_pantry_categories([]), list(AISLE_CATEGORIES))
+        self.assertEqual(AISLE_CATEGORIES[-1], "Other")
+
+
+class ToBuySourceTests(TestCase):
+    def test_merge_qty_sums_same_unit(self):
+        from app.store import _merge_qty
+
+        self.assertEqual(
+            _merge_qty([{"qty": "200 g"}, {"qty": "100 g"}]),
+            "300 g",
+        )
+        self.assertEqual(
+            _merge_qty([{"qty": "1 cup"}, {"qty": "2 cups"}]),
+            "3 cup",
+        )
+
+    def test_merge_qty_joins_mixed_units(self):
+        from app.store import _merge_qty
+
+        self.assertEqual(
+            _merge_qty([{"qty": "2"}, {"qty": "1 cup"}]),
+            "2 + 1 cup",
+        )
+        self.assertEqual(
+            _merge_qty([{"qty": "a handful"}, {"qty": "1 tbsp"}]),
+            "1 tbsp + a handful",
+        )
+
+    def test_legacy_qty_becomes_manual_source(self):
+        from app.store import _normalize_to_buy_item
+
+        item = _normalize_to_buy_item({"text": "Onion", "qty": "2"})
+        self.assertEqual(item["sources"], [{"recipe_id": None, "qty": "2"}])
+        self.assertEqual(item["qty"], "2")
+        self.assertEqual(item["category"], "Vegetables")
+
+    def test_qty_is_derived_not_trusted(self):
+        from app.store import _normalize_to_buy_item
+
+        item = _normalize_to_buy_item({
+            "text": "onion",
+            "qty": "999",
+            "sources": [
+                {"recipe_id": 2, "qty": "1"},
+                {"recipe_id": 5, "qty": "1"},
+            ],
+        })
+        self.assertEqual(item["qty"], "2")
+        self.assertEqual(len(item["sources"]), 2)

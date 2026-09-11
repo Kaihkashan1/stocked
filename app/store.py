@@ -12,13 +12,17 @@ import gspread
 
 from app.config import settings
 from app.fetch import normalize_url
-from app.match import pantry_items, split_ingredient_section
+from app.match import (
+    AISLE_CATEGORIES,
+    UNITS,
+    _split_leading_quantity,
+    canonical_ingredient,
+    pantry_category,
+    pantry_items,
+    split_ingredient_section,
+)
 from app.errors import NOT_A_RECIPE_MESSAGE, REQUEST_TIMEOUT_MESSAGE
 from app.models import (
-    MAX_PANTRY_CATEGORIES,
-    MAX_PANTRY_CATEGORY_LENGTH,
-    PANTRY_CATEGORIES,
-    PANTRY_CATEGORY_ALIASES,
     FetchedPost,
     Recipe,
     recipe_is_importable,
@@ -204,12 +208,38 @@ def _normalize_expiry(value) -> str | None:
     return text[:10]
 
 
+_AISLE_BY_LOWER = {name.casefold(): name for name in AISLE_CATEGORIES}
+
+
+def _aisle_category(raw) -> str | None:
+    text = " ".join(str(raw or "").split())
+    if not text:
+        return None
+    return _AISLE_BY_LOWER.get(text.casefold())
+
+
+def _category_for_item(name: str, raw_category) -> str:
+    """Honor a client aisle that is already in AISLE_CATEGORIES; otherwise
+    classify from the ingredient name.
+
+    Stored pantry_inventory / to-buy rows that still carry the previous
+    cupboard taxonomy (Baking Supplies, Plant-Based Proteins, custom
+    names, …) are not in AISLE_CATEGORIES, so the next read or save
+    re-buckets them with pantry_category(). That move is one-way: the old
+    label is discarded, not aliased.
+    """
+    override = _aisle_category(raw_category)
+    if override:
+        return override
+    return pantry_category(canonical_ingredient(name))
+
+
 def _normalize_pantry_item(raw: dict) -> dict | None:
     name = str(raw.get("name") or "").strip()
     if not name:
         return None
     item_id = str(raw.get("id") or "").strip() or str(uuid.uuid4())
-    category = _normalize_category_name(raw.get("category") or "Other") or "Other"
+    category = _category_for_item(name, raw.get("category"))
     unit = str(raw.get("unit") or "pcs").strip().lower()
     if unit not in ("pcs", "g", "kg"):
         unit = "pcs"
@@ -235,36 +265,6 @@ def _normalize_pantry_item(raw: dict) -> dict | None:
     }
 
 
-def _normalize_category_name(raw) -> str | None:
-    text = " ".join(str(raw or "").split())
-    if not text:
-        return None
-    text = PANTRY_CATEGORY_ALIASES.get(text, text)
-    if len(text) > MAX_PANTRY_CATEGORY_LENGTH:
-        text = text[:MAX_PANTRY_CATEGORY_LENGTH].rstrip()
-    return text or None
-
-
-def _normalize_category_list(raw, extra: list[str] | None = None) -> list[str]:
-    names: list[str] = []
-    seen: set[str] = set()
-    source = list(raw) if isinstance(raw, list) and raw else list(PANTRY_CATEGORIES)
-    if extra:
-        source.extend(extra)
-    for item in source:
-        name = _normalize_category_name(item)
-        if not name:
-            continue
-        key = name.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-        names.append(name)
-        if len(names) >= MAX_PANTRY_CATEGORIES:
-            break
-    return names or ["Other"]
-
-
 def get_pantry_inventory() -> list[dict]:
     raw_items = _read_app_state().get("pantry_inventory") or []
     cleaned: list[dict] = []
@@ -278,13 +278,13 @@ def get_pantry_inventory() -> list[dict]:
 
 
 def get_pantry_categories(items: list[dict] | None = None) -> list[str]:
-    state = _read_app_state()
-    inventory = items if items is not None else get_pantry_inventory()
-    extras = [str(row.get("category") or "") for row in inventory if isinstance(row, dict)]
-    return _normalize_category_list(state.get("pantry_categories"), extra=extras)
+    return list(AISLE_CATEGORIES)
 
 
 def save_pantry_inventory(items: list, categories: list[str] | None = None) -> dict:
+    # Client-supplied category lists are ignored; aisles come from
+    # AISLE_CATEGORIES. `categories` stays on the signature for the PUT body.
+    _ = categories
     cleaned: list[dict] = []
     seen_ids: set[str] = set()
     for raw in items:
@@ -297,28 +297,174 @@ def save_pantry_inventory(items: list, categories: list[str] | None = None) -> d
             continue
         seen_ids.add(item["id"])
         cleaned.append(item)
-    extras = [row["category"] for row in cleaned]
-    if categories is None:
-        names = get_pantry_categories(cleaned)
-        _write_app_state(pantry_inventory=cleaned)
-    else:
-        names = _normalize_category_list(categories, extra=extras)
-        _write_app_state(pantry_inventory=cleaned, pantry_categories=names)
+    names = get_pantry_categories(cleaned)
+    _write_app_state(pantry_inventory=cleaned, pantry_categories=names)
     return {"items": cleaned, "categories": names}
+
+
+_UNICODE_FRACTIONS = {
+    "¼": 0.25,
+    "½": 0.5,
+    "¾": 0.75,
+    "⅓": 1 / 3,
+    "⅔": 2 / 3,
+    "⅛": 0.125,
+    "⅜": 0.375,
+}
+
+
+def _canonical_to_buy_key(text: str) -> str:
+    name = canonical_ingredient(text)
+    if name:
+        return name
+    return " ".join(str(text or "").split()).casefold()
+
+
+def _same_to_buy_row(item: dict, text: str) -> bool:
+    return _canonical_to_buy_key(item.get("text") or "") == _canonical_to_buy_key(text)
+
+
+def _parse_qty_number(token: str) -> float | None:
+    raw = (token or "").strip().replace(",", ".")
+    if raw in _UNICODE_FRACTIONS:
+        return _UNICODE_FRACTIONS[raw]
+    if "/" in raw and raw.count("/") == 1:
+        left, right = raw.split("/")
+        try:
+            denom = float(right)
+        except ValueError:
+            return None
+        if denom == 0:
+            return None
+        try:
+            return float(left) / denom
+        except ValueError:
+            return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _canonical_unit(unit: str) -> str:
+    text = " ".join((unit or "").strip(".,;").lower().split())
+    if text in {"floz", "fl.oz", "fl oz", "fluid oz", "fluid ounce", "fluid ounces"}:
+        return "fl oz"
+    if text.endswith("es") and text[:-2] in UNITS:
+        return text[:-2]
+    if text.endswith("s") and text[:-1] in UNITS:
+        return text[:-1]
+    return text
+
+
+def _format_qty_amount(amount: float, unit: str) -> str:
+    if abs(amount - round(amount)) < 1e-9:
+        number = str(int(round(amount)))
+    else:
+        number = f"{amount:.3f}".rstrip("0").rstrip(".")
+    return f"{number} {unit}".strip()
+
+
+def _parse_source_qty(qty: str) -> tuple[float, str] | None:
+    text = (qty or "").strip()
+    if not text:
+        return None
+    leading, _rest = _split_leading_quantity(text)
+    if not leading:
+        return None
+    words = leading.split()
+    amount = _parse_qty_number(words[0])
+    if amount is None:
+        return None
+    unit = _canonical_unit(" ".join(words[1:]))
+    return amount, unit
+
+
+def _merge_qty(sources: list[dict]) -> str:
+    """Sum same-unit source qtys; mixed or unparseable parts join with ' + '."""
+    grouped: dict[str, float] = {}
+    order: list[str] = []
+    leftovers: list[str] = []
+    for source in sources:
+        raw = str(source.get("qty") or "").strip()
+        if not raw:
+            continue
+        parsed = _parse_source_qty(raw)
+        if parsed is None:
+            leftovers.append(raw)
+            continue
+        amount, unit = parsed
+        if unit not in grouped:
+            order.append(unit)
+            grouped[unit] = 0.0
+        grouped[unit] += amount
+    parts = [_format_qty_amount(grouped[unit], unit) for unit in order]
+    parts.extend(leftovers)
+    return " + ".join(parts)
+
+
+def _normalize_source(raw) -> dict | None:
+    if hasattr(raw, "model_dump"):
+        raw = raw.model_dump()
+    if not isinstance(raw, dict):
+        return None
+    recipe_id = raw.get("recipe_id")
+    if recipe_id is not None and recipe_id != "":
+        try:
+            recipe_id = int(recipe_id)
+        except (TypeError, ValueError):
+            return None
+    else:
+        recipe_id = None
+    return {
+        "recipe_id": recipe_id,
+        "qty": str(raw.get("qty") or "").strip(),
+    }
+
+
+def _normalize_to_buy_sources(raw: dict) -> list[dict]:
+    incoming = raw.get("sources")
+    if isinstance(incoming, list) and incoming:
+        sources: list[dict] = []
+        seen: set = set()
+        for entry in incoming:
+            source = _normalize_source(entry)
+            if source is None:
+                continue
+            key = source["recipe_id"]
+            if key in seen:
+                sources = [item for item in sources if item["recipe_id"] != key]
+            else:
+                seen.add(key)
+            sources.append(source)
+        return sources
+    qty = str(raw.get("qty") or "").strip()
+    return [{"recipe_id": None, "qty": qty}]
+
+
+def _finalize_to_buy_item(item: dict) -> dict:
+    sources = item.get("sources") or []
+    item["qty"] = _merge_qty(sources)
+    item["category"] = _category_for_item(item["text"], item.get("category"))
+    return item
 
 
 def _normalize_to_buy_item(raw: dict) -> dict | None:
     text = str(raw.get("text") or "").strip()
     if not text:
         return None
+    sources = _normalize_to_buy_sources(raw)
+    if not sources:
+        return None
     item_id = str(raw.get("id") or "").strip() or str(uuid.uuid4())
-    return {
+    return _finalize_to_buy_item({
         "id": item_id,
         "text": text,
-        "qty": str(raw.get("qty") or "").strip(),
+        "category": raw.get("category"),
         "notes": str(raw.get("notes") or "").strip()[:200],
         "checked": bool(raw.get("checked", False)),
-    }
+        "sources": sources,
+    })
 
 
 def get_to_buy_items() -> list[dict]:
@@ -348,6 +494,59 @@ def save_to_buy_items(items: list) -> list[dict]:
         cleaned.append(item)
     _write_app_state(to_buy=cleaned)
     return cleaned
+
+
+def add_to_buy_source(text: str, qty: str = "", recipe_id: int | None = None) -> list[dict]:
+    trimmed = str(text or "").strip()
+    if not trimmed:
+        return get_to_buy_items()
+    qty = str(qty or "").strip()
+    if recipe_id is not None:
+        recipe_id = int(recipe_id)
+    items = get_to_buy_items()
+    target = next((item for item in items if _same_to_buy_row(item, trimmed)), None)
+    source = {"recipe_id": recipe_id, "qty": qty}
+    if target is None:
+        items.append({
+            "id": str(uuid.uuid4()),
+            "text": trimmed,
+            "category": _category_for_item(trimmed, None),
+            "notes": "",
+            "checked": False,
+            "sources": [source],
+        })
+    else:
+        target["sources"] = [
+            entry for entry in target.get("sources") or []
+            if entry.get("recipe_id") != recipe_id
+        ]
+        target["sources"].append(source)
+        target["checked"] = False
+    return save_to_buy_items(items)
+
+
+def remove_to_buy_source(text: str, recipe_id: int | None = None) -> list[dict]:
+    trimmed = str(text or "").strip()
+    if not trimmed:
+        return get_to_buy_items()
+    if recipe_id is not None:
+        recipe_id = int(recipe_id)
+    items = get_to_buy_items()
+    next_items: list[dict] = []
+    for item in items:
+        if not _same_to_buy_row(item, trimmed):
+            next_items.append(item)
+            continue
+        sources = [
+            entry for entry in item.get("sources") or []
+            if entry.get("recipe_id") != recipe_id
+        ]
+        if not sources:
+            continue
+        item = dict(item)
+        item["sources"] = sources
+        next_items.append(item)
+    return save_to_buy_items(next_items)
 
 
 # Gemini's free-tier quota resets on its own clock (~midnight Pacific, per

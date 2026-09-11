@@ -297,6 +297,9 @@
     "Clear" : {
       "extractionState" : "manual"
     },
+    "Clear all" : {
+      "extractionState" : "manual"
+    },
     "Clear all filters" : {
       "extractionState" : "manual"
     },

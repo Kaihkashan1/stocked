@@ -155,29 +155,7 @@ class PantryUpdate(BaseModel):
 
 # Inventory on the Cupboard tab — distinct from PantryUpdate/`have`, which is
 # still the list-screen "What I have" fit filter (a flat string list).
-PANTRY_CATEGORIES = (
-    "Grains",
-    "Canned Goods",
-    "Baking Supplies",
-    "Snacks",
-    "Breakfast Items",
-    "Condiments & Sauces",
-    "Spices & Seasonings",
-    "Pantry Staples",
-    "Supplements / Vitamins",
-    "Plant-Based Proteins",
-    "Other",
-)
-PANTRY_CATEGORY_ALIASES = {
-    "Grains & pantry": "Grains",
-    "Grains & cupboard": "Grains",
-    "Condiments & spices": "Condiments & Sauces",
-    "Produce": "Other",
-    "Dairy & eggs": "Other",
-    "Meat & seafood": "Other",
-}
-MAX_PANTRY_CATEGORY_LENGTH = 40
-MAX_PANTRY_CATEGORIES = 32
+# Aisle names live in app.match.AISLE_CATEGORIES (shared with to-buy).
 PantryUnit = Literal["pcs", "g", "kg"]
 PantryStatus = Literal["open", "unopened"]
 
@@ -198,16 +176,29 @@ class PantryInventoryUpdate(BaseModel):
     categories: list[str] | None = None
 
 
+class ToBuySource(BaseModel):
+    recipe_id: int | None = None
+    qty: str = ""
+
+
 class ToBuyItem(BaseModel):
     id: str
     text: str
+    category: str = "Other"
     qty: str = ""
     notes: str = ""
     checked: bool = False
+    sources: list[ToBuySource] = Field(default_factory=list)
 
 
 class ToBuyUpdate(BaseModel):
     items: list[ToBuyItem] = Field(default_factory=list)
+
+
+class ToBuySourceChange(BaseModel):
+    text: str
+    qty: str = ""
+    recipe_id: int | None = None
 
 
 class RecipeCategory(BaseModel):

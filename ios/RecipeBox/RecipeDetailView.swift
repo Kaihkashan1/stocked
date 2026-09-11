@@ -466,7 +466,7 @@ private struct IngredientsCard: View {
                                 .foregroundStyle(Theme.ink)
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                            toBuyButton(for: parsed)
+                            toBuyButton(for: parsed, recipeID: recipe.id)
                         }
                         .padding(.vertical, 13)
 
@@ -484,11 +484,11 @@ private struct IngredientsCard: View {
 
     /// Round + / ✓ control — the only link from a recipe into the Cupboard
     /// to-buy list. Prefills qty from the ingredient's quantity chip.
-    private func toBuyButton(for line: IngredientLine) -> some View {
-        let inList = pantry.isInToBuy(line.text)
+    private func toBuyButton(for line: IngredientLine, recipeID: Int) -> some View {
+        let inList = pantry.isInToBuy(text: line.text, recipeID: recipeID)
         return Button {
             let qty = line.quantity.map { metricFromOunces($0, ingredient: line.text) } ?? ""
-            pantry.toggleToBuy(text: line.text, qty: qty)
+            pantry.toggleToBuy(text: line.text, qty: qty, recipeID: recipeID)
         } label: {
             LucideIcon(inList ? .check : .plus, size: 12)
                 .foregroundStyle(inList ? Theme.bg : Theme.neutral700)

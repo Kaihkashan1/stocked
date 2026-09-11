@@ -139,48 +139,165 @@ struct PantryItem: Codable, Hashable, Identifiable {
     }
 }
 
+struct ToBuySource: Codable, Hashable {
+    var recipeID: Int?
+    var qty: String
+
+    init(recipeID: Int? = nil, qty: String = "") {
+        self.recipeID = recipeID
+        self.qty = qty
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        recipeID = try container.decodeIfPresent(Int.self, forKey: .recipeID)
+        qty = try container.decodeIfPresent(String.self, forKey: .qty) ?? ""
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(recipeID, forKey: .recipeID)
+        try container.encode(qty, forKey: .qty)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case recipeID = "recipe_id"
+        case qty
+    }
+}
+
 struct ToBuyItem: Codable, Hashable, Identifiable {
     var id: String
     var text: String
-    /// Free-text amount from a recipe ("200 g") or typed in on the To buy row.
+    var category: String
+    /// Derived from `sources` — never a separate override.
     var qty: String
-    /// Optional extra reminder on the To buy row ("brand", "from the market").
     var notes: String
     var checked: Bool
+    var sources: [ToBuySource]
 
-    init(id: String = UUID().uuidString, text: String, qty: String = "", notes: String = "", checked: Bool = false) {
+    var recipeSourceCount: Int {
+        sources.filter { $0.recipeID != nil }.count
+    }
+
+    init(
+        id: String = UUID().uuidString,
+        text: String,
+        category: String = "Other",
+        qty: String = "",
+        notes: String = "",
+        checked: Bool = false,
+        sources: [ToBuySource]? = nil
+    ) {
         self.id = id
         self.text = text
-        self.qty = qty
+        self.category = category
         self.notes = notes
         self.checked = checked
+        let resolved = sources ?? [ToBuySource(recipeID: nil, qty: qty)]
+        self.sources = resolved
+        self.qty = mergeToBuyQty(resolved)
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         text = try container.decode(String.self, forKey: .text)
-        qty = try container.decodeIfPresent(String.self, forKey: .qty) ?? ""
-        if let value = try? container.decode(String.self, forKey: .notes) {
-            notes = value
-        } else {
-            notes = ""
-        }
+        category = try container.decodeIfPresent(String.self, forKey: .category) ?? "Other"
+        notes = (try? container.decode(String.self, forKey: .notes)) ?? ""
         checked = try container.decodeIfPresent(Bool.self, forKey: .checked) ?? false
+        let decodedQty = try container.decodeIfPresent(String.self, forKey: .qty) ?? ""
+        if let decoded = try container.decodeIfPresent([ToBuySource].self, forKey: .sources), !decoded.isEmpty {
+            sources = decoded
+        } else {
+            sources = [ToBuySource(recipeID: nil, qty: decodedQty)]
+        }
+        qty = mergeToBuyQty(sources)
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(text, forKey: .text)
-        try container.encode(qty, forKey: .qty)
+        try container.encode(category, forKey: .category)
+        try container.encode(mergeToBuyQty(sources), forKey: .qty)
         try container.encode(notes, forKey: .notes)
         try container.encode(checked, forKey: .checked)
+        try container.encode(sources, forKey: .sources)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, text, qty, notes, checked
+        case id, text, category, qty, notes, checked, sources
     }
+}
+
+func mergeToBuyQty(_ sources: [ToBuySource]) -> String {
+    var grouped: [(unit: String, amount: Double)] = []
+    var leftovers: [String] = []
+    for source in sources {
+        let raw = source.qty.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { continue }
+        if let parsed = parseToBuyQty(raw) {
+            if let index = grouped.firstIndex(where: { $0.unit == parsed.unit }) {
+                grouped[index].amount += parsed.amount
+            } else {
+                grouped.append(parsed)
+            }
+        } else {
+            leftovers.append(raw)
+        }
+    }
+    var parts = grouped.map { formatToBuyQty($0.amount, unit: $0.unit) }
+    parts.append(contentsOf: leftovers)
+    return parts.joined(separator: " + ")
+}
+
+private let toBuyQtyUnits: Set<String> = [
+    "cup", "cups", "tbsp", "tsp", "teaspoon", "teaspoons", "tablespoon", "tablespoons",
+    "g", "gram", "grams", "kg", "ml", "l", "litre", "liter",
+    "oz", "ounce", "ounces", "lb", "pound",
+    "clove", "cloves", "slice", "slices", "pinch", "pinches",
+    "can", "cans", "pack", "packet", "piece", "pieces", "handful",
+]
+
+private func parseToBuyQty(_ text: String) -> (unit: String, amount: Double)? {
+    let words = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+    guard let first = words.first, let amount = Double(first.replacingOccurrences(of: ",", with: ".")) else {
+        return nil
+    }
+    var consumed = 1
+    if words.count > 1 {
+        let second = words[1].trimmingCharacters(in: CharacterSet(charactersIn: ".,;")).lowercased()
+        if toBuyQtyUnits.contains(second) || second == "floz" || second == "fl.oz" {
+            consumed = 2
+        }
+    }
+    let unitRaw = words[1..<consumed].joined(separator: " ")
+    return (canonicalToBuyUnit(unitRaw), amount)
+}
+
+private func canonicalToBuyUnit(_ unit: String) -> String {
+    var text = unit.trimmingCharacters(in: CharacterSet(charactersIn: ".,;")).lowercased()
+    if ["floz", "fl.oz", "fl oz"].contains(text) { return "fl oz" }
+    if text.hasSuffix("s"), toBuyQtyUnits.contains(String(text.dropLast())) {
+        text = String(text.dropLast())
+    }
+    return text
+}
+
+private func formatToBuyQty(_ amount: Double, unit: String) -> String {
+    let number: String
+    if abs(amount - amount.rounded()) < 0.000_000_001 {
+        number = String(Int(amount.rounded()))
+    } else {
+        number = String(format: "%g", amount)
+    }
+    let trimmedUnit = unit.trimmingCharacters(in: .whitespaces)
+    return trimmedUnit.isEmpty ? number : "\(number) \(trimmedUnit)"
+}
+
+func toBuyMatchKey(_ text: String) -> String {
+    text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 }
 
 /// Older backends omit `notes` on to-buy rows. Keep whatever was typed locally
@@ -207,6 +324,28 @@ struct PantryInventoryResponse: Codable {
 
 struct ToBuyResponse: Codable {
     let items: [ToBuyItem]
+}
+
+struct ToBuySourceChange: Encodable {
+    let text: String
+    var qty: String = ""
+    var recipeID: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case text, qty
+        case recipeID = "recipe_id"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(text, forKey: .text)
+        try container.encode(qty, forKey: .qty)
+        if let recipeID {
+            try container.encode(recipeID, forKey: .recipeID)
+        } else {
+            try container.encodeNil(forKey: .recipeID)
+        }
+    }
 }
 
 struct Recipe: Codable, Identifiable, Hashable {
