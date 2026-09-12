@@ -15,6 +15,12 @@ final class RecipeStore {
     var recipes: [Recipe] = []
     var isLoading = false
     var errorMessage: String?
+    /// Set only when an *automatic* refresh (launch/foreground/reconnect)
+    /// fails with an existing cache already on screen — those failures used
+    /// to be swallowed silently, leaving stale data with no sign a refresh
+    /// even happened. `errorMessage` above stays reserved for the
+    /// cold-empty-cache case, which already shows a real loading state.
+    var lastRefreshError: String?
     /// Tags cover cooking method/appliance (air-fryer, one-pot, ...), diet
     /// (vegetarian, non-vegetarian), course (dessert), and source (mom's
     /// recipes) — whatever a recipe is tagged with — so this is the one
@@ -473,14 +479,14 @@ final class RecipeStore {
     }
 
     @discardableResult
-    func refresh(force: Bool = true) async -> Bool {
+    func refresh(force: Bool = true, auto: Bool = false) async -> Bool {
         if !force, let lastSuccessfulRefresh, Date().timeIntervalSince(lastSuccessfulRefresh) < Self.staleInterval {
             return true
         }
         if let refreshTask {
             return await refreshTask.value
         }
-        let task = Task { await loadRemote() }
+        let task = Task { await loadRemote(auto: auto) }
         refreshTask = task
         let result = await task.value
         if refreshTask == task {
@@ -489,13 +495,35 @@ final class RecipeStore {
         return result
     }
 
-    private func loadRemote() async -> Bool {
+    private func loadRemote(auto: Bool) async -> Bool {
         let hadRecipes = !recipes.isEmpty
         if !hadRecipes {
             isLoading = true
         }
         defer { isLoading = false }
 
+        if await fetchOnce(hadRecipes: hadRecipes) {
+            lastRefreshError = nil
+            return true
+        }
+        // An automatic refresh (launch/foreground/reconnect) with an
+        // existing cache gets one retry after a short delay before giving
+        // up — the common real-world cause is a cold Vercel function on the
+        // very first hit, which a manual pull-to-refresh moments later
+        // would have beaten anyway. A manual pull-to-refresh itself (auto:
+        // false) does not retry — the user can just pull again.
+        guard auto, hadRecipes, !Task.isCancelled else { return false }
+        try? await Task.sleep(nanoseconds: 2_500_000_000)
+        guard !Task.isCancelled else { return false }
+        if await fetchOnce(hadRecipes: hadRecipes) {
+            lastRefreshError = nil
+            return true
+        }
+        lastRefreshError = "Couldn't refresh — pull down to try again."
+        return false
+    }
+
+    private func fetchOnce(hadRecipes: Bool) async -> Bool {
         do {
             let client = APIClient(baseURLString: serverURL)
             async let catalog = client.fetchRecipes()

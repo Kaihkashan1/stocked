@@ -47,3 +47,31 @@ struct OfflineBanner: View {
         .background(Theme.sage100)
     }
 }
+
+/// Shown only after an automatic refresh (launch/foreground/reconnect) has
+/// already failed twice in a row over an existing cache — see
+/// RecipeStore/PantryStore.loadRemote. Terracotta, not sage: unlike being
+/// offline, this is a real failure worth a manual nudge, not a normal state.
+struct RefreshFailedBanner: View {
+    let message: String
+    var onRetry: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                .font(.system(size: 12, weight: .semibold))
+            Text(message)
+                .font(Theme.body(12.5, weight: .semibold))
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Button("Retry", action: onRetry)
+                .font(Theme.body(12.5, weight: .bold))
+                .buttonStyle(.plain)
+        }
+        .foregroundStyle(Theme.accent700)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .padding(.horizontal, Theme.screenPadding)
+        .background(Theme.accent100)
+    }
+}

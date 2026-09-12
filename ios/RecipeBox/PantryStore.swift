@@ -19,6 +19,11 @@ final class PantryStore {
     var toBuy: [ToBuyItem] = []
     var isLoading = false
     var actionError: String?
+    /// Same reasoning as RecipeStore.lastRefreshError — an automatic refresh
+    /// failing silently over an existing cache used to look identical to
+    /// "nothing changed," which is what made a manual pull-to-refresh seem
+    /// necessary every time.
+    var lastRefreshError: String?
 
     private nonisolated static let encoder = JSONEncoder()
     private nonisolated static let decoder = JSONDecoder()
@@ -67,14 +72,14 @@ final class PantryStore {
     }
 
     @discardableResult
-    func refresh(force: Bool = true) async -> Bool {
+    func refresh(force: Bool = true, auto: Bool = false) async -> Bool {
         if !force, let lastSuccessfulRefresh, Date().timeIntervalSince(lastSuccessfulRefresh) < Self.staleInterval {
             return true
         }
         if let refreshTask {
             return await refreshTask.value
         }
-        let task = Task { await loadRemote() }
+        let task = Task { await loadRemote(auto: auto) }
         refreshTask = task
         let result = await task.value
         if refreshTask == task {
@@ -83,12 +88,31 @@ final class PantryStore {
         return result
     }
 
-    private func loadRemote() async -> Bool {
+    private func loadRemote(auto: Bool) async -> Bool {
         let hadCache = !items.isEmpty || !toBuy.isEmpty
         if !hadCache {
             isLoading = true
         }
         defer { isLoading = false }
+
+        if await fetchOnce() {
+            lastRefreshError = nil
+            return true
+        }
+        // See RecipeStore.loadRemote — same one-retry-then-surface pattern
+        // for a silent automatic refresh over an existing cache.
+        guard auto, hadCache, !Task.isCancelled else { return false }
+        try? await Task.sleep(nanoseconds: 2_500_000_000)
+        guard !Task.isCancelled else { return false }
+        if await fetchOnce() {
+            lastRefreshError = nil
+            return true
+        }
+        lastRefreshError = "Couldn't refresh — pull down to try again."
+        return false
+    }
+
+    private func fetchOnce() async -> Bool {
         do {
             let client = APIClient(baseURLString: serverURL)
             async let inventory = client.fetchPantryInventory()

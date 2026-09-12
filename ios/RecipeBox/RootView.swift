@@ -78,6 +78,13 @@ struct RootView: View {
             VStack(spacing: 0) {
                 if connectivity.isOffline {
                     OfflineBanner()
+                } else if let message = refreshErrorMessage {
+                    // Only shown once the auto-retry in loadRemote() has
+                    // already failed twice — a routine cold-function blip
+                    // resolves itself before this ever appears.
+                    RefreshFailedBanner(message: message) {
+                        Task { await refreshCatalog(force: true) }
+                    }
                 }
                 if let job = importBannerJob {
                     importBanner(job)
@@ -184,6 +191,10 @@ struct RootView: View {
         .onChange(of: photoImportStatus) { _, _ in
             handlePhotoImportUpdate()
         }
+    }
+
+    private var refreshErrorMessage: String? {
+        store.lastRefreshError ?? pantryStore.lastRefreshError
     }
 
     private var photoImportStatus: BackgroundImportJob.Status? {
@@ -321,8 +332,12 @@ struct RootView: View {
     /// all fetch. `refresh` coalesces overlapping calls so launch `.task`
     /// plus the first `.active` ping share one request.
     private func refreshCatalog(force: Bool) async {
-        async let recipes = store.refresh(force: force)
-        async let pantry = pantryStore.refresh(force: force)
+        // auto: true — every caller here is launch/foreground/reconnect,
+        // never a manual pull-to-refresh — so a failure over an existing
+        // cache gets the one-retry-then-banner treatment (see
+        // RecipeStore/PantryStore.loadRemote) instead of failing silently.
+        async let recipes = store.refresh(force: force, auto: true)
+        async let pantry = pantryStore.refresh(force: force, auto: true)
         _ = await (recipes, pantry)
     }
 
