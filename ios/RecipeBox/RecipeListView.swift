@@ -299,7 +299,8 @@ private struct PantryBanner: View {
     }
 
     /// One removable chip per ingredient filter, same × pattern as the
-    /// Filters sheet's what-I-have card, plus a compact Clear all.
+    /// Filters sheet's what-I-have card. No separate "Clear all" here — the
+    /// "Clear all filters" row just below already covers that.
     private var banner: some View {
         FlowLayout(spacing: 8) {
             ForEach(store.have, id: \.self) { item in
@@ -317,10 +318,6 @@ private struct PantryBanner: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(L("Remove \(item)"))
             }
-            Button(L("Clear all")) { store.setHave([]) }
-                .font(Theme.body(12.5, weight: .semibold))
-                .foregroundStyle(Theme.sage800)
-                .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
