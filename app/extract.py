@@ -106,6 +106,12 @@ def extract_recipe(post: FetchedPost) -> tuple[list[Recipe], bool]:
         api_key=settings.gemini_api_key,
         http_options=types.HttpOptions(timeout=call_timeout_ms),
     )
+    if caption.strip():
+        text_recipes, used_backup = _extract_from_caption(client, caption_part)
+        if text_recipes:
+            logger.info("Extracted from caption/comments without watching the video")
+            return text_recipes, used_backup
+
     uploaded: list = []
     try:
         contents: list = []
@@ -137,6 +143,50 @@ def extract_recipe(post: FetchedPost) -> tuple[list[Recipe], bool]:
                 client.files.delete(name=file.name)
             except Exception:
                 logger.debug("Could not delete Gemini file %s", getattr(file, "name", file))
+
+
+def _extract_from_caption(client, caption_part: str) -> tuple[list[Recipe], bool]:
+    """Cheap first pass: caption + owner comments only, no video upload.
+
+    Incomplete or missing recipes return [] so extract_recipe can watch the
+    reel. Quota errors still raise — a second video call would fail too.
+    """
+    on_vercel = bool(os.environ.get("VERCEL"))
+    try:
+        text, used_backup = _generate_with_retry(
+            client,
+            [caption_part],
+            RecipeSet,
+            timeout_ms=(40_000 if on_vercel else 60_000),
+        )
+    except Exception as exc:
+        if gemini_is_quota_exhausted(exc):
+            raise
+        logger.info("Caption-only extract failed (%s); watching media", type(exc).__name__)
+        return [], False
+    recipes = _importable_recipes_from_json(text)
+    if recipes:
+        return recipes, used_backup
+    logger.info("Caption/comments had no complete recipe; watching media")
+    return [], used_backup
+
+
+def _importable_recipes_from_json(text: str) -> list[Recipe]:
+    """Like `_parse_recipe_set`, but a miss is empty instead of an error."""
+    parsed = None
+    try:
+        parsed = RecipeSet.model_validate_json(text)
+    except Exception:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1:
+            try:
+                parsed = RecipeSet.model_validate(json.loads(text[start : end + 1]))
+            except Exception:
+                parsed = None
+    if parsed is None or parsed.content_kind == "not_recipe":
+        return []
+    return [item for item in parsed.recipes if recipe_is_importable(item)][:5]
 
 
 _IMAGE_MIME = {

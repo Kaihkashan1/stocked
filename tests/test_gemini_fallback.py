@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from google.genai.errors import APIError as GeminiAPIError
 
 from app.errors import NOT_A_RECIPE_MESSAGE, REQUEST_TIMEOUT_MESSAGE
-from app.extract import _generate_with_retry, _parse_recipe_set
+from app.extract import _generate_with_retry, _importable_recipes_from_json, _parse_recipe_set
 from app.store import _parse_import_log_values, _present_import_rows
 
 
@@ -60,6 +60,25 @@ class GenerateWithRetryTests(TestCase):
         self.assertEqual(text, '{"ok": true}')
         self.assertFalse(used_backup)
         self.assertEqual(self.once.call_count, 1)
+
+
+class CaptionFirstExtractTests(TestCase):
+    def test_complete_caption_recipe_is_used(self):
+        payload = json.dumps({"content_kind": "recipe", "recipes": [_pasta()]})
+        recipes = _importable_recipes_from_json(payload)
+        self.assertEqual(len(recipes), 1)
+        self.assertEqual(recipes[0].title, "Pasta")
+
+    def test_not_recipe_falls_through_to_video(self):
+        payload = json.dumps({"content_kind": "not_recipe", "recipes": []})
+        self.assertEqual(_importable_recipes_from_json(payload), [])
+
+    def test_ingredients_without_steps_falls_through(self):
+        payload = json.dumps({
+            "content_kind": "recipe",
+            "recipes": [_pasta(steps=[])],
+        })
+        self.assertEqual(_importable_recipes_from_json(payload), [])
 
 
 def _pasta(**overrides):
