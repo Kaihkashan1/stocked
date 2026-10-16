@@ -19,6 +19,22 @@ class CanonicalIngredientTests(unittest.TestCase):
     def test_protected_phrase_keeps_protein(self):
         self.assertEqual(canonical_ingredient("1 tbsp protein powder"), "protein powder")
 
+    def test_strips_vague_measure_and_quantity_words(self):
+        # "spoon" isn't a real unit word like tbsp/tsp, but it shouldn't
+        # end up glued onto the ingredient name either.
+        self.assertEqual(canonical_ingredient("1 spoon turmeric"), "turmeric")
+        self.assertEqual(canonical_ingredient("few sprig coriander"), "coriander")
+        self.assertEqual(canonical_ingredient("half mushroom"), "mushroom")
+        self.assertEqual(canonical_ingredient("med red onion"), "red onion")
+
+    def test_plural_unit_is_caught_without_a_second_entry(self):
+        self.assertEqual(canonical_ingredient("2 packets fajita seasoning"), "fajita seasoning")
+        self.assertEqual(canonical_ingredient("3 spoons salt"), "salt")
+
+    def test_collapses_prawn_descriptors(self):
+        for text in ["deveined prawn", "freshwater prawn", "frozen king prawn", "marinated prawn", "prawn"]:
+            self.assertEqual(canonical_ingredient(text), "prawn")
+
 
 class CollapseCatalogTests(unittest.TestCase):
     def test_folds_descriptive_variant_into_existing_entry(self):

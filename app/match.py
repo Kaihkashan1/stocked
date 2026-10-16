@@ -128,6 +128,23 @@ UNITS = {
     "piece",
     "pieces",
     "handful",
+    "spoon",
+    "scoop",
+    "shot",
+    "stick",
+    "splash",
+    "drizzle",
+    "dash",
+    "glass",
+    "sprig",
+    "tin",
+    "jar",
+    "bottle",
+    "bag",
+    "box",
+    "sachet",
+    "knob",
+    "bunch",
 }
 PREP = {
     "chopped",
@@ -168,9 +185,34 @@ PREP = {
     "inch",
     "inches",
     "size",
+    "sized",
     "halved",
     "mini",
     "protein",
+    # Vague quantity/amount words ("few sprig coriander", "half salt",
+    # "spoon turmeric" after the unit word is dropped) that aren't units
+    # themselves but still aren't part of the ingredient's name.
+    "few",
+    "half",
+    "couple",
+    "little",
+    "more",
+    "med",
+    "generous",
+    "amount",
+    "loads",
+    "packed",
+    "required",
+    "remaining",
+    "reserved",
+    # Prawn/shrimp descriptors — "deveined prawn", "freshwater prawn",
+    # "frozen king prawn", "marinated prawn" should all collapse to "prawn".
+    "deveined",
+    "peeled",
+    "marinated",
+    "frozen",
+    "king",
+    "freshwater",
 }
 # Cuts and shapes of a grocery item, not their own pantry entries.
 # "chicken lollipop" and "chicken breast" should both be "chicken".
@@ -234,8 +276,15 @@ def canonical_ingredient(line: str) -> str:
     text = re.sub(r"[\d¼½¾⅓⅔⅛⅜/.\-]+", " ", text)
     for phrase in _PROTECTED_PHRASES:
         text = text.replace(phrase, phrase.replace(" ", "_"))
-    words = [word for word in re.findall(r"[a-z_]+", text) if word not in UNITS and word not in PREP]
-    core = [word for word in words if word not in FORMS]
+    # Checked by both the raw word and its singular, so a plural someone
+    # didn't think to list by hand (e.g. "spoons", "packets") is still
+    # caught without needing a second entry in UNITS/PREP/FORMS.
+    words = [
+        word
+        for word in re.findall(r"[a-z_]+", text)
+        if word not in UNITS and word not in PREP and _singularize(word) not in UNITS and _singularize(word) not in PREP
+    ]
+    core = [word for word in words if word not in FORMS and _singularize(word) not in FORMS]
     if core:
         words = core
     if not words:
