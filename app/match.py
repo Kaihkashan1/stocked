@@ -282,6 +282,49 @@ def match_score(pantry: list[str], selected: list[str]) -> dict | None:
     }
 
 
+# Trailing words that only describe the cut/part of an ingredient someone
+# already has elsewhere in the catalog, e.g. "spinach leaves" and "spinach"
+# are the same pantry item. Only strips when the shorter form is *already*
+# a catalog entry in its own right — never invents a new canonical name, so
+# an ingredient whose real name ends in one of these ("curry leaves", "bay
+# leaf") is left alone unless "curry"/"bay" also shows up on its own.
+_CATALOG_DESCRIPTORS = {
+    "leaf",
+    "leaves",
+    # _singularize only strips a trailing "s", so "leaves" comes out of
+    # canonical_ingredient as "leave" (an irregular plural _singularize
+    # doesn't special-case, like knife/knives) — catch that form too.
+    "leave",
+    "sprig",
+    "sprigs",
+    "stalk",
+    "stalks",
+    "stem",
+    "stems",
+    "floret",
+    "florets",
+}
+
+
+def collapse_catalog(items: list[str]) -> list[str]:
+    """Fold descriptive variants of an existing catalog entry into it.
+
+    Given a deduped, cross-recipe list of canonical ingredient names,
+    returns the same set with entries like "spinach leaves" merged into
+    "spinach" when "spinach" is also present."""
+    item_set = set(items)
+    merged: set[str] = set()
+    for item in items:
+        words = item.split()
+        if len(words) > 1 and words[-1] in _CATALOG_DESCRIPTORS:
+            shorter = " ".join(words[:-1])
+            if shorter in item_set:
+                merged.add(shorter)
+                continue
+        merged.add(item)
+    return sorted(merged, key=str.lower)
+
+
 def _names_match(left: str, right: str) -> bool:
     if left == right:
         return True

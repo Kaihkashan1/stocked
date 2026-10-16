@@ -19,7 +19,7 @@ from app.config import ROOT, settings
 from app.errors import GEMINI_DAILY_QUOTA, NOT_A_RECIPE_MESSAGE, REQUEST_TIMEOUT_MESSAGE, friendly_message, gemini_is_busy
 from app.extract import extract_recipe
 from app.fetch import extract_url, get_apify_usage
-from app.match import STAPLES, grouped_pantry
+from app.match import STAPLES, collapse_catalog, grouped_pantry
 from app.models import (
     FetchedPost,
     PantryInventoryUpdate,
@@ -106,7 +106,8 @@ async def api_list_recipes():
     # need to show up in the catalog too, so they get a real category
     # instead of vanishing until they happen to match a recipe.
     items |= set(get_have_items())
-    return {"recipes": recipes, "pantry": grouped_pantry(sorted(items, key=str.lower))}
+    catalog = collapse_catalog(sorted(items, key=str.lower))
+    return {"recipes": recipes, "pantry": grouped_pantry(catalog)}
 
 
 @app.get("/api/recipes/{row_id}")

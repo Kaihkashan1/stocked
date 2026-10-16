@@ -819,10 +819,11 @@ function closeRecipeMenu() {
   if (btn) btn.setAttribute("aria-expanded", "false");
 }
 
+// Reads from the server-grouped catalog (already deduped and collapsed,
+// e.g. "spinach leaves" folded into "spinach") rather than recomputing an
+// uncollapsed list straight from each recipe's raw pantry field.
 function pantryCatalog() {
-  return unique(state.recipes.flatMap((recipe) => recipe.pantry || [])).filter(
-    (item) => !STAPLES.has(item)
-  );
+  return state.pantryGroups.flatMap((group) => group.items);
 }
 
 function groupPantry(items) {
