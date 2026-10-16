@@ -650,7 +650,7 @@ final class RecipeStore {
         }
         visiblePantryGroups = groups.compactMap { group in
             let items = group.items.filter { item in
-                !haveSet.contains(item) && (item.contains(needle) || needle.contains(item) || namesMatch(item, needle))
+                !haveSet.contains(item) && pantryQueryMatch(item, needle)
             }
             return items.isEmpty ? nil : PantryGroup(category: group.category, items: items)
         }

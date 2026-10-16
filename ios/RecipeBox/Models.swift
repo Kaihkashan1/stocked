@@ -1232,6 +1232,18 @@ func namesMatch(_ left: String, _ right: String) -> Bool {
     left == right || left.contains(right) || right.contains(left) || stem(left) == stem(right)
 }
 
+/// Prefix-only, unlike namesMatch's anywhere-substring check above: while
+/// someone is still typing, a bare substring match is too eager — "pra" is
+/// contained in "spray", so every "oil spray"/"cooking spray" item would
+/// show up in the live suggestion row for someone halfway through typing
+/// "prawn". Matching at the start of the item or of one of its words keeps
+/// suggestions relevant to what's actually been typed so far.
+func pantryQueryMatch(_ item: String, _ needle: String) -> Bool {
+    guard !needle.isEmpty else { return true }
+    if item.hasPrefix(needle) || needle.hasPrefix(item) { return true }
+    return item.split(separator: " ").contains { $0.hasPrefix(needle) }
+}
+
 /// True when the recipe's pantry stems cover every selected ingredient
 /// filter (AND). Independent of Pantry-tab inventory and of fit %.
 func recipeMatchesIngredientFilter(_ recipe: Recipe, ingredients: [String]) -> Bool {

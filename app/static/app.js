@@ -866,9 +866,16 @@ function namesMatch(left, right) {
   return stem(left) === stem(right);
 }
 
+// Prefix-only, unlike namesMatch's anywhere-substring check below: while
+// you're still typing, a bare substring match is too eager — "pra" is
+// contained in "spray", so every "oil spray"/"cooking spray" item would
+// show up in the suggestion row for someone halfway through typing
+// "prawn". Matching at the start of the item or of one of its words
+// keeps suggestions relevant to what's actually been typed so far.
 function pantryQueryMatch(item, needle) {
   if (!needle) return true;
-  return item.includes(needle) || needle.includes(item) || namesMatch(item, needle);
+  if (item.startsWith(needle) || needle.startsWith(item)) return true;
+  return item.split(" ").some((word) => word.startsWith(needle));
 }
 
 // How much of this recipe's core (non-staple) ingredients are covered by
