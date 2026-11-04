@@ -18,10 +18,6 @@ func formatExpiryDate(_ date: Date) -> String {
     return formatter.string(from: date)
 }
 
-/// A plaster or bandage doesn't expire in any way that matters here, so
-/// First aid is the one category where skipping expiry is allowed.
-let medicineExpiryExemptCategory = "First aid"
-
 /// Bottom sheet for adding or editing a medicine — same layout and fields
 /// as PantryItemSheet (Cupboard): this is a stock tracker ("how much do I
 /// have, is it opened, when does it expire"), not a dosage/prescription
@@ -42,7 +38,6 @@ struct MedicineItemSheet: View {
     @State private var expiryDate: Date
     @State private var purpose: String
     @State private var notes: String
-    @State private var showExpiryError = false
 
     init(item: MedicineItem?, categories: [String], onSave: @escaping (MedicineItem) -> Void) {
         let names = categories.isEmpty ? defaultMedicineCategories : categories
@@ -80,10 +75,6 @@ struct MedicineItemSheet: View {
     private var title: String { isEditing ? L("Edit medicine") : L("Add medicine") }
     private var saveLabel: String { isEditing ? L("Save changes") : L("Add medicine") }
 
-    private var expiryExempt: Bool {
-        category.caseInsensitiveCompare(medicineExpiryExemptCategory) == .orderedSame
-    }
-
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -115,7 +106,6 @@ struct MedicineItemSheet: View {
                             ForEach(categories, id: \.self) { option in
                                 compactChip(option, selected: category.caseInsensitiveCompare(option) == .orderedSame) {
                                     category = option
-                                    if expiryExempt { showExpiryError = false }
                                 }
                             }
                         }
@@ -182,7 +172,7 @@ struct MedicineItemSheet: View {
                         }
                     }
 
-                    field(kicker: L("Expiry date")) {
+                    field(kicker: L("Expiry date (optional)")) {
                         VStack(alignment: .leading, spacing: 10) {
                             Toggle(isOn: $hasExpiry) {
                                 Text(hasExpiry ? L("Date set") : L("No expiry"))
@@ -190,7 +180,6 @@ struct MedicineItemSheet: View {
                                     .foregroundStyle(Theme.neutral700)
                             }
                             .tint(Theme.accent)
-                            .onChange(of: hasExpiry) { _, _ in showExpiryError = false }
 
                             if hasExpiry {
                                 DatePicker(
@@ -207,12 +196,6 @@ struct MedicineItemSheet: View {
                                 .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
                                 .clipShape(Capsule())
                             }
-
-                            Text(expiryExempt
-                                ? L("Optional for First aid.")
-                                : L("Required unless the category is First aid."))
-                            .font(Theme.body(12))
-                            .foregroundStyle(showExpiryError ? Theme.accent700 : Theme.neutral600)
                         }
                     }
 
@@ -291,10 +274,6 @@ struct MedicineItemSheet: View {
     private func save() {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        guard hasExpiry || expiryExempt else {
-            showExpiryError = true
-            return
-        }
         let amount = Double(amountText.replacingOccurrences(of: ",", with: ".")) ?? 1
         let saved = MedicineItem(
             id: item?.id ?? UUID().uuidString,

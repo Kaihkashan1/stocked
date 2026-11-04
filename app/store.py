@@ -355,10 +355,6 @@ def _normalize_medicine_item(raw: dict) -> dict | None:
         "amount": amount,
         "unit": unit,
         "status": status,
-        # Required unless First aid — enforced in the add/edit forms (web
-        # and iOS); kept permissive here the same way other "required"
-        # fields in this app are (e.g. a recipe title) rather than
-        # rejecting a save server-side.
         "expiry": expiry,
         "purpose": str(raw.get("purpose") or "").strip(),
         "notes": str(raw.get("notes") or "").strip(),

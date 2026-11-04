@@ -180,8 +180,7 @@ struct MedicineItem: Codable, Hashable, Identifiable {
     var amount: Double
     var unit: MedicineUnit
     var status: PantryItemStatus
-    /// ISO date-only string `YYYY-MM-DD` — required unless category is
-    /// "First aid" (enforced in MedicineItemSheet, not here).
+    /// ISO date-only string `YYYY-MM-DD`, when set.
     var expiry: String?
     var purpose: String
     var notes: String

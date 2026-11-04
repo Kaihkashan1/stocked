@@ -29,11 +29,11 @@
 		A20000000000000000000018 /* PantryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* PantryView.swift */; };
 		A20000000000000000000019 /* PantryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PantryStore.swift */; };
 		A2000000000000000000001A /* PantryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* PantryItemSheet.swift */; };
+		A2000000000000000000001C /* Connectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Connectivity.swift */; };
+		A2000000000000000000001E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* Assets.xcassets */; };
 		A20000000000000000000041 /* MedicineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* MedicineStore.swift */; };
 		A20000000000000000000042 /* MedicineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* MedicineView.swift */; };
 		A20000000000000000000043 /* MedicineItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* MedicineItemSheet.swift */; };
-		A2000000000000000000001C /* Connectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Connectivity.swift */; };
-		A2000000000000000000001E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* Assets.xcassets */; };
 		A40000000000000000000002 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000001 /* Localizable.xcstrings */; };
 		A40000000000000000000004 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000003 /* InfoPlist.xcstrings */; };
 /* End PBXBuildFile section */
@@ -62,11 +62,11 @@
 		A20000000000000000000008 /* PantryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryView.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* PantryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryStore.swift; sourceTree = "<group>"; };
 		A2000000000000000000000A /* PantryItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryItemSheet.swift; sourceTree = "<group>"; };
+		A2000000000000000000000B /* Connectivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connectivity.swift; sourceTree = "<group>"; };
+		A2000000000000000000000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000000000000000000031 /* MedicineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicineStore.swift; sourceTree = "<group>"; };
 		A20000000000000000000032 /* MedicineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicineView.swift; sourceTree = "<group>"; };
 		A20000000000000000000033 /* MedicineItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicineItemSheet.swift; sourceTree = "<group>"; };
-		A2000000000000000000000B /* Connectivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connectivity.swift; sourceTree = "<group>"; };
-		A2000000000000000000000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A40000000000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A40000000000000000000003 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -171,7 +171,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
-				LastUpgradeCheck = 2660;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					A10000000000000000000060 = {
 						CreatedOnToolsVersion = 16.0;
@@ -274,6 +274,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
@@ -296,6 +297,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = PMLXUJ2NU2;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -323,6 +325,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
@@ -345,6 +348,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = PMLXUJ2NU2;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -371,7 +375,6 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = PMLXUJ2NU2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Stocked;
@@ -404,7 +407,6 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = PMLXUJ2NU2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Stocked;

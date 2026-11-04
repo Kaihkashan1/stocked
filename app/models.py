@@ -218,7 +218,7 @@ class MedicineItem(BaseModel):
     amount: float = 1
     unit: MedicineUnit = "pills"
     status: PantryStatus = "unopened"
-    expiry: str | None = None  # YYYY-MM-DD — required unless category is "First aid"
+    expiry: str | None = None  # YYYY-MM-DD, optional
     purpose: str = ""
     notes: str = ""
 

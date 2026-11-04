@@ -180,7 +180,6 @@ const I18N = {
     purposePlaceholder: "e.g. Headache",
     unopened: "Unopened",
     open: "Open",
-    expiryRequiredHint: "Required unless the category is {category}.",
     searchCupboardAria: "Search what's in the cupboard",
     searchCupboardPlaceholder: "Search what's in stock",
     searchMedicinesAria: "Search your medicines",

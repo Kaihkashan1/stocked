@@ -45,6 +45,22 @@ const INGREDIENT_UNITS = new Set([
   "piece", "pieces", "pc", "pcs", "handful", "handfuls",
 ]);
 
+// Fallback category lists for the Cupboard/Medicine add forms, used only
+// until the real list arrives from the server (state.pantryInventoryCategories
+// / state.medicineCategories start empty, so opening "+ Add" right after
+// switching tabs — before that fetch resolves — would otherwise show just
+// "Other"). Mirrors app/match.py's AISLE_CATEGORIES and
+// app/store.py's MEDICINE_CATEGORIES.
+const DEFAULT_PANTRY_CATEGORIES = [
+  "Sauces & condiments", "Meat", "Seafood", "Dairy & eggs", "Nuts & seeds",
+  "Herbs & spices", "Grains & pasta", "Legumes", "Fruit", "Vegetables", "Other",
+];
+const DEFAULT_MEDICINE_CATEGORIES = [
+  "Pain relief", "Fever & cold", "Cough & throat", "Allergy", "Digestive",
+  "Skin & topical", "Eye & ear", "Antibiotics", "Vitamins & supplements",
+  "First aid", "Prescription", "Other",
+];
+
 const LOG_PAGE_SIZE = 5;
 const SECRET_KEY = "recipeBox.secret";
 const HAVE_KEY = "recipeBox.have";
@@ -1740,7 +1756,7 @@ function categoryOptionsHtml(categories, selected) {
 
 function pantryItemFormHtml(item) {
   const config = INVENTORY_KINDS.cupboard;
-  const categories = state.pantryInventoryCategories.length ? state.pantryInventoryCategories : ["Other"];
+  const categories = state.pantryInventoryCategories.length ? state.pantryInventoryCategories : DEFAULT_PANTRY_CATEGORIES;
   const category = item?.category && categories.includes(item.category) ? item.category : categories[0];
   return `
     <div class="drawer-actions">
@@ -1800,14 +1816,9 @@ function saveAddOrEditPantryItem() {
   saveInventoryItem("cupboard", item);
 }
 
-// Expiry is required for every category except First aid (a plaster or a
-// bandage doesn't expire in any way that matters here) — enforced on save,
-// same as a recipe's title being required.
-const MEDICINE_EXPIRY_EXEMPT_CATEGORY = "First aid";
-
 function medicineFormHtml(item) {
   const config = INVENTORY_KINDS.medicine;
-  const categories = state.medicineCategories.length ? state.medicineCategories : ["Other"];
+  const categories = state.medicineCategories.length ? state.medicineCategories : DEFAULT_MEDICINE_CATEGORIES;
   const category = item?.category && categories.includes(item.category) ? item.category : categories[0];
   return `
     <div class="drawer-actions">
@@ -1842,7 +1853,6 @@ function medicineFormHtml(item) {
       <label class="field">
         <span>${escapeHtml(t("expiry"))}</span>
         <input id="medicine-expiry" type="date" value="${escapeAttr(item?.expiry || "")}">
-        <p class="field-note">${escapeHtml(t("expiryRequiredHint", { category: MEDICINE_EXPIRY_EXEMPT_CATEGORY }))}</p>
       </label>
       <label class="field">
         <span>${escapeHtml(t("purpose"))}</span>
@@ -1852,31 +1862,21 @@ function medicineFormHtml(item) {
         <span>${escapeHtml(t("notes"))}</span>
         <textarea id="medicine-notes" class="notes-grow" rows="3">${escapeHtml(item?.notes || "")}</textarea>
       </label>
-      <p id="medicine-error" class="edit-error" hidden></p>
       <button class="pill-btn primary" type="button" data-action="save-medicine">${escapeHtml(t("save"))}</button>
     </div>`;
 }
 
 function saveAddOrEditMedicine() {
   const name = document.getElementById("medicine-name").value.trim();
-  const errorEl = document.getElementById("medicine-error");
   if (!name) return;
-  const category = document.getElementById("medicine-category").value || "Other";
-  const expiry = document.getElementById("medicine-expiry").value || null;
-  if (!expiry && category !== MEDICINE_EXPIRY_EXEMPT_CATEGORY) {
-    errorEl.textContent = t("expiryRequiredHint", { category: MEDICINE_EXPIRY_EXEMPT_CATEGORY });
-    errorEl.hidden = false;
-    return;
-  }
-  errorEl.hidden = true;
   const item = {
     id: document.getElementById("medicine-id").value || `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     name,
-    category,
+    category: document.getElementById("medicine-category").value || "Other",
     amount: Number(document.getElementById("medicine-amount").value) || 1,
     unit: document.getElementById("medicine-unit").value,
     status: document.getElementById("medicine-status").value,
-    expiry,
+    expiry: document.getElementById("medicine-expiry").value || null,
     purpose: document.getElementById("medicine-purpose").value.trim(),
     notes: document.getElementById("medicine-notes").value.trim(),
   };
