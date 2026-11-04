@@ -238,7 +238,7 @@ struct SettingsView: View {
     }
 
     private func importLogRow(_ row: ImportLogEntry) -> some View {
-        let isPhoto = row.url.isEmpty || row.url == "(photo)"
+        let isPhoto = row.url.isEmpty || row.url == "(photo)" || row.url == "photo"
         let headline = row.displayTitle.isEmpty
             ? (row.isError ? L("Errors") : L("Saved"))
             : row.displayTitle

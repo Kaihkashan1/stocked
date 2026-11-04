@@ -16,7 +16,13 @@ from google.genai.errors import APIError as GeminiAPIError
 
 from app.auth import require_secret
 from app.config import ROOT, settings
-from app.errors import GEMINI_DAILY_QUOTA, NOT_A_RECIPE_MESSAGE, REQUEST_TIMEOUT_MESSAGE, friendly_message, gemini_is_busy
+from app.errors import (
+    GEMINI_DAILY_QUOTA,
+    NOT_A_RECIPE_MESSAGE,
+    REQUEST_TIMEOUT_MESSAGE,
+    friendly_message,
+    gemini_is_busy,
+)
 from app.extract import extract_recipe
 from app.fetch import extract_url, get_apify_usage
 from app.match import STAPLES, collapse_catalog, grouped_pantry
@@ -339,12 +345,12 @@ async def ingest(request: Request, background_tasks: BackgroundTasks):
     if os.environ.get("VERCEL"):
         # Keep HTTP 200 on save/duplicate/error so the iPhone Shortcut can
         # read `status` and notify only when it is "error".
-        return await _ingest_watching_client(request, content)
+        return await _ingest_watching_client(request, content, process_recipe)
     background_tasks.add_task(process_recipe, content)
     return {"status": "queued", "message": "Saving… I'll add it to your sheet shortly."}
 
 
-async def _ingest_watching_client(request: Request, content: str) -> dict:
+async def _ingest_watching_client(request: Request, content: str, processor=process_recipe) -> dict:
     """Run ingest off the event loop so a Shortcut hang-up can be logged.
 
     process_recipe is blocking. If it ran inline, the phone closing the
@@ -355,7 +361,7 @@ async def _ingest_watching_client(request: Request, content: str) -> dict:
         url = extract_url(content)
     except Exception:
         url = None
-    task = asyncio.create_task(asyncio.to_thread(process_recipe, content))
+    task = asyncio.create_task(asyncio.to_thread(processor, content))
     logged_timeout = False
     while not task.done():
         if not logged_timeout and await request.is_disconnected():
@@ -393,11 +399,13 @@ async def api_recipe_photo(row_id: int):
     )
 
 
+
 def _public(recipe: dict) -> dict:
     out = {key: value for key, value in recipe.items() if not key.endswith("_text") and key != "photo_id"}
     if recipe.get("photo_id"):
         out["photo_url"] = f"/api/recipes/{recipe['id']}/photo"
     return out
+
 
 
 async def _read_content(request: Request) -> str:

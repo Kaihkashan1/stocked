@@ -728,6 +728,11 @@ struct FiltersSheet: View {
 
 /// Bottom sheet presented from the header's + button.
 struct AddOptionsSheet: View {
+    var title: String = "Add a recipe"
+    var linkSubtitle: String = "Instagram reel or recipe page"
+    var photoSubtitle: String = "Cookbook page or recipe card"
+    var librarySubtitle: String = "A screenshot you already saved"
+    var typedSubtitle: String = "Write it down yourself"
     var onLink: () -> Void
     var onPhoto: () -> Void
     var onLibrary: () -> Void
@@ -740,18 +745,18 @@ struct AddOptionsSheet: View {
                 .frame(width: 44, height: 5)
                 .padding(.top, 10)
 
-            Text("Add a recipe")
+            Text(title)
                 .font(Theme.display(24))
                 .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(spacing: 12) {
-                row(icon: "link", title: L("Paste a link"), subtitle: L("Reel, video, or recipe page"), action: onLink)
+                row(icon: "link", title: L("Paste a link"), subtitle: L(String.LocalizationValue(linkSubtitle)), action: onLink)
                 if CameraPicker.isAvailable {
-                    row(icon: "camera", title: L("Take a photo"), subtitle: L("Cookbook page or recipe card"), action: onPhoto)
+                    row(icon: "camera", title: L("Take a photo"), subtitle: L(String.LocalizationValue(photoSubtitle)), action: onPhoto)
                 }
-                row(icon: "photo.on.rectangle", title: L("Choose from library"), subtitle: L("A screenshot you already saved"), action: onLibrary)
-                row(icon: "keyboard", title: L("Type it in"), subtitle: L("Write it down yourself"), action: onTyped)
+                row(icon: "photo.on.rectangle", title: L("Choose from library"), subtitle: L(String.LocalizationValue(librarySubtitle)), action: onLibrary)
+                row(icon: "keyboard", title: L("Type it in"), subtitle: L(String.LocalizationValue(typedSubtitle)), action: onTyped)
             }
         }
         .padding(EdgeInsets(top: 0, leading: 22, bottom: 40, trailing: 22))

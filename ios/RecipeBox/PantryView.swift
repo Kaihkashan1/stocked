@@ -293,6 +293,12 @@ struct PantryView: View {
                     .font(Theme.body(14.5, weight: .semibold))
                     .foregroundStyle(Theme.neutral900)
                     .multilineTextAlignment(.leading)
+                if !item.notes.isEmpty {
+                    Text(item.notes)
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.neutral600)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 6) {
                         amountAndStatusChips(item)

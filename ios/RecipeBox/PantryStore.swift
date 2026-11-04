@@ -358,6 +358,27 @@ final class PantryStore {
         scheduleToBuySync()
     }
 
+    func updateToBuy(id: String, text: String, category: String?, qty: String, notes: String) {
+        guard let index = toBuy.firstIndex(where: { $0.id == id }) else { return }
+        var item = toBuy[index]
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        item.text = trimmed
+        if let category, !category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            item.category = category
+        }
+        item.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let sourceIndex = item.sources.firstIndex(where: { $0.recipeID == nil }) {
+            item.sources[sourceIndex].qty = qty
+        } else if !qty.isEmpty {
+            item.sources.append(ToBuySource(recipeID: nil, qty: qty))
+        }
+        item.qty = mergeToBuyQty(item.sources)
+        var next = toBuy
+        next[index] = item
+        replaceToBuy(next)
+    }
+
     func replaceToBuy(_ next: [ToBuyItem]) {
         let previous = toBuy
         toBuy = next

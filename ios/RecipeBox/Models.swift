@@ -559,10 +559,9 @@ struct Recipe: Codable, Identifiable, Hashable {
         try container.encodeIfPresent(photoURL, forKey: .photoURL)
     }
 
-    /// nil for "" (typed in) and the "(photo)" sentinel — neither is a real
-    /// link to open.
+    /// nil for "" (typed in) and a photo import — neither is a real link to open.
     var sourceURL: URL? {
-        guard source != "(photo)" else { return nil }
+        guard !isPhotoImportSource(source, photoURL: photoURL) else { return nil }
         return URL(string: source)
     }
 
@@ -586,34 +585,29 @@ struct Recipe: Codable, Identifiable, Hashable {
         return L("Saved \(relative)")
     }
 
-    /// Short, human label for the meta row / detail footer — "INSTAGRAM",
-    /// "YOUTUBE", "TIKTOK", the bare host for any other link, "Photo" for a
-    /// photo extraction saved through the Add-recipe form (source is the
-    /// "(photo)" sentinel for those), or "Typed in" for a genuinely
+    /// Short, human label for the meta row / detail footer — "Instagram",
+    /// the bare host for any other link, "Photo" for a photo extraction
+    /// saved through the Add-recipe form, or "Typed in" for a genuinely
     /// hand-entered recipe (source is "" — see store.py).
     var sourceLabel: String {
-        if source == "(photo)" { return L("Photo") }
+        if isPhotoImportSource(source, photoURL: photoURL) { return L("Photo") }
         guard let host = sourceURL?.host?.lowercased(), !host.isEmpty else {
             return L("Typed in")
         }
         if host.contains("instagram.com") { return L("Instagram") }
-        if host.contains("youtube.com") || host.contains("youtu.be") { return L("YouTube") }
-        if host.contains("tiktok.com") { return L("TikTok") }
         return host.replacingOccurrences(of: "www.", with: "")
     }
 
-    /// The Filters sheet's Source row bucket for this recipe. Instagram,
-    /// YouTube and TikTok are read straight off the URL; anything else with
-    /// a URL is "Link"; the "(photo)" sentinel is "Photo"; a recipe with no
-    /// URL and no sentinel is "Typed in".
+    /// The Filters sheet's Source row bucket for this recipe. Instagram is
+    /// read straight off the URL; anything else with a URL is "Link"; a
+    /// photo import is "Photo"; a recipe with no URL and no photo is
+    /// "Typed in".
     var sourceCategory: SourceCategory {
-        if source == "(photo)" { return .photo }
+        if isPhotoImportSource(source, photoURL: photoURL) { return .photo }
         guard let host = sourceURL?.host?.lowercased(), !host.isEmpty else {
             return .typedIn
         }
         if host.contains("instagram.com") { return .instagram }
-        if host.contains("youtube.com") || host.contains("youtu.be") { return .youtube }
-        if host.contains("tiktok.com") { return .tiktok }
         return .link
     }
 
@@ -663,11 +657,16 @@ enum Course: String, CaseIterable, Identifiable {
     }
 }
 
+func isPhotoImportSource(_ source: String, photoURL: String? = nil) -> Bool {
+    let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    if trimmed == "(photo)" || trimmed == "photo" { return true }
+    if let photoURL, !photoURL.isEmpty { return true }
+    return false
+}
+
 /// The Filters sheet's Source chip row — see `Recipe.sourceCategory`.
 enum SourceCategory: String, CaseIterable, Identifiable {
     case instagram = "Instagram"
-    case youtube = "YouTube"
-    case tiktok = "TikTok"
     case link = "Link"
     case photo = "Photo"
     case typedIn = "Typed in"
@@ -918,9 +917,6 @@ func detectedSourceLine(for url: URL) -> String {
     if host.contains("instagram.com") {
         return L("Instagram reel — caption and owner comment will be read")
     }
-    if host.contains("youtube.com") || host.contains("youtu.be") || host.contains("tiktok.com") {
-        return L("Video — audio and description will be read")
-    }
     return L("Page — the text will be read")
 }
 
@@ -934,7 +930,7 @@ struct RecipeCreate: Encodable {
     var course: String
     var tags: [String]
     var notes: String
-    /// "" or the "(photo)" sentinel — see app.store.create_recipe.
+    /// "" or "photo" / "(photo)" — see app.store.create_recipe.
     var source: String = ""
 }
 

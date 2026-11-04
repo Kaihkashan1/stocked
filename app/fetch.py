@@ -60,8 +60,8 @@ def normalize_url(url: str) -> str:
 
 
 def _has_dedicated_extractor(url: str) -> bool:
-    """True if yt-dlp has a site-specific extractor for this URL (Instagram,
-    YouTube, TikTok, hundreds more) rather than only its generic page-scraper.
+    """True if yt-dlp has a site-specific extractor for this URL (Instagram
+    and other video hosts) rather than only its generic page-scraper.
     Used to skip straight to the article-text fallback for plain blog links
     instead of wasting a request having yt-dlp's generic extractor try (and
     fail) to find an embedded video first."""

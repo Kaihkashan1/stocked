@@ -35,8 +35,8 @@ final class RecipeStore {
     var courseFilter: Course? {
         didSet { if oldValue != courseFilter { updateVisible() } }
     }
-    /// Filters' Source chip row (Instagram/YouTube/TikTok/Link/Photo/Typed
-    /// in). Multi-select, but OR'd together rather than AND'd like
+    /// Filters' Source chip row (Instagram/Link/Photo/Typed in).
+    /// Multi-select, but OR'd together rather than AND'd like
     /// tagFilters — a recipe only ever has one source, so requiring all
     /// selected sources at once would just show nothing past the first pick.
     var sourceFilters: Set<SourceCategory> = [] {

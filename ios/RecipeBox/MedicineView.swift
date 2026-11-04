@@ -203,6 +203,12 @@ struct MedicineView: View {
                         .font(Theme.body(12))
                         .foregroundStyle(Theme.neutral600)
                 }
+                if !item.notes.isEmpty {
+                    Text(item.notes)
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.neutral600)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 6) {

@@ -54,8 +54,30 @@ HEADERS = [
     "Photo",
 ]
 TRUE_VALUES = {"true", "yes", "1", "y"}
+# Clients send/receive "(photo)". That string is parsed as a named-range
+# formula under Sheets USER_ENTERED and comes back empty, so photo imports
+# were filed as typed-in. Store the bare word instead; map it back on read.
+PHOTO_SOURCE_STORED = "photo"
+PHOTO_SOURCE_PUBLIC = "(photo)"
+_PHOTO_SOURCE_ALIASES = {PHOTO_SOURCE_STORED, PHOTO_SOURCE_PUBLIC, "#name?"}
 COURSES = ("Main course", "Appetizers", "Desserts", "Dips")
 _COURSES_CASEFOLDED = {course.casefold(): course for course in COURSES}
+
+
+def is_photo_source(value: str | None) -> bool:
+    return (value or "").strip().casefold() in _PHOTO_SOURCE_ALIASES
+
+
+def stored_photo_source(source: str = "", *, has_photo: bool = False) -> str:
+    if is_photo_source(source) or has_photo:
+        return PHOTO_SOURCE_STORED
+    return ""
+
+
+def public_photo_source(source: str = "", photo_id: str = "") -> str:
+    if is_photo_source(source) or str(photo_id or "").strip():
+        return PHOTO_SOURCE_PUBLIC
+    return (source or "").strip()
 
 
 def _col_letter(one_based_index: int) -> str:
@@ -940,12 +962,12 @@ def create_recipe(
     way update_recipe re-serializes them, so a later edit round-trips
     cleanly.
 
-    `source` is "" for a genuinely hand-typed recipe, or the "(photo)"
-    sentinel when this save is really a photo extraction the user reviewed
-    and confirmed in the same Add-recipe form — both go through this one
+    `source` is "" for a genuinely hand-typed recipe, or the photo sentinel
+    when this save is really a photo extraction the user reviewed and
+    confirmed in the same Add-recipe form — both go through this one
     endpoint, so without this the two were indistinguishable later (always
     bucketed as "Typed in" in Filters)."""
-    clean_source = source if source == "(photo)" else ""
+    clean_source = stored_photo_source(source)
     ingredients_text = "\n".join(f"- {line}" for line in ingredients)
     steps_text = "\n".join(f"{i}. {line}" for i, line in enumerate(steps, start=1))
     saved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -956,6 +978,7 @@ def create_recipe(
         from app.photos import upload_recipe_photo
 
         photo_id = upload_recipe_photo(photo_bytes)
+        clean_source = PHOTO_SOURCE_STORED
     row = _recipe_cells(
         title=title,
         ingredients_text=ingredients_text,
@@ -984,7 +1007,7 @@ def create_recipe(
         "ingredients": ingredients,
         "pantry": pantry_items(ingredients),
         "steps": steps,
-        "source": clean_source,
+        "source": public_photo_source(clean_source, photo_id),
         "confidence": "high",
         "saved_at": saved_at,
         "course": clean_course,
@@ -1125,7 +1148,8 @@ def _record_to_recipe(row_id: int, record: dict) -> dict:
         "ingredients": ingredients,
         "pantry": pantry_items(ingredients),
         "steps": steps,
-        "source": str(record.get("Source") or "").strip(),
+        "photo_id": str(record.get("Photo") or "").strip(),
+        "source": public_photo_source(str(record.get("Source") or ""), str(record.get("Photo") or "")),
         "confidence": str(record.get("Confidence") or "medium").strip() or "medium",
         "saved_at": str(record.get("Saved at") or "").strip(),
         "course": _clean_course(str(record.get("Course") or "")),
@@ -1134,7 +1158,6 @@ def _record_to_recipe(row_id: int, record: dict) -> dict:
         "notes": str(record.get("Notes") or "").strip(),
         "ingredients_text": ingredients_text,
         "steps_text": steps_text,
-        "photo_id": str(record.get("Photo") or "").strip(),
     }
 
 

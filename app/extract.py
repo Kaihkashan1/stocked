@@ -14,12 +14,20 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.errors import NOT_A_RECIPE_MESSAGE, gemini_is_busy, gemini_is_quota_exhausted
 from app.match import apply_section_labels
-from app.models import RECIPE_TAGS, FetchedPost, FetchedSlide, Recipe, RecipeCategory, RecipeSet, recipe_is_importable
+from app.models import (
+    RECIPE_TAGS,
+    FetchedPost,
+    FetchedSlide,
+    Recipe,
+    RecipeCategory,
+    RecipeSet,
+    recipe_is_importable,
+)
 from app.store import record_gemini_read
 
 logger = logging.getLogger(__name__)
 
-# Comma-joined once, reused in both prompts below — kept as a single source
+# Comma-joined once, reused in the extraction prompt — kept as a single source
 # (RECIPE_TAGS in app/models.py) rather than duplicated text, since the
 # model layer already enforces this same list regardless of what Gemini
 # picks. Telling Gemini the real list up front means it usually picks
@@ -357,6 +365,7 @@ def _parse_recipe(text: str) -> Recipe:
         if start == -1 or end == -1:
             raise RuntimeError(f"Could not parse recipe JSON: {text[:400]}")
         return Recipe.model_validate(json.loads(text[start : end + 1]))
+
 
 
 class _IngredientSectionHit(BaseModel):

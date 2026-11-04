@@ -709,6 +709,17 @@ a.import-log-url {
   margin-bottom: 1rem;
 }
 
+.view-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: none;
+}
+
+.view-header-actions .icon-round {
+  margin-left: 0;
+}
+
 .view-header h2 {
   margin: 0;
 }
@@ -778,7 +789,7 @@ a.import-log-url {
 }
 
 .to-buy-card {
-  cursor: default;
+  cursor: pointer;
 }
 
 .to-buy-card .card-body h2 {

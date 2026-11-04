@@ -54,8 +54,6 @@ const I18N = {
     tags: "Tags",
     source: "Source",
     Instagram: "Instagram",
-    YouTube: "YouTube",
-    TikTok: "TikTok",
     Link: "Link",
     Photo: "Photo",
     "Typed in": "Typed in",
@@ -156,6 +154,8 @@ const I18N = {
     airfryer: "airfryer",
 
     // Cupboard / Medicines tabs
+    pasteALink: "Paste a link",
+    editItem: "Edit item",
     cookbookTab: "Cookbook",
     cupboardTab: "Cupboard",
     shopTab: "Shop",

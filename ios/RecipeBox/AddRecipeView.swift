@@ -221,7 +221,7 @@ struct AddRecipeView: View {
             course: course.rawValue,
             tags: Array(selectedTags),
             notes: "",
-            source: isFromPhoto ? "(photo)" : ""
+            source: isFromPhoto ? "photo" : ""
         )
         if let failure = await store.addRecipe(draft, photoJPEG: photoJPEG) {
             errorMessage = failure

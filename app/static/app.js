@@ -7,16 +7,20 @@ const MAX_RECIPE_TAGS = 24;
 const COURSES = ["Main course", "Appetizers", "Desserts", "Dips"];
 const SOURCE_CATEGORIES = [
   { id: "instagram", labelKey: "Instagram" },
-  { id: "youtube", labelKey: "YouTube" },
-  { id: "tiktok", labelKey: "TikTok" },
   { id: "link", labelKey: "Link" },
   { id: "photo", labelKey: "Photo" },
   { id: "typedIn", labelKey: "Typed in" },
 ];
 
+function isPhotoImportSource(item) {
+  const source = String(item?.source || "").trim().toLowerCase();
+  if (source === "(photo)" || source === "photo") return true;
+  return Boolean(item?.photo_url);
+}
+
 function recipeSourceCategory(recipe) {
+  if (isPhotoImportSource(recipe)) return "photo";
   const source = String(recipe?.source || "").trim();
-  if (source === "(photo)") return "photo";
   let host = "";
   try {
     if (source) host = new URL(source, "https://placeholder.invalid").hostname.toLowerCase();
@@ -25,8 +29,6 @@ function recipeSourceCategory(recipe) {
   }
   if (!host || host === "placeholder.invalid") return "typedIn";
   if (host.includes("instagram.com")) return "instagram";
-  if (host.includes("youtube.com") || host.includes("youtu.be")) return "youtube";
-  if (host.includes("tiktok.com")) return "tiktok";
   return "link";
 }
 
@@ -432,7 +434,7 @@ function importLogRowHtml(row, index) {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
       </span>`;
   const headline = logHeadline(row) || (isError ? t("errorLogs") : t("savedLogs"));
-  const isPhoto = !row.url || row.url === "(photo)";
+  const isPhoto = !row.url || row.url === "(photo)" || row.url === "photo";
   const photoChip = isPhoto
     ? `<span class="log-photo-chip">${escapeHtml(t("Photo"))}</span>`
     : "";
@@ -954,14 +956,15 @@ function viewModeIcon(mode) {
 }
 
 function applyViewMode() {
-  if (!els.grid) return;
-  els.grid.classList.toggle("view-list", state.viewMode === "list");
-  els.grid.classList.toggle("view-grid", state.viewMode === "grid");
-  if (els.viewModeBtn) {
-    const next = state.viewMode === "grid" ? "list" : "grid";
-    els.viewModeBtn.innerHTML = viewModeIcon(next);
-    els.viewModeBtn.setAttribute("aria-label", t("toggleViewMode"));
-  }
+  document.querySelectorAll(".grid").forEach((grid) => {
+    grid.classList.toggle("view-list", state.viewMode === "list");
+    grid.classList.toggle("view-grid", state.viewMode === "grid");
+  });
+  const next = state.viewMode === "grid" ? "list" : "grid";
+  document.querySelectorAll(".view-mode-btn").forEach((btn) => {
+    btn.innerHTML = viewModeIcon(next);
+    btn.setAttribute("aria-label", t("toggleViewMode"));
+  });
 }
 
 function toggleViewMode() {
@@ -1277,7 +1280,7 @@ function recipeHtml(recipe) {
   const steps = (recipe.steps || [])
     .map((item, index) => `<li><span class="step-num">${index + 1}</span><span>${escapeHtml(item)}</span></li>`)
     .join("");
-  const originalPostItem = recipe.source && recipe.source !== "(photo)"
+  const originalPostItem = recipe.source && !isPhotoImportSource(recipe)
     ? `<a href="${escapeAttr(recipe.source)}" target="_blank" rel="noopener">${escapeHtml(t("originalPost"))}</a>`
     : "";
   const notesSection = recipe.notes
@@ -1463,7 +1466,7 @@ function addRecipeFormHtml(prefill) {
     </div>
     <div class="recipe recipe-body">
       <h2 style="margin-bottom:1.2rem;">${escapeHtml(t(prefill ? "fromAPhoto" : "addRecipeTitle"))}</h2>
-      <input type="hidden" id="add-source" value="${prefill ? "(photo)" : ""}">
+      <input type="hidden" id="add-source" value="${prefill ? "photo" : ""}">
       ${prefill ? `<p style="margin:-0.4rem 0 1.2rem; color:var(--ink-soft); font-size:0.85rem;">${escapeHtml(t("photoPrefillHint"))}</p>` : ""}
       <label class="field">
         <span>${escapeHtml(t("title"))}</span>
@@ -1526,13 +1529,15 @@ async function saveAddRecipe() {
     notes: notesInput.value.trim(),
     source: document.getElementById("add-source")?.value || "",
   };
+  const fromPhoto = Boolean(state.pendingPhoto) || isPhotoImportSource(draft);
+  if (fromPhoto) draft.source = "photo";
 
   saveBtns.forEach((btn) => {
     btn.disabled = true;
     btn.textContent = t("saving");
   });
   try {
-    const created = await createRecipeRequest(draft, draft.source === "(photo)" ? state.pendingPhoto : null);
+    const created = await createRecipeRequest(draft, fromPhoto ? state.pendingPhoto : null);
     created.searchBlob = computeSearchBlob(created);
     state.recipes.unshift(created);
     state.addingRecipe = false;
@@ -1660,8 +1665,11 @@ function closeDrawer() {
 }
 
 function maybeOpenFromHash() {
-  const match = location.hash.match(/^#recipe\/(\d+)/);
-  if (match) openRecipe(match[1]);
+  const recipeMatch = location.hash.match(/^#recipe\/(\d+)/);
+  if (recipeMatch) {
+    openRecipe(recipeMatch[1]);
+    return;
+  }
 }
 
 function unique(values) {
@@ -1860,10 +1868,11 @@ function renderInventory(kind) {
       ([category, groupItems]) => `
     <div class="pantry-group" style="grid-column:1/-1;">
       <h3 class="pantry-heading">${escapeHtml(category)}</h3>
-      <div class="grid">${groupItems.map((item) => inventoryCardHtml(kind, item)).join("")}</div>
+      <div class="grid${state.viewMode === "list" ? " view-list" : " view-grid"}">${groupItems.map((item) => inventoryCardHtml(kind, item)).join("")}</div>
     </div>`
     )
     .join("");
+  applyViewMode();
 }
 
 function inventoryCardHtml(kind, item) {
@@ -2400,6 +2409,25 @@ function setToBuyNotes(id, notes) {
   scheduleToBuySync();
 }
 
+function updateToBuyItem(id, { text, category, qty, notes }) {
+  const index = state.toBuy.findIndex((item) => item.id === id);
+  if (index === -1) return;
+  const current = state.toBuy[index];
+  const item = { ...current, sources: [...(current.sources || [])] };
+  item.text = text;
+  if (category) item.category = category;
+  item.notes = notes || "";
+  if (qty != null) {
+    const sourceIndex = item.sources.findIndex((source) => source.recipe_id == null || source.recipe_id === "");
+    if (sourceIndex === -1) item.sources.push({ recipe_id: null, qty });
+    else item.sources[sourceIndex] = { ...item.sources[sourceIndex], qty };
+    item.qty = qty;
+  }
+  state.toBuy = state.toBuy.map((row, i) => (i === index ? item : row));
+  scheduleToBuySync();
+  renderToBuy();
+}
+
 function shopCategoryList() {
   const order = [];
   const seen = new Set();
@@ -2466,6 +2494,7 @@ function renderToBuy() {
   if (state.view === "pack") {
     const sorted = [...rows].sort((a, b) => a.text.localeCompare(b.text));
     listEl.innerHTML = sorted.map(toBuyRowHtml).join("");
+    applyViewMode();
     return;
   }
   listEl.innerHTML = groupedToBuy(rows)
@@ -2473,10 +2502,11 @@ function renderToBuy() {
       ([category, items]) => `
     <div class="pantry-group" style="grid-column:1/-1;">
       <h3 class="pantry-heading">${escapeHtml(category)}</h3>
-      <div class="grid">${items.map(toBuyRowHtml).join("")}</div>
+      <div class="grid${state.viewMode === "list" ? " view-list" : " view-grid"}">${items.map(toBuyRowHtml).join("")}</div>
     </div>`
     )
     .join("");
+  applyViewMode();
 }
 
 function toBuyRowHtml(item) {
@@ -2485,11 +2515,11 @@ function toBuyRowHtml(item) {
   const checkLabel = checked ? t("uncheckItem", { name: item.text }) : t("checkItem", { name: item.text });
   const pack = shopListOf(item) === "take_to_india" || shopListOf(item) === "bring_to_germany";
   const notes = String(item.notes || "").trim();
-  const qtyField = pack
-    ? ""
-    : `<input class="to-buy-qty" data-action="to-buy-qty" data-id="${escapeAttr(item.id)}" value="${escapeAttr(item.qty || "")}" placeholder="${escapeAttr(t("qtyPlaceholder"))}" aria-label="${escapeAttr(t("quantityFor", { name: item.text }))}">`;
   const qtyChip = !pack && item.qty
     ? `<span class="pill">${escapeHtml(item.qty)}</span>`
+    : "";
+  const recipeChip = !pack && sources > 1
+    ? `<span class="inventory-meta">${escapeHtml(t("recipesCount", { n: sources }))}</span>`
     : "";
   return `
     <div class="card to-buy-card${checked ? " checked" : ""}" data-action="to-buy-card" data-id="${escapeAttr(item.id)}">
@@ -2503,13 +2533,9 @@ function toBuyRowHtml(item) {
           <button class="to-buy-check${checked ? " checked" : ""}" type="button" data-action="toggle-to-buy-checked" data-id="${escapeAttr(item.id)}" aria-label="${escapeAttr(checkLabel)}"></button>
           <h2>${escapeHtml(item.text)}</h2>
         </div>
-        ${!pack && sources > 1 ? `<span class="inventory-meta">${escapeHtml(t("recipesCount", { n: sources }))}</span>` : ""}
-        ${qtyChip ? `<div class="meta">${qtyChip}</div>` : ""}
+        ${recipeChip}
         ${notes ? `<span class="inventory-meta">${escapeHtml(notes)}</span>` : ""}
-        <div class="to-buy-fields">
-          ${qtyField}
-          <input class="to-buy-notes" data-action="to-buy-notes" data-id="${escapeAttr(item.id)}" value="${escapeAttr(item.notes || "")}" placeholder="${escapeAttr(t("notes"))}" aria-label="${escapeAttr(t("notesFor", { name: item.text }))}">
-        </div>
+        ${qtyChip ? `<div class="meta">${qtyChip}</div>` : ""}
       </div>
     </div>`;
 }
@@ -2538,8 +2564,9 @@ function toBuyCategoryChipsHtml(selected) {
   return autoChip + rest;
 }
 
-function toBuyFormHtml() {
-  const title = shopAddLabel();
+function toBuyFormHtml(item) {
+  const editing = Boolean(item);
+  const title = editing ? t("edit") : shopAddLabel();
   const key = currentChecklistKey();
   const prompt = key === "shop_medicines"
     ? t("whichMedicine")
@@ -2549,17 +2576,18 @@ function toBuyFormHtml() {
         ? t("whatToBring")
         : t("whatDoYouNeed");
   const pack = key === "take_to_india" || key === "bring_to_germany";
+  const category = item?.category || "";
   const extraFields = pack
     ? ""
     : `
       <div class="field">
         <span>${escapeHtml(t("category"))}</span>
-        <input type="hidden" id="to-buy-category" value="">
-        <div id="to-buy-category-chips" class="chips">${toBuyCategoryChipsHtml("")}</div>
+        <input type="hidden" id="to-buy-category" value="${escapeAttr(category)}">
+        <div id="to-buy-category-chips" class="chips">${toBuyCategoryChipsHtml(category)}</div>
       </div>
       <label class="field">
         <span>${escapeHtml(t("quantity"))}</span>
-        <input id="to-buy-qty-new" placeholder="${escapeAttr(t("quantityExample"))}">
+        <input id="to-buy-qty-new" placeholder="${escapeAttr(t("quantityExample"))}" value="${escapeAttr(item?.qty || "")}">
       </label>`;
   return `
     <div class="drawer-actions">
@@ -2570,14 +2598,15 @@ function toBuyFormHtml() {
     </div>
     <div class="recipe recipe-body">
       <h2 style="margin-bottom:1.2rem;">${escapeHtml(title)}</h2>
+      <input type="hidden" id="to-buy-edit-id" value="${escapeAttr(item?.id || "")}">
       <label class="field">
         <span>${escapeHtml(t("name"))}</span>
-        <input id="to-buy-text" placeholder="${escapeAttr(prompt)}">
+        <input id="to-buy-text" placeholder="${escapeAttr(prompt)}" value="${escapeAttr(item?.text || "")}">
       </label>
       ${extraFields}
       <label class="field">
         <span>${escapeHtml(t("notes"))}</span>
-        <textarea id="to-buy-notes-new" class="notes-grow" rows="3" placeholder="${escapeAttr(t("optional"))}"></textarea>
+        <textarea id="to-buy-notes-new" class="notes-grow" rows="3" placeholder="${escapeAttr(t("optional"))}">${escapeHtml(item?.notes || "")}</textarea>
       </label>
       <button class="pill-btn primary" type="button" data-action="save-to-buy">${escapeHtml(t("save"))}</button>
     </div>`;
@@ -2593,6 +2622,17 @@ function openAddToBuy() {
   document.getElementById("to-buy-text")?.focus();
 }
 
+function openEditToBuy(id) {
+  const item = state.toBuy.find((row) => row.id === id);
+  if (!item) return;
+  state.openRecipeId = null;
+  state.editingId = null;
+  state.addingRecipe = false;
+  els.detail.innerHTML = toBuyFormHtml(item);
+  els.drawer.hidden = false;
+  els.detail.querySelectorAll(".notes-grow").forEach(autoGrowTextarea);
+}
+
 function saveAddToBuy() {
   const text = document.getElementById("to-buy-text")?.value.trim();
   if (!text) return;
@@ -2600,7 +2640,12 @@ function saveAddToBuy() {
   const category = pack ? null : (document.getElementById("to-buy-category")?.value || null);
   const qty = pack ? "" : (document.getElementById("to-buy-qty-new")?.value.trim() || "");
   const notes = document.getElementById("to-buy-notes-new")?.value.trim() || "";
+  const editId = document.getElementById("to-buy-edit-id")?.value;
   closeDrawer();
+  if (editId) {
+    updateToBuyItem(editId, { text, category, qty, notes });
+    return;
+  }
   addToBuySource({ text, qty, category, notes, list: currentChecklistKey() });
 }
 
@@ -2654,7 +2699,6 @@ els.favoritesToggle.addEventListener("click", () => {
   renderGrid();
 });
 
-els.viewModeBtn?.addEventListener("click", toggleViewMode);
 els.filtersBtn.addEventListener("click", () => {
   if (els.filtersPanel.hidden) openFilters();
   else closeFilters();
@@ -2754,6 +2798,9 @@ document.addEventListener("click", (event) => {
 
   const { action, id } = actionEl.dataset;
   switch (action) {
+    case "toggle-view-mode":
+      toggleViewMode();
+      break;
     case "open-recipe":
       openRecipe(id);
       break;
@@ -2907,6 +2954,7 @@ document.addEventListener("click", (event) => {
       break;
     }
     case "to-buy-card":
+      openEditToBuy(actionEl.dataset.id);
       break;
     case "delete-to-buy":
       event.stopPropagation();

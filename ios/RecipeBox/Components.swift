@@ -585,12 +585,15 @@ extension View {
 struct TagPicker: View {
     @Binding var selected: Set<String>
     var extraTags: [String] = []
+    var suggestedTags: [String] = recipeTags
+    var localize: (String) -> String = localizedRecipeTag
+    var normalize: (String) -> String? = normalizeRecipeTag
     @State private var draft = ""
 
     private var offered: [String] {
         var seen = Set<String>()
         var ordered: [String] = []
-        for tag in recipeTags + extraTags + selected.sorted() {
+        for tag in suggestedTags + extraTags + selected.sorted() {
             let key = tag.lowercased()
             if seen.insert(key).inserted {
                 ordered.append(tag)
@@ -600,7 +603,7 @@ struct TagPicker: View {
     }
 
     private var canAddDraft: Bool {
-        guard let tag = normalizeRecipeTag(draft) else { return false }
+        guard let tag = normalize(draft) else { return false }
         return !selected.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame })
             && selected.count < maxRecipeTags
     }
@@ -609,7 +612,7 @@ struct TagPicker: View {
         VStack(alignment: .leading, spacing: 10) {
             FlowLayout(spacing: 8) {
                 ForEach(offered, id: \.self) { tag in
-                    ChipButton(title: localizedRecipeTag(tag), selected: selected.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame })) {
+                    ChipButton(title: localize(tag), selected: selected.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame })) {
                         toggle(tag)
                     }
                     .fixedSize()
@@ -647,13 +650,13 @@ struct TagPicker: View {
     private func toggle(_ tag: String) {
         if let existing = selected.first(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
             selected.remove(existing)
-        } else if selected.count < maxRecipeTags, let normalized = normalizeRecipeTag(tag) {
+        } else if selected.count < maxRecipeTags, let normalized = normalize(tag) {
             selected.insert(normalized)
         }
     }
 
     private func addDraft() {
-        guard let tag = normalizeRecipeTag(draft), canAddDraft else { return }
+        guard let tag = normalize(draft), canAddDraft else { return }
         // `offered` already includes every entry in `selected`, so this chip
         // shows up immediately without needing to tell RecipeStore about it —
         // it becomes visible everywhere else (Filters, other Add/Edit

@@ -131,7 +131,7 @@ class RecipeCreate(BaseModel):
     course: str = "Main course"
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
-    # "" (typed by hand) or the "(photo)" sentinel (prefilled from a photo
+    # "" (typed by hand) or "photo" / "(photo)" (prefilled from a photo
     # extraction, then saved through this same manual-entry endpoint) — see
     # app.store.create_recipe. Anything else is treated as "".
     source: str = ""

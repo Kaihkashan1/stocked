@@ -11,12 +11,35 @@ struct ToBuyItemSheet: View {
     var prompt: String = "What do you need?"
     var saveTitle: String = "Save"
     var showsCategoryAndQty = true
+    var item: ToBuyItem? = nil
     var onSave: (_ text: String, _ category: String?, _ qty: String, _ notes: String) -> Void
 
-    @State private var text = ""
+    @State private var text: String
     @State private var category: String?
-    @State private var qty = ""
-    @State private var notes = ""
+    @State private var qty: String
+    @State private var notes: String
+
+    init(
+        categories: [String],
+        title: String = "Add to buy",
+        prompt: String = "What do you need?",
+        saveTitle: String = "Save",
+        showsCategoryAndQty: Bool = true,
+        item: ToBuyItem? = nil,
+        onSave: @escaping (_ text: String, _ category: String?, _ qty: String, _ notes: String) -> Void
+    ) {
+        self.categories = categories
+        self.title = title
+        self.prompt = prompt
+        self.saveTitle = saveTitle
+        self.showsCategoryAndQty = showsCategoryAndQty
+        self.item = item
+        self.onSave = onSave
+        _text = State(initialValue: item?.text ?? "")
+        _category = State(initialValue: item?.category)
+        _qty = State(initialValue: item?.qty ?? "")
+        _notes = State(initialValue: item?.notes ?? "")
+    }
 
     private var canSave: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

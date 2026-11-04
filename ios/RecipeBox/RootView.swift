@@ -47,6 +47,7 @@ struct RootView: View {
     @State private var activeSheet: ActiveSheet?
     @State private var addRecipePrefill: RecipeExtraction?
     @State private var addRecipePhotoJPEG: Data?
+    @State private var recipesPath = NavigationPath()
     /// What to do once `activeSheet` has actually finished dismissing —
     /// only needed for handoffs to a different presentation kind (camera,
     /// photo library) than the ones `.sheet(item:)` covers. See the
@@ -59,7 +60,6 @@ struct RootView: View {
     @State private var photoOverlayDismissed = false
     @State private var photoJobID: UUID?
     @State private var extractError: String?
-    @State private var recipesPath = NavigationPath()
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -363,7 +363,9 @@ struct RootView: View {
     private var recipesTab: some View {
         NavigationStack(path: $recipesPath) {
             RecipeListView(
-                onAdd: { activeSheet = .addOptions },
+                onAdd: {
+                    activeSheet = .addOptions
+                },
                 onSettings: { activeSheet = .settings }
             )
             .toolbar(.hidden, for: .navigationBar)
@@ -400,6 +402,11 @@ struct RootView: View {
         switch sheet {
         case .addOptions:
             AddOptionsSheet(
+                title: "Add a recipe",
+                linkSubtitle: "Instagram reel or recipe page",
+                photoSubtitle: "Cookbook page or recipe card",
+                librarySubtitle: "A screenshot you already saved",
+                typedSubtitle: "Write it down yourself",
                 onLink: { activeSheet = .pasteLink },
                 onPhoto: { pendingAddAction = .photo; activeSheet = nil },
                 onLibrary: { pendingAddAction = .library; activeSheet = nil },

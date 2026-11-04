@@ -1,8 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// Screen 4 from the handoff — paste a link (an Instagram reel, a YouTube/
-/// TikTok video, or any recipe page) instead of going through the
+/// Screen 4 from the handoff — paste a link (an Instagram reel or any
+/// recipe page) instead of going through the
 /// Shortcut's share sheet. POSTs to the same /ingest endpoint the Shortcut
 /// uses, with the same X-Recipe-Box-Key header.
 struct PasteALinkView: View {
@@ -11,7 +11,7 @@ struct PasteALinkView: View {
 
     /// Called with the new recipe's id once the user taps "Open the
     /// recipe" — the caller dismisses this sheet and navigates there.
-    var onOpenRecipe: (Int) -> Void
+    var onOpenRecipe: (Int) -> Void = { _ in }
 
     @State private var urlText = ""
     @State private var phase: LinkPhase = .idle
@@ -47,14 +47,14 @@ struct PasteALinkView: View {
     }
 
     var body: some View {
-        let _ = currentImportStatus
+        let _ = store.importJobs
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Paste a link")
                             .font(Theme.display(30))
                             .foregroundStyle(Theme.ink)
-                        Text("A reel, a video, or any recipe page. We read it and fill the card in for you.")
+                        Text("An Instagram reel or any recipe page. We read it and fill the card in for you.")
                             .font(Theme.body(14))
                             .foregroundStyle(Theme.neutral700)
                     }
@@ -94,8 +94,8 @@ struct PasteALinkView: View {
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .background(Theme.bg.ignoresSafeArea())
         .onDisappear { fetchStepTask?.cancel() }
-        .onChange(of: currentImportStatus) { _, _ in
-            syncPhase(from: store.importJobs)
+        .onChange(of: store.importJobs) { _, jobs in
+            syncPhase(from: jobs)
         }
     }
 
@@ -241,11 +241,6 @@ struct PasteALinkView: View {
         case .idle, .error: detectedURL == nil
         case .done: false
         }
-    }
-
-    private var currentImportStatus: BackgroundImportJob.Status? {
-        guard let importJobID else { return nil }
-        return store.importJobs.first(where: { $0.id == importJobID })?.status
     }
 
     /// Drives the three fetching-card rows through their messages on a

@@ -1,8 +1,12 @@
 """Persist original recipe photos on Google Drive.
 
-The sheet only holds a Drive file id (the Photo column). Bytes live next
-to the spreadsheet so they survive Vercel cold starts — /tmp does not.
-The same service account that already edits the Sheet is used; gspread
+The sheet only holds a Drive file id (the Photo column). Bytes live in
+Drive so they survive Vercel cold starts — /tmp does not.
+
+Service accounts have no Drive storage quota of their own. Sharing only
+the spreadsheet is enough for recipe rows, but photos need a folder the
+user owns (or a Shared Drive) that is also shared with the bot. The
+same service account that already edits the Sheet is used; gspread
 already requests the Drive scope.
 """
 from __future__ import annotations
@@ -26,10 +30,48 @@ DRIVE_SCOPES = (
 PHOTOS_FOLDER_NAME = "Recipe Box photos"
 UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true"
 FILES_URL = "https://www.googleapis.com/drive/v3/files"
+FOLDER_FIELDS = "id,name,parents,driveId,owners(me,emailAddress),capabilities(canAddChildren)"
 
 
 class PhotoStoreError(RuntimeError):
     """Drive upload/download failed; the recipe should not pretend it kept the photo."""
+
+
+def _service_account_email() -> str:
+    try:
+        return str(settings.service_account_info().get("client_email") or "").strip()
+    except Exception:
+        return ""
+
+
+def _share_folder_message() -> str:
+    email = _service_account_email() or "the recipe-box service account"
+    return (
+        f'Share a Google Drive folder named “{PHOTOS_FOLDER_NAME}” with {email} '
+        "as Editor (same email as the spreadsheet), then save again."
+    )
+
+
+def folder_uses_service_account_quota(folder: dict) -> bool:
+    """True when files created here count against the bot's empty Drive quota."""
+    if folder.get("driveId"):
+        return False
+    owners = folder.get("owners") or []
+    if not owners:
+        return False
+    return all(bool(owner.get("me")) for owner in owners)
+
+
+def pick_photos_folder(folders: list[dict]) -> dict | None:
+    for folder in folders:
+        capabilities = folder.get("capabilities") or {}
+        if capabilities.get("canAddChildren") is False:
+            continue
+        if folder_uses_service_account_quota(folder):
+            continue
+        if folder.get("id"):
+            return folder
+    return None
 
 
 @lru_cache(maxsize=1)
@@ -38,63 +80,29 @@ def _session() -> AuthorizedSession:
     return AuthorizedSession(creds)
 
 
-@lru_cache(maxsize=1)
-def _photos_folder_id() -> str:
-    session = _session()
-    parents = _spreadsheet_parents(session)
-    parent_clause = ""
-    if parents:
-        parent_clause = " and ({})".format(" or ".join(f"'{pid}' in parents" for pid in parents))
-    query = (
-        f"name = '{PHOTOS_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' "
-        f"and trashed = false{parent_clause}"
-    )
-    response = session.get(
-        FILES_URL,
-        params={
-            "q": query,
-            "fields": "files(id)",
-            "pageSize": 1,
-            "supportsAllDrives": "true",
-            "includeItemsFromAllDrives": "true",
-        },
-        timeout=20,
-    )
-    if response.ok:
-        files = response.json().get("files") or []
-        if files:
-            return files[0]["id"]
-    metadata = {
-        "name": PHOTOS_FOLDER_NAME,
-        "mimeType": "application/vnd.google-apps.folder",
+def _list_files(session: AuthorizedSession, query: str, extra: dict | None = None) -> list[dict]:
+    params = {
+        "q": query,
+        "fields": f"files({FOLDER_FIELDS})",
+        "pageSize": 20,
+        "supportsAllDrives": "true",
+        "includeItemsFromAllDrives": "true",
+        "corpora": "allDrives",
     }
-    if parents:
-        metadata["parents"] = [parents[0]]
-    created = session.post(
-        FILES_URL,
-        params={"supportsAllDrives": "true"},
-        json=metadata,
-        timeout=20,
+    if extra:
+        params.update(extra)
+    response = session.get(FILES_URL, params=params, timeout=20)
+    if not response.ok:
+        logger.warning("Drive list failed (%s): %s", response.status_code, response.text[:200])
+        return []
+    return list(response.json().get("files") or [])
+
+
+def _named_photo_folders(session: AuthorizedSession) -> list[dict]:
+    return _list_files(
+        session,
+        f"name = '{PHOTOS_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
     )
-    # Sharing only the spreadsheet (not its parent folder) is the usual
-    # setup — in that case a sibling folder is forbidden, so fall back to
-    # the service account's own Drive. The API can still serve those files.
-    if not created.ok and "parents" in metadata:
-        logger.warning("Could not create photos folder next to the sheet (%s); using the service account Drive", created.status_code)
-        metadata.pop("parents", None)
-        created = session.post(
-            FILES_URL,
-            params={"supportsAllDrives": "true"},
-            json=metadata,
-            timeout=20,
-        )
-    if not created.ok:
-        raise PhotoStoreError(f"Could not create a photos folder ({created.status_code}).")
-    folder_id = created.json().get("id")
-    if not folder_id:
-        raise PhotoStoreError("Could not create a photos folder.")
-    logger.info("Created Drive folder %s for recipe photos", folder_id)
-    return folder_id
 
 
 def _spreadsheet_parents(session: AuthorizedSession) -> list[str]:
@@ -112,12 +120,74 @@ def _spreadsheet_parents(session: AuthorizedSession) -> list[str]:
     return list(response.json().get("parents") or [])
 
 
+def _shared_folder_parents(session: AuthorizedSession) -> list[str]:
+    folders = _list_files(
+        session,
+        "mimeType = 'application/vnd.google-apps.folder' and trashed = false and sharedWithMe",
+        extra={"corpora": "user"},
+    )
+    return [folder["id"] for folder in folders if folder.get("id") and not folder_uses_service_account_quota(folder)]
+
+
+def _create_folder(session: AuthorizedSession, parent_id: str) -> str | None:
+    created = session.post(
+        FILES_URL,
+        params={"supportsAllDrives": "true"},
+        json={
+            "name": PHOTOS_FOLDER_NAME,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [parent_id],
+        },
+        timeout=20,
+    )
+    if not created.ok:
+        logger.warning("Could not create photos folder in %s (%s): %s", parent_id, created.status_code, created.text[:200])
+        return None
+    folder_id = created.json().get("id")
+    return str(folder_id) if folder_id else None
+
+
+@lru_cache(maxsize=1)
+def _photos_folder_id() -> str:
+    configured = settings.google_photos_folder_id.strip()
+    if configured:
+        return configured
+
+    session = _session()
+    existing = pick_photos_folder(_named_photo_folders(session))
+    if existing:
+        logger.info("Using Drive folder %s for recipe photos", existing["id"])
+        return existing["id"]
+
+    parent_ids = list(dict.fromkeys(_spreadsheet_parents(session) + _shared_folder_parents(session)))
+    for parent_id in parent_ids:
+        nested = pick_photos_folder(
+            _list_files(
+                session,
+                f"name = '{PHOTOS_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' "
+                f"and trashed = false and '{parent_id}' in parents",
+            )
+        )
+        if nested:
+            return nested["id"]
+        created_id = _create_folder(session, parent_id)
+        if created_id:
+            logger.info("Created Drive folder %s for recipe photos", created_id)
+            return created_id
+
+    raise PhotoStoreError(_share_folder_message())
+
+
 def upload_recipe_photo(data: bytes, *, filename: str | None = None) -> str:
     if not data:
         raise PhotoStoreError("That photo was empty.")
+    try:
+        folder_id = _photos_folder_id()
+    except PhotoStoreError:
+        raise
     metadata = {
         "name": filename or f"recipe-{uuid.uuid4().hex}.jpg",
-        "parents": [_photos_folder_id()],
+        "parents": [folder_id],
         "mimeType": "image/jpeg",
     }
     metadata_part = json.dumps(metadata).encode("utf-8")
@@ -138,6 +208,9 @@ def upload_recipe_photo(data: bytes, *, filename: str | None = None) -> str:
     )
     if not response.ok:
         logger.error("Drive photo upload failed: %s %s", response.status_code, response.text[:300])
+        _photos_folder_id.cache_clear()
+        if response.status_code == 403 and "storage quota" in response.text.lower():
+            raise PhotoStoreError(_share_folder_message())
         raise PhotoStoreError("Could not keep that photo. Try again.")
     file_id = response.json().get("id")
     if not file_id:

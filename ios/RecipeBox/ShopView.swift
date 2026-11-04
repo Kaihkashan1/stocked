@@ -13,8 +13,19 @@ struct ShopView: View {
     @Environment(MedicineStore.self) private var medicines
 
     @State private var query = ""
-    @State private var showAdd = false
+    @State private var presentedSheet: ShopPresentedSheet?
     @State private var segment: ShopSegment
+
+    private enum ShopPresentedSheet: Identifiable {
+        case add
+        case edit(ToBuyItem)
+        var id: String {
+            switch self {
+            case .add: "add"
+            case .edit(let item): "edit-\(item.id)"
+            }
+        }
+    }
 
     init(mode: Mode = .shop) {
         self.mode = mode
@@ -87,19 +98,11 @@ struct ShopView: View {
         .scrollIndicators(.hidden)
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await pantry.refresh() }
-        .sheet(isPresented: $showAdd) {
-            ToBuyItemSheet(
-                categories: shopCategories,
-                title: addTitle,
-                prompt: addPrompt,
-                saveTitle: L("Save"),
-                showsCategoryAndQty: mode == .shop
-            ) { text, category, qty, notes in
-                pantry.addToBuy(text, qty: qty, category: category, notes: notes, list: segment.listKey)
-            }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.hidden)
-            .presentationCornerRadius(34)
+        .sheet(item: $presentedSheet) { sheet in
+            shopSheet(sheet)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(34)
         }
         .alert(
             "Couldn't save",
@@ -112,6 +115,33 @@ struct ShopView: View {
             Button("OK", role: .cancel) {}
         } message: { message in
             Text(message)
+        }
+    }
+
+    @ViewBuilder
+    private func shopSheet(_ sheet: ShopPresentedSheet) -> some View {
+        switch sheet {
+        case .add:
+            ToBuyItemSheet(
+                categories: shopCategories,
+                title: addTitle,
+                prompt: addPrompt,
+                saveTitle: L("Save"),
+                showsCategoryAndQty: mode == .shop
+            ) { text, category, qty, notes in
+                pantry.addToBuy(text, qty: qty, category: category, notes: notes, list: segment.listKey)
+            }
+        case .edit(let item):
+            ToBuyItemSheet(
+                categories: shopCategories,
+                title: L("Edit item"),
+                prompt: addPrompt,
+                saveTitle: L("Save"),
+                showsCategoryAndQty: mode == .shop,
+                item: item
+            ) { text, category, qty, notes in
+                pantry.updateToBuy(id: item.id, text: text, category: category, qty: qty, notes: notes)
+            }
         }
     }
 
@@ -129,7 +159,7 @@ struct ShopView: View {
             }
             Spacer()
             Button {
-                showAdd = true
+                presentedSheet = .add
             } label: {
                 LucideIcon(.plus, size: 19)
                     .foregroundStyle(Theme.bg)
@@ -314,73 +344,69 @@ struct ShopView: View {
     }
 
     private func toBuyRow(_ item: ToBuyItem) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(alignment: .center, spacing: 12) {
-                Button {
-                    pantry.toggleChecked(id: item.id)
-                } label: {
-                    Circle()
-                        .strokeBorder(item.checked ? Theme.sage500 : Theme.neutral400, lineWidth: 2)
-                        .background(Circle().fill(item.checked ? Theme.sage500 : .clear))
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(item.checked ? L("Uncheck \(item.text)") : L("Check \(item.text)"))
+        HStack(alignment: .center, spacing: 12) {
+            Button {
+                pantry.toggleChecked(id: item.id)
+            } label: {
+                Circle()
+                    .strokeBorder(item.checked ? Theme.sage500 : Theme.neutral400, lineWidth: 2)
+                    .background(Circle().fill(item.checked ? Theme.sage500 : .clear))
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(item.checked ? L("Uncheck \(item.text)") : L("Check \(item.text)"))
 
+            VStack(alignment: .leading, spacing: 5) {
                 Text(item.text)
                     .font(Theme.body(14.5, weight: .semibold))
                     .strikethrough(item.checked)
                     .foregroundStyle(item.checked ? Theme.neutral500 : Theme.neutral900)
                     .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                if item.recipeSourceCount > 1 {
-                    Text(L("\(item.recipeSourceCount) recipes"))
-                        .font(Theme.body(10.5, weight: .semibold))
-                        .foregroundStyle(Theme.neutral500)
-                        .fixedSize()
+                if !item.notes.isEmpty {
+                    Text(item.notes)
+                        .font(Theme.body(12))
+                        .foregroundStyle(Theme.neutral600)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                LucideTrashButton(accessibilityLabel: L("Remove \(item.text)")) {
-                    pantry.removeToBuy(id: item.id)
+                if mode == .shop, !item.qty.isEmpty || item.recipeSourceCount > 1 {
+                    HStack(spacing: 6) {
+                        if !item.qty.isEmpty {
+                            Text(item.qty)
+                                .font(Theme.body(10.5, weight: .semibold))
+                                .foregroundStyle(Theme.neutral700)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 3)
+                                .background(Theme.neutral100)
+                                .clipShape(Capsule())
+                        }
+                        if item.recipeSourceCount > 1 {
+                            Text(L("\(item.recipeSourceCount) recipes"))
+                                .font(Theme.body(10.5, weight: .semibold))
+                                .foregroundStyle(Theme.neutral700)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 3)
+                                .background(Theme.neutral100)
+                                .clipShape(Capsule())
+                        }
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 8) {
-                if mode == .shop {
-                    TextField("qty", text: Binding(
-                        get: { pantry.toBuy.first(where: { $0.id == item.id })?.qty ?? "" },
-                        set: { pantry.setToBuyQty(id: item.id, qty: $0) }
-                    ))
-                    .font(Theme.body(12.5, weight: .semibold))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 12)
-                    .frame(width: 76, height: 34)
-                    .background(Theme.bg)
-                    .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
-                    .clipShape(Capsule())
-                    .accessibilityLabel(L("Quantity for \(item.text)"))
-                }
-
-                TextField(
-                    L("Notes"),
-                    text: Binding(
-                        get: { pantry.toBuy.first(where: { $0.id == item.id })?.notes ?? "" },
-                        set: { pantry.setToBuyNotes(id: item.id, notes: $0) }
-                    )
-                )
-                .font(Theme.body(12.5, weight: .semibold))
-                .padding(.horizontal, 14)
-                .frame(height: 34)
-                .background(Theme.bg)
-                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
-                .clipShape(Capsule())
-                .accessibilityLabel(L("Notes for \(item.text)"))
+            LucideTrashButton(accessibilityLabel: L("Remove \(item.text)")) {
+                pantry.removeToBuy(id: item.id)
             }
-            .padding(.leading, 34)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 13)
         .cardBackground(radius: 22)
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onTapGesture {
+            presentedSheet = .edit(item)
+        }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(item.text)
     }
 }

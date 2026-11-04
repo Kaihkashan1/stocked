@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # its daily free-tier cap. Override with GEMINI_FALLBACK_MODEL.
     gemini_fallback_model: str = "gemini-3.5-flash-lite"
     google_sheet_id: str = ""
+    # Optional Drive folder the service account can write photos into.
+    # Needed because service accounts have no Drive storage of their own —
+    # share a user-owned folder (or a Shared Drive) with the bot.
+    google_photos_folder_id: str = ""
     google_service_account_file: Path = ROOT / "service_account.json"
     google_service_account_json: str = ""
     recipe_box_secret: str = ""
