@@ -486,21 +486,6 @@ struct RecipeCard: View, Equatable {
     /// fit pill and favorite star.
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let url = recipe.resolvedPhotoURL(baseURLString: store.serverURL) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        Theme.neutral200
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: isGrid ? 96 : 140)
-                .clipped()
-            }
             VStack(alignment: .leading, spacing: isGrid ? 8 : 10) {
                 HStack(spacing: 8) {
                     if !isGrid {

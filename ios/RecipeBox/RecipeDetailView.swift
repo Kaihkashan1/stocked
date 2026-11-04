@@ -11,6 +11,7 @@ struct RecipeDetailView: View {
     @State private var deleting = false
     @State private var deleteError: String?
     @State private var showCookMode = false
+    @State private var showOriginalPhoto = false
     @State private var showMoreMenu = false
 
     private var recipe: Recipe? { store.recipe(id: id) }
@@ -52,6 +53,11 @@ struct RecipeDetailView: View {
         .fullScreenCover(isPresented: $showCookMode) {
             if let recipe {
                 CookModeView(recipe: recipe)
+            }
+        }
+        .fullScreenCover(isPresented: $showOriginalPhoto) {
+            if let recipe, let url = recipe.resolvedPhotoURL(baseURLString: store.serverURL) {
+                OriginalPhotoViewer(url: url)
             }
         }
         // Delete confirm is its own overlay so it isn't clipped when the
@@ -303,19 +309,25 @@ struct RecipeDetailView: View {
     @ViewBuilder
     private func originalPhoto(for recipe: Recipe) -> some View {
         if let url = recipe.resolvedPhotoURL(baseURLString: store.serverURL) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFit()
-                default:
-                    Theme.neutral200
-                        .frame(height: 160)
+            Button {
+                showOriginalPhoto = true
+            } label: {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                    default:
+                        Theme.neutral200
+                            .frame(height: 160)
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             }
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .buttonStyle(.plain)
+            .accessibilityLabel(L("View photo"))
         }
     }
 
@@ -403,6 +415,63 @@ struct RecipeDetailView: View {
         Text(title)
             .font(Theme.display(23))
             .foregroundStyle(Theme.ink)
+    }
+}
+
+private struct OriginalPhotoViewer: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1
+    @State private var lastScale: CGFloat = 1
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(scale)
+                        .gesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    scale = max(1, lastScale * value)
+                                }
+                                .onEnded { _ in
+                                    lastScale = scale
+                                    if scale < 1.05 {
+                                        withAnimation {
+                                            scale = 1
+                                            lastScale = 1
+                                        }
+                                    }
+                                }
+                        )
+                        .onTapGesture {
+                            if scale > 1.05 {
+                                withAnimation {
+                                    scale = 1
+                                    lastScale = 1
+                                }
+                            } else {
+                                dismiss()
+                            }
+                        }
+                default:
+                    ProgressView()
+                        .tint(.white)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .overlay(alignment: .topTrailing) {
+            CircleIconButton(lucide: .xmark, size: 40) { dismiss() }
+                .accessibilityLabel(L("Close"))
+                .padding(.top, 16)
+                .padding(.trailing, Theme.screenPadding)
+        }
     }
 }
 

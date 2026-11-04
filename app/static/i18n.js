@@ -8,6 +8,7 @@ const I18N = {
     fromAPhoto: "From a photo",
     takeAPhoto: "Take a photo",
     chooseFromLibrary: "Choose from library",
+    viewPhoto: "View photo",
     settings: "Settings",
     language: "Language",
     matchDevice: "System",

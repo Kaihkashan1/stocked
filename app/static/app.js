@@ -150,6 +150,8 @@ const els = {
   status: document.getElementById("status"),
   drawer: document.getElementById("drawer"),
   detail: document.getElementById("recipe-detail"),
+  photoLightbox: document.getElementById("photo-lightbox"),
+  photoLightboxImage: document.getElementById("photo-lightbox-image"),
   settingsBtn: document.getElementById("settings-btn"),
   addRecipeBtn: document.getElementById("add-recipe-btn"),
   addRecipeMenu: document.getElementById("add-recipe-menu"),
@@ -1151,7 +1153,6 @@ function cardHtml({ recipe, match }) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="${recipe.favorite ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8"><path d="M12 3.6c-2-2.3-5.4-2.6-7.5-.4-2.2 2.2-2.1 5.8.3 8.1L12 18.6l7.2-7.3c2.4-2.3 2.5-5.9.3-8.1-2.1-2.2-5.5-1.9-7.5.4z"/></svg>
         </button>
       </div>
-      ${recipe.photo_url ? `<img class="card-photo" src="${escapeAttr(recipe.photo_url)}" alt="">` : ""}
       <button class="card-body" type="button" data-action="open-recipe" data-id="${recipe.id}" style="text-align:left; background:none; border:none; cursor:pointer; padding:1.1rem; font:inherit; color:inherit;">
         ${source}
         <h2>${escapeHtml(recipe.title)}</h2>
@@ -1331,7 +1332,7 @@ function recipeHtml(recipe) {
       <ol class="steps">${steps || `<li>${escapeHtml(t("noneListed"))}</li>`}</ol>
       ${notesSection}
       ${tags ? `<div class="meta">${tags}</div>` : ""}
-      ${recipe.photo_url ? `<img class="recipe-photo" src="${escapeAttr(recipe.photo_url)}" alt="">` : ""}
+      ${recipe.photo_url ? `<button class="recipe-photo-btn" type="button" data-action="open-recipe-photo" data-src="${escapeAttr(recipe.photo_url)}" aria-label="${escapeAttr(t("viewPhoto"))}"><img class="recipe-photo" src="${escapeAttr(recipe.photo_url)}" alt=""></button>` : ""}
     </div>`;
 }
 
@@ -1653,7 +1654,20 @@ async function deleteRecipe(id) {
   }
 }
 
+function openRecipePhoto(src) {
+  if (!src || !els.photoLightbox || !els.photoLightboxImage) return;
+  els.photoLightboxImage.src = src;
+  els.photoLightbox.hidden = false;
+}
+
+function closeRecipePhoto() {
+  if (!els.photoLightbox) return;
+  els.photoLightbox.hidden = true;
+  if (els.photoLightboxImage) els.photoLightboxImage.removeAttribute("src");
+}
+
 function closeDrawer() {
+  closeRecipePhoto();
   els.drawer.hidden = true;
   state.openRecipeId = null;
   state.editingId = null;
@@ -2812,6 +2826,14 @@ document.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleRecipeMenu();
       break;
+    case "open-recipe-photo":
+      event.stopPropagation();
+      openRecipePhoto(actionEl.dataset.src);
+      break;
+    case "close-recipe-photo":
+      event.stopPropagation();
+      closeRecipePhoto();
+      break;
     case "close-drawer":
       closeDrawer();
       break;
@@ -2985,8 +3007,18 @@ els.drawer.addEventListener("click", (event) => {
   if (event.target === els.drawer) closeDrawer();
 });
 window.addEventListener("hashchange", maybeOpenFromHash);
+els.photoLightbox?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-action='close-recipe-photo']")) return;
+  closeRecipePhoto();
+});
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") closeDrawer();
+  if (event.key === "Escape") {
+    if (els.photoLightbox && !els.photoLightbox.hidden) {
+      closeRecipePhoto();
+      return;
+    }
+    closeDrawer();
+  }
   if (event.key === "Enter" && event.target && (event.target.id === "add-tag-draft" || event.target.id === "edit-tag-draft")) {
     event.preventDefault();
     addCustomTag(event.target.id.startsWith("edit") ? "edit" : "add");

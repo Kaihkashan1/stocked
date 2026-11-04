@@ -620,7 +620,6 @@ a.import-log-url {
 .card-icon-btn.favorite.active svg { fill: currentColor; }
 .card-icon-btn.plan.active { color: var(--accent); }
 
-.card-photo,
 .hero-photo,
 .add-photo-preview {
   display: block;
@@ -628,8 +627,6 @@ a.import-log-url {
   object-fit: cover;
   background: var(--surface-2);
 }
-
-.card-photo { height: 140px; }
 
 .hero-photo {
   max-height: 280px;
@@ -642,13 +639,50 @@ a.import-log-url {
   margin-bottom: 1.2rem;
 }
 
-.recipe-photo {
+.recipe-photo-btn {
   display: block;
   width: 100%;
   margin-top: 1.8rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+}
+
+.recipe-photo {
+  display: block;
+  width: 100%;
   border-radius: 18px;
   object-fit: contain;
   background: var(--surface-2);
+}
+
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 1.2rem 1.2rem;
+  background: rgba(20, 16, 12, 0.92);
+  cursor: zoom-out;
+}
+
+.photo-lightbox[hidden] { display: none; }
+
+.photo-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.photo-lightbox-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  margin-left: 0;
+  cursor: pointer;
 }
 
 .card-body { padding: 1rem 1rem 1.1rem; }

@@ -427,6 +427,9 @@
     "Cookbook" : {
       "extractionState" : "manual"
     },
+    "View photo" : {
+      "extractionState" : "manual"
+    },
     "Cookbook page or recipe card" : {
       "extractionState" : "manual"
     },
