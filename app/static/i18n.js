@@ -1,7 +1,8 @@
 const I18N = {
   en: {
     personalCollection: "Personal collection",
-    recipeBox: "Recipe Box",
+    appName: "Curry and Cask",
+    recipeBox: "Cookbook",
     addRecipe: "Add recipe",
     typeItIn: "Type it in",
     fromAPhoto: "From a photo",
@@ -163,11 +164,11 @@ const I18N = {
     packTitle: "Pack",
     addMedicineToBuy: "Add medicine to buy",
     whichMedicine: "Which medicine?",
-    searchShopGroceries: "Search groceries to buy",
+    searchShopGroceries: "Search items to buy",
     searchShopMedicines: "Search medicines to buy",
     shopMedicinesEmpty: "Nothing to buy for medicines yet.",
-    shopGroceriesCountOne: "{n} grocery",
-    shopGroceriesCountOther: "{n} groceries",
+    shopGroceriesCountOne: "{n} item",
+    shopGroceriesCountOther: "{n} items",
     shopToBuy: "To buy",
     takeToIndia: "Take to India",
     bringToGermany: "Bring to Germany",
@@ -189,7 +190,7 @@ const I18N = {
     cupboardTitle: "Cupboard",
     shopTitle: "Shop",
     medicinesTitle: "Medicines",
-    groceries: "Groceries",
+    groceries: "Items",
     addItem: "Add item",
     inStock: "In stock",
     toBuy: "Buy",
@@ -283,5 +284,5 @@ function applyStaticI18n() {
     el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria")));
   });
   const title = document.querySelector("title");
-  if (title) title.textContent = t("recipeBox");
+  if (title) title.textContent = t("appName");
 }

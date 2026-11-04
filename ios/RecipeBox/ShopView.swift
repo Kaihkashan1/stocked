@@ -33,7 +33,7 @@ struct ShopView: View {
     }
 
     private enum ShopSegment: String, CaseIterable, Identifiable {
-        case groceries = "Groceries"
+        case groceries = "Items"
         case medicines = "Medicines"
         case takeToIndia = "Take to India"
         case bringToGermany = "Bring to Germany"
@@ -198,7 +198,7 @@ struct ShopView: View {
             let germany = pantry.toBuyCount(in: "bring_to_germany")
             return "\(india) 🇮🇳 · \(germany) 🇩🇪"
         }
-        let groceries = L("\(pantry.toBuyCount(in: "shop")) groceries")
+        let groceries = L("\(pantry.toBuyCount(in: "shop")) items")
         let meds = L("\(pantry.toBuyCount(in: "shop_medicines")) medicines")
         return "\(groceries) · \(meds)"
     }
@@ -223,7 +223,7 @@ struct ShopView: View {
 
     private var searchPlaceholder: String {
         switch segment {
-        case .groceries: L("Search groceries to buy")
+        case .groceries: L("Search items to buy")
         case .medicines: L("Search medicines to buy")
         case .takeToIndia: L("Search items for India")
         case .bringToGermany: L("Search items for Germany")

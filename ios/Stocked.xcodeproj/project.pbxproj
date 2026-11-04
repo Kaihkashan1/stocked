@@ -385,10 +385,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Stocked;
+				INFOPLIST_KEY_CFBundleDisplayName = "Curry and Cask";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Stocked uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Stocked can load recipes from a server on your local network when you are testing.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Curry and Cask uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Curry and Cask can load recipes from a server on your local network when you are testing.";
 				INFOPLIST_KEY_UIAppFonts = "Caprasimo-Regular.ttf Figtree-Regular.ttf Figtree-SemiBold.ttf Figtree-Bold.ttf";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -417,10 +417,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Stocked;
+				INFOPLIST_KEY_CFBundleDisplayName = "Curry and Cask";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Stocked uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Stocked can load recipes from a server on your local network when you are testing.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Curry and Cask uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Curry and Cask can load recipes from a server on your local network when you are testing.";
 				INFOPLIST_KEY_UIAppFonts = "Caprasimo-Regular.ttf Figtree-Regular.ttf Figtree-SemiBold.ttf Figtree-Bold.ttf";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;

@@ -113,7 +113,7 @@ private struct ListHeader: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 Kicker(text: "\(L("\(store.recipes.count) recipes")) · \(L("\(favoriteCount) favorites"))")
-                Text("Stocked")
+                Text("Cookbook")
                     .font(Theme.display(36))
                     .foregroundStyle(Theme.ink)
             }

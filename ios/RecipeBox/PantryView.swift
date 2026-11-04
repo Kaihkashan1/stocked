@@ -17,7 +17,7 @@ struct PantryView: View {
     @State private var requestMedicineAdd = false
 
     private enum CupboardSegment: String, CaseIterable, Identifiable {
-        case groceries = "Groceries"
+        case groceries = "Items"
         case medicines = "Medicines"
         var id: String { rawValue }
         var localizedName: String {

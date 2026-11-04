@@ -7,7 +7,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stocked"
+            "value" : "Curry and Cask"
           }
         }
       }
@@ -31,7 +31,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stocked uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you."
+            "value" : "Curry and Cask uses the camera to photograph a recipe card or cookbook page so it can read the recipe for you."
           }
         }
       }
@@ -43,7 +43,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stocked can load recipes from a server on your local network when you are testing."
+            "value" : "Curry and Cask can load recipes from a server on your local network when you are testing."
           }
         }
       }

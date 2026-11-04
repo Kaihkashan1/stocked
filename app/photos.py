@@ -1,25 +1,23 @@
-"""Persist original recipe photos on Google Drive.
+"""Persist original recipe photos.
 
-The sheet only holds a Drive file id (the Photo column). Bytes live in
-Drive so they survive Vercel cold starts — /tmp does not.
-
-Service accounts have no Drive storage quota of their own. Sharing only
-the spreadsheet is enough for recipe rows, but photos need a folder the
-user owns (or a Shared Drive) that is also shared with the bot. The
-same service account that already edits the Sheet is used; gspread
-already requests the Drive scope.
+Prefer a user-owned Drive folder (service accounts have no storage of
+their own). If that is not available, keep the bytes in a Photos tab of
+the same spreadsheet the recipes already live in — that file is owned
+by you, so it works from the phone or Vercel without this Mac.
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import uuid
 from functools import lru_cache
+from pathlib import Path
 
 from google.auth.transport.requests import AuthorizedSession
 from google.oauth2.service_account import Credentials
 
-from app.config import settings
+from app.config import ROOT, settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +29,15 @@ PHOTOS_FOLDER_NAME = "Recipe Box photos"
 UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true"
 FILES_URL = "https://www.googleapis.com/drive/v3/files"
 FOLDER_FIELDS = "id,name,parents,driveId,owners(me,emailAddress),capabilities(canAddChildren)"
+LOCAL_PREFIX = "local:"
+SHEET_PREFIX = "sheet:"
+LOCAL_DIR = ROOT / "data" / "photos"
+PHOTOS_SHEET_TITLE = "Photos"
+PHOTOS_SHEET_HEADERS = ["id", "content_type", "part", "data"]
+# Stay under Sheets' 50k character cell limit, and write a few rows at a
+# time so one photo cannot blow the API request size cap.
+SHEET_CELL_CHARS = 45_000
+SHEET_WRITE_BATCH = 8
 
 
 class PhotoStoreError(RuntimeError):
@@ -178,13 +185,95 @@ def _photos_folder_id() -> str:
     raise PhotoStoreError(_share_folder_message())
 
 
-def upload_recipe_photo(data: bytes, *, filename: str | None = None) -> str:
-    if not data:
-        raise PhotoStoreError("That photo was empty.")
+def is_local_photo_id(file_id: str) -> bool:
+    return str(file_id or "").startswith(LOCAL_PREFIX)
+
+
+def is_sheet_photo_id(file_id: str) -> bool:
+    return str(file_id or "").startswith(SHEET_PREFIX)
+
+
+def _local_path(file_id: str) -> Path:
+    name = Path(str(file_id)[len(LOCAL_PREFIX) :]).name
+    if not name or name.startswith("."):
+        raise FileNotFoundError(file_id)
+    return LOCAL_DIR / name
+
+
+def _sheet_photo_key(file_id: str) -> str:
+    key = str(file_id)[len(SHEET_PREFIX) :].strip()
+    if not key:
+        raise FileNotFoundError(file_id)
+    return key
+
+
+@lru_cache(maxsize=1)
+def _photos_worksheet():
+    import gspread
+    from app.store import _worksheet
+
+    spreadsheet = _worksheet().spreadsheet
     try:
-        folder_id = _photos_folder_id()
-    except PhotoStoreError:
-        raise
+        worksheet = spreadsheet.worksheet(PHOTOS_SHEET_TITLE)
+    except gspread.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(title=PHOTOS_SHEET_TITLE, rows=2, cols=len(PHOTOS_SHEET_HEADERS))
+        worksheet.update("A1:D1", [PHOTOS_SHEET_HEADERS], value_input_option="RAW")
+        return worksheet
+    if worksheet.col_count < len(PHOTOS_SHEET_HEADERS):
+        worksheet.resize(rows=max(worksheet.row_count, 2), cols=len(PHOTOS_SHEET_HEADERS))
+    return worksheet
+
+
+def _upload_sheet(data: bytes, filename: str | None = None) -> str:
+    photo_id = uuid.uuid4().hex
+    encoded = base64.b64encode(data).decode("ascii")
+    chunks = [encoded[i : i + SHEET_CELL_CHARS] for i in range(0, len(encoded), SHEET_CELL_CHARS)] or [""]
+    worksheet = _photos_worksheet()
+    start = max(len(worksheet.col_values(1)) + 1, 2)
+    rows = [[photo_id, "image/jpeg", str(index), chunk] for index, chunk in enumerate(chunks)]
+    for offset in range(0, len(rows), SHEET_WRITE_BATCH):
+        batch = rows[offset : offset + SHEET_WRITE_BATCH]
+        first = start + offset
+        last = first + len(batch) - 1
+        worksheet.update(f"A{first}:D{last}", batch, value_input_option="RAW")
+    logger.info("Kept recipe photo in the spreadsheet (%s, %s chunks)", filename or photo_id, len(chunks))
+    return f"{SHEET_PREFIX}{photo_id}"
+
+
+def _download_sheet(file_id: str) -> tuple[bytes, str]:
+    key = _sheet_photo_key(file_id)
+    values = _photos_worksheet().get_all_values()
+    parts: list[tuple[int, str]] = []
+    content_type = "image/jpeg"
+    for row in values[1:]:
+        if not row or row[0] != key:
+            continue
+        content_type = (row[1] if len(row) > 1 else "") or content_type
+        try:
+            index = int(row[2]) if len(row) > 2 else 0
+        except ValueError:
+            index = 0
+        parts.append((index, row[3] if len(row) > 3 else ""))
+    if not parts:
+        raise FileNotFoundError(file_id)
+    parts.sort()
+    try:
+        return base64.b64decode("".join(chunk for _, chunk in parts)), content_type
+    except Exception as exc:
+        raise PhotoStoreError("Could not load that photo.") from exc
+
+
+def _delete_sheet(file_id: str) -> None:
+    key = _sheet_photo_key(file_id)
+    worksheet = _photos_worksheet()
+    values = worksheet.get_all_values()
+    rows = [index for index, row in enumerate(values, start=1) if index > 1 and row and row[0] == key]
+    for index in reversed(rows):
+        worksheet.delete_rows(index)
+
+
+def _upload_drive(data: bytes, filename: str | None) -> str:
+    folder_id = _photos_folder_id()
     metadata = {
         "name": filename or f"recipe-{uuid.uuid4().hex}.jpg",
         "parents": [folder_id],
@@ -218,7 +307,24 @@ def upload_recipe_photo(data: bytes, *, filename: str | None = None) -> str:
     return file_id
 
 
+def upload_recipe_photo(data: bytes, *, filename: str | None = None) -> str:
+    if not data:
+        raise PhotoStoreError("That photo was empty.")
+    try:
+        return _upload_drive(data, filename)
+    except PhotoStoreError:
+        logger.warning("Google Drive cannot store the photo; keeping it in the spreadsheet instead")
+        return _upload_sheet(data, filename)
+
+
 def download_recipe_photo(file_id: str) -> tuple[bytes, str]:
+    if is_local_photo_id(file_id):
+        path = _local_path(file_id)
+        if not path.is_file():
+            raise FileNotFoundError(file_id)
+        return path.read_bytes(), "image/jpeg"
+    if is_sheet_photo_id(file_id):
+        return _download_sheet(file_id)
     response = _session().get(
         f"{FILES_URL}/{file_id}",
         params={"alt": "media", "supportsAllDrives": "true"},
@@ -235,6 +341,13 @@ def download_recipe_photo(file_id: str) -> tuple[bytes, str]:
 
 def delete_recipe_photo(file_id: str) -> None:
     if not file_id:
+        return
+    if is_local_photo_id(file_id):
+        path = _local_path(file_id)
+        path.unlink(missing_ok=True)
+        return
+    if is_sheet_photo_id(file_id):
+        _delete_sheet(file_id)
         return
     response = _session().delete(
         f"{FILES_URL}/{file_id}",

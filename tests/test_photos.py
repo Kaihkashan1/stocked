@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import base64
 import unittest
+from unittest.mock import patch
 
-from app.photos import folder_uses_service_account_quota, pick_photos_folder
+from app.photos import (
+    PhotoStoreError,
+    SHEET_CELL_CHARS,
+    delete_recipe_photo,
+    download_recipe_photo,
+    folder_uses_service_account_quota,
+    pick_photos_folder,
+    upload_recipe_photo,
+)
 
 
 class PhotoFolderPickerTests(unittest.TestCase):
@@ -38,3 +48,54 @@ class PhotoFolderPickerTests(unittest.TestCase):
         }
         self.assertFalse(folder_uses_service_account_quota(folder))
         self.assertEqual(pick_photos_folder([folder])["id"], "shared")
+
+
+class FakePhotosSheet:
+    def __init__(self):
+        self.rows = [["id", "content_type", "part", "data"]]
+
+    def col_values(self, _index):
+        return [row[0] for row in self.rows]
+
+    def get_all_values(self):
+        return [list(row) for row in self.rows]
+
+    def update(self, range_name, values, value_input_option="RAW"):
+        start = int(range_name.split("A")[1].split(":")[0])
+        while len(self.rows) < start - 1 + len(values):
+            self.rows.append(["", "", "", ""])
+        for offset, row in enumerate(values):
+            self.rows[start - 1 + offset] = list(row)
+
+    def delete_rows(self, index):
+        del self.rows[index - 1]
+
+
+class SheetPhotoFallbackTests(unittest.TestCase):
+    def test_keeps_photo_in_the_spreadsheet_when_drive_is_unavailable(self):
+        sheet = FakePhotosSheet()
+        payload = b"jpeg-bytes" * 20
+        with (
+            patch("app.photos._photos_worksheet", return_value=sheet),
+            patch("app.photos._upload_drive", side_effect=PhotoStoreError("share a folder")),
+        ):
+            photo_id = upload_recipe_photo(payload, filename="curry.jpg")
+            data, content_type = download_recipe_photo(photo_id)
+            self.assertTrue(photo_id.startswith("sheet:"))
+            self.assertEqual(data, payload)
+            self.assertEqual(content_type, "image/jpeg")
+            delete_recipe_photo(photo_id)
+            self.assertEqual(sheet.rows, [["id", "content_type", "part", "data"]])
+
+    def test_splits_large_photos_across_cells(self):
+        sheet = FakePhotosSheet()
+        payload = b"\xff" * (SHEET_CELL_CHARS + 50)
+        with (
+            patch("app.photos._photos_worksheet", return_value=sheet),
+            patch("app.photos._upload_drive", side_effect=PhotoStoreError("share a folder")),
+        ):
+            photo_id = upload_recipe_photo(payload)
+            encoded = base64.b64encode(payload).decode("ascii")
+            self.assertGreater(len(sheet.rows), 2)
+            self.assertEqual(download_recipe_photo(photo_id)[0], payload)
+            self.assertEqual("".join(row[3] for row in sheet.rows[1:]), encoded)

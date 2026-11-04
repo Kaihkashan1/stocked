@@ -26,7 +26,7 @@ def process_recipe(raw_content: str) -> dict:
         if source_exists(url):
             logger.info("Already saved, skipping %s", url)
             _record(url=url, status="duplicate")
-            notify.send("Recipe Box", f"Already saved:\n{url}")
+            notify.send("Curry and Cask", f"Already saved:\n{url}")
             return {"status": "duplicate", "url": url, "message": "Already saved"}
 
         with tempfile.TemporaryDirectory(prefix="recipe-") as tmp:
@@ -58,7 +58,7 @@ def process_recipe(raw_content: str) -> dict:
             error=message,
             used_backup=bool(getattr(exc, "used_backup", used_backup)),
         )
-        notify.send("Recipe Box failed", message[:400])
+        notify.send("Curry and Cask failed", message[:400])
         return {
             "status": "error",
             "url": url,

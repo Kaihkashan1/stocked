@@ -73,7 +73,7 @@ STATIC = ROOT / "app" / "static"
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info(
-        "Recipe Box ready  model=%s  sheet=%s  apify=%s",
+        "Curry and Cask ready  model=%s  sheet=%s  apify=%s",
         settings.gemini_model,
         "yes" if settings.google_sheet_id else "MISSING",
         "yes" if settings.apify_api_token.strip() else "MISSING",
@@ -85,7 +85,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Recipe Box", lifespan=lifespan)
+app = FastAPI(title="Curry and Cask", lifespan=lifespan)
 
 
 @app.get("/")
