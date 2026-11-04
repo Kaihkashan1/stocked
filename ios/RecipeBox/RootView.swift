@@ -33,11 +33,13 @@ private enum PendingAddAction {
 private enum AppTab: Hashable {
     case recipes
     case pantry
+    case medicines
 }
 
 struct RootView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(PantryStore.self) private var pantryStore
+    @Environment(MedicineStore.self) private var medicineStore
     @Environment(Connectivity.self) private var connectivity
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: AppTab = .recipes
@@ -70,6 +72,12 @@ struct RootView: View {
                     Label("Cupboard", systemImage: "cabinet")
                 }
                 .tag(AppTab.pantry)
+
+            medicinesTab
+                .tabItem {
+                    Label("Medicines", systemImage: "cross.case")
+                }
+                .tag(AppTab.medicines)
         }
         .tint(Theme.accent)
         .toolbarBackground(Theme.surface, for: .tabBar)
@@ -194,7 +202,7 @@ struct RootView: View {
     }
 
     private var refreshErrorMessage: String? {
-        store.lastRefreshError ?? pantryStore.lastRefreshError
+        store.lastRefreshError ?? pantryStore.lastRefreshError ?? medicineStore.lastRefreshError
     }
 
     private var photoImportStatus: BackgroundImportJob.Status? {
@@ -338,7 +346,8 @@ struct RootView: View {
         // RecipeStore/PantryStore.loadRemote) instead of failing silently.
         async let recipes = store.refresh(force: force, auto: true)
         async let pantry = pantryStore.refresh(force: force, auto: true)
-        _ = await (recipes, pantry)
+        async let meds = medicineStore.refresh(force: force, auto: true)
+        _ = await (recipes, pantry, meds)
     }
 
     private var recipesTab: some View {
@@ -364,6 +373,12 @@ struct RootView: View {
         }
     }
 
+    private var medicinesTab: some View {
+        NavigationStack {
+            MedicineView()
+        }
+    }
+
     @ViewBuilder
     private func sheetContent(for sheet: ActiveSheet) -> some View {
         switch sheet {
@@ -381,6 +396,7 @@ struct RootView: View {
             SettingsView()
                 .environment(store)
                 .environment(pantryStore)
+                .environment(medicineStore)
         case .addRecipe:
             AddRecipeView(prefill: addRecipePrefill)
                 .environment(store)

@@ -67,6 +67,13 @@ const state = {
   logFilter: "all",
   logShown: 5,
   devSettingsOpen: false,
+  view: "recipes",
+  pantryInventory: [],
+  pantryInventoryCategories: [],
+  pantryInventoryLoaded: false,
+  medicines: [],
+  medicineCategories: [],
+  medicinesLoaded: false,
 };
 
 const els = {
@@ -87,6 +94,17 @@ const els = {
   addRecipeMenu: document.getElementById("add-recipe-menu"),
   photoInput: document.getElementById("photo-input"),
   offlineBanner: document.getElementById("offline-banner"),
+  viewTabs: document.getElementById("view-tabs"),
+  searchRow: document.getElementById("search-row"),
+  recipesView: document.getElementById("recipes-view"),
+  cupboardView: document.getElementById("cupboard-view"),
+  medicinesView: document.getElementById("medicines-view"),
+  cupboardList: document.getElementById("cupboard-list"),
+  cupboardStatus: document.getElementById("cupboard-status"),
+  cupboardSearch: document.getElementById("cupboard-search"),
+  medicinesList: document.getElementById("medicines-list"),
+  medicinesStatus: document.getElementById("medicines-status"),
+  medicinesSearch: document.getElementById("medicines-search"),
 };
 
 function setOfflineBanner(show) {
@@ -1470,6 +1488,401 @@ function escapeAttr(value) {
   return escapeHtml(value).replaceAll("'", "&#39;");
 }
 
+// ---------- Cupboard / Medicines tabs ----------
+// Both are a flat list of items grouped by category, with the same
+// fetch/save/delete shape as the backend's pantry_inventory/medicines
+// AppState keys (see app/store.py) — one generic module instead of two
+// near-identical copies. Only the fields shown per item, and the add/edit
+// form's fields, differ between the two (see INVENTORY_KINDS below).
+const INVENTORY_KINDS = {
+  cupboard: {
+    apiPath: "/api/pantry-inventory",
+    itemsKey: "pantryInventory",
+    categoriesKey: "pantryInventoryCategories",
+    loadedKey: "pantryInventoryLoaded",
+    listEl: () => els.cupboardList,
+    statusEl: () => els.cupboardStatus,
+    searchEl: () => els.cupboardSearch,
+    emptyLabel: "cupboardEmpty",
+    countOneKey: "cupboardCountOne",
+    countOtherKey: "cupboardCountOther",
+    units: ["pcs", "g", "kg"],
+    statuses: ["unopened", "open"],
+    defaultUnit: "pcs",
+    defaultStatus: "unopened",
+  },
+  medicine: {
+    apiPath: "/api/medicines",
+    itemsKey: "medicines",
+    categoriesKey: "medicineCategories",
+    loadedKey: "medicinesLoaded",
+    listEl: () => els.medicinesList,
+    statusEl: () => els.medicinesStatus,
+    searchEl: () => els.medicinesSearch,
+    emptyLabel: "medicinesEmpty",
+    countOneKey: "medicinesCountOne",
+    countOtherKey: "medicinesCountOther",
+    units: ["pills", "ml", "mg", "pcs"],
+    // Same meaning as Cupboard's: has this strip/bottle been opened yet.
+    statuses: ["unopened", "open"],
+    defaultUnit: "pills",
+    defaultStatus: "unopened",
+  },
+};
+
+function switchView(view) {
+  state.view = view;
+  els.recipesView.hidden = view !== "recipes";
+  els.cupboardView.hidden = view !== "cupboard";
+  els.medicinesView.hidden = view !== "medicines";
+  els.searchRow.hidden = view !== "recipes";
+  if (view !== "recipes") els.searchSuggest.hidden = true;
+  els.viewTabs.querySelectorAll("[data-view]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === view);
+  });
+  if (view === "cupboard" && !state.pantryInventoryLoaded) loadInventory("cupboard");
+  if (view === "medicines" && !state.medicinesLoaded) loadInventory("medicine");
+}
+
+async function loadInventory(kind) {
+  const config = INVENTORY_KINDS[kind];
+  state[config.loadedKey] = true;
+  try {
+    const response = await fetch(config.apiPath);
+    if (!response.ok) return;
+    const data = await response.json();
+    state[config.itemsKey] = Array.isArray(data.items) ? data.items : [];
+    state[config.categoriesKey] = Array.isArray(data.categories) ? data.categories : [];
+    renderInventory(kind);
+  } catch {
+    config.statusEl().textContent = t("couldNotLoad");
+  }
+}
+
+async function putInventory(kind, items) {
+  const config = INVENTORY_KINDS[kind];
+  const response = await fetch(config.apiPath, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ items }),
+  });
+  if (!response.ok) throw await errorForResponse(response);
+  return response.json();
+}
+
+// Optimistic like togglePantry: update locally and re-render first, push
+// the whole list, then reconcile with whatever the server actually saved
+// (or roll back on failure).
+async function saveInventoryItem(kind, item) {
+  const config = INVENTORY_KINDS[kind];
+  const previous = state[config.itemsKey];
+  const index = previous.findIndex((existing) => existing.id === item.id);
+  const next = index === -1 ? [...previous, item] : previous.map((existing, i) => (i === index ? item : existing));
+  state[config.itemsKey] = next;
+  renderInventory(kind);
+  try {
+    const data = await putInventory(kind, next);
+    state[config.itemsKey] = data.items || next;
+    if (data.categories) state[config.categoriesKey] = data.categories;
+    closeDrawer();
+  } catch (err) {
+    state[config.itemsKey] = previous;
+    window.alert(t("couldntSave", { error: err.message }));
+  }
+  renderInventory(kind);
+}
+
+async function deleteInventoryItem(kind, id) {
+  const config = INVENTORY_KINDS[kind];
+  const previous = state[config.itemsKey];
+  state[config.itemsKey] = previous.filter((item) => item.id !== id);
+  renderInventory(kind);
+  try {
+    const data = await putInventory(kind, state[config.itemsKey]);
+    state[config.itemsKey] = data.items || state[config.itemsKey];
+  } catch (err) {
+    state[config.itemsKey] = previous;
+    window.alert(t("couldntSave", { error: err.message }));
+  }
+  renderInventory(kind);
+}
+
+function groupInventoryByCategory(items, categories) {
+  const buckets = new Map();
+  for (const category of categories) buckets.set(category, []);
+  for (const item of items) {
+    const category = item.category || "Other";
+    if (!buckets.has(category)) buckets.set(category, []);
+    buckets.get(category).push(item);
+  }
+  return [...buckets.entries()].filter(([, list]) => list.length);
+}
+
+// Expired/expiring-soon gets called out the same way in both tabs — most
+// useful for medicines, but equally relevant to anything in the cupboard.
+function expiryPillHtml(expiry) {
+  if (!expiry) return "";
+  const days = Math.ceil((new Date(`${expiry}T00:00:00`) - new Date()) / 86400000);
+  if (days < 0) return `<span class="pill danger">${escapeHtml(t("expired"))}</span>`;
+  if (days <= 30) return `<span class="pill warm">${escapeHtml(t("expiresInDays", { n: days }))}</span>`;
+  return `<span class="pill">${escapeHtml(t("expiresOn", { date: expiry }))}</span>`;
+}
+
+function inventorySearchMatch(item, needle) {
+  if (!needle) return true;
+  if (item.name.toLowerCase().includes(needle)) return true;
+  if ((item.category || "").toLowerCase().includes(needle)) return true;
+  if (item.purpose && item.purpose.toLowerCase().includes(needle)) return true;
+  return false;
+}
+
+function renderInventory(kind) {
+  const config = INVENTORY_KINDS[kind];
+  const items = state[config.itemsKey];
+  const needle = (config.searchEl()?.value || "").trim().toLowerCase();
+  const visibleItems = needle ? items.filter((item) => inventorySearchMatch(item, needle)) : items;
+  const groups = groupInventoryByCategory(visibleItems, state[config.categoriesKey]);
+  // Always the total count, like iOS — a search narrows what's shown, not
+  // what "items" means.
+  config.statusEl().textContent =
+    items.length === 1 ? t(config.countOneKey, { n: items.length }) : t(config.countOtherKey, { n: items.length });
+  const listEl = config.listEl();
+  if (!groups.length) {
+    listEl.innerHTML = `<div class="empty">${escapeHtml(needle ? t("inventoryNoMatch") : t(config.emptyLabel))}</div>`;
+    return;
+  }
+  listEl.innerHTML = groups
+    .map(
+      ([category, groupItems]) => `
+    <div class="pantry-group" style="grid-column:1/-1;">
+      <h3 class="pantry-heading">${escapeHtml(category)}</h3>
+      <div class="grid">${groupItems.map((item) => inventoryCardHtml(kind, item)).join("")}</div>
+    </div>`
+    )
+    .join("");
+}
+
+function inventoryCardHtml(kind, item) {
+  const meta = kind === "cupboard" ? cupboardMetaHtml(item) : medicineMetaHtml(item);
+  return `
+    <div class="card" data-action="edit-inventory-item" data-kind="${kind}" data-id="${escapeAttr(item.id)}">
+      <div class="card-actions">
+        <button class="card-icon-btn" type="button" data-action="delete-inventory-item" data-kind="${kind}" data-id="${escapeAttr(item.id)}" aria-label="${escapeAttr(t("delete"))}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13"/></svg>
+        </button>
+      </div>
+      <div class="card-body">
+        <h2>${escapeHtml(item.name)}</h2>
+        ${meta}
+      </div>
+    </div>`;
+}
+
+function cupboardMetaHtml(item) {
+  return `
+    <span class="inventory-meta">${escapeHtml(String(item.amount))} ${escapeHtml(item.unit)} · ${escapeHtml(t(item.status))}</span>
+    <div class="meta">${expiryPillHtml(item.expiry)}</div>`;
+}
+
+function medicineMetaHtml(item) {
+  return `
+    <span class="inventory-meta">${escapeHtml(String(item.amount))} ${escapeHtml(item.unit)} · ${escapeHtml(t(item.status))}</span>
+    ${item.purpose ? `<span class="inventory-meta">${escapeHtml(item.purpose)}</span>` : ""}
+    <div class="meta">${expiryPillHtml(item.expiry)}</div>`;
+}
+
+// Grows a textarea to fit its content instead of scrolling inside a fixed
+// box — called on input, and once right after a form opens so an existing
+// multi-line note starts at full height instead of a tiny scrollable box.
+function autoGrowTextarea(el) {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
+document.addEventListener("input", (event) => {
+  if (event.target.classList?.contains("notes-grow")) autoGrowTextarea(event.target);
+});
+
+function openAddInventoryItem(kind) {
+  state.openRecipeId = null;
+  state.editingId = null;
+  state.addingRecipe = false;
+  els.detail.innerHTML = kind === "cupboard" ? pantryItemFormHtml(null) : medicineFormHtml(null);
+  els.drawer.hidden = false;
+  els.detail.querySelectorAll(".notes-grow").forEach(autoGrowTextarea);
+}
+
+function openEditInventoryItem(kind, id) {
+  const config = INVENTORY_KINDS[kind];
+  const item = state[config.itemsKey].find((existing) => existing.id === id);
+  if (!item) return;
+  state.openRecipeId = null;
+  state.editingId = null;
+  state.addingRecipe = false;
+  els.detail.innerHTML = kind === "cupboard" ? pantryItemFormHtml(item) : medicineFormHtml(item);
+  els.drawer.hidden = false;
+  els.detail.querySelectorAll(".notes-grow").forEach(autoGrowTextarea);
+}
+
+function unitOptionsHtml(units, selected) {
+  return units.map((unit) => `<option value="${escapeAttr(unit)}"${unit === selected ? " selected" : ""}>${escapeHtml(unit)}</option>`).join("");
+}
+
+function statusOptionsHtml(statuses, selected) {
+  return statuses.map((status) => `<option value="${escapeAttr(status)}"${status === selected ? " selected" : ""}>${escapeHtml(t(status))}</option>`).join("");
+}
+
+function categoryOptionsHtml(categories, selected) {
+  return categories
+    .map((category) => `<option value="${escapeAttr(category)}"${category === selected ? " selected" : ""}>${escapeHtml(category)}</option>`)
+    .join("");
+}
+
+function pantryItemFormHtml(item) {
+  const config = INVENTORY_KINDS.cupboard;
+  const categories = state.pantryInventoryCategories.length ? state.pantryInventoryCategories : ["Other"];
+  const category = item?.category && categories.includes(item.category) ? item.category : categories[0];
+  return `
+    <div class="drawer-actions">
+      <button class="icon-btn" type="button" data-action="close-drawer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        ${escapeHtml(t("cancel"))}
+      </button>
+    </div>
+    <div class="recipe recipe-body">
+      <h2 style="margin-bottom:1.2rem;">${escapeHtml(item ? t("editItem") : t("addItem"))}</h2>
+      <input type="hidden" id="pantry-item-id" value="${escapeAttr(item?.id || "")}">
+      <label class="field">
+        <span>${escapeHtml(t("name"))}</span>
+        <input id="pantry-item-name" value="${escapeAttr(item?.name || "")}">
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("category"))}</span>
+        <select id="pantry-item-category">${categoryOptionsHtml(categories, category)}</select>
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("amount"))}</span>
+        <input id="pantry-item-amount" type="number" min="0" step="any" value="${escapeAttr(item?.amount ?? 1)}">
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("unit"))}</span>
+        <select id="pantry-item-unit">${unitOptionsHtml(config.units, item?.unit || config.defaultUnit)}</select>
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("status"))}</span>
+        <select id="pantry-item-status">${statusOptionsHtml(config.statuses, item?.status || config.defaultStatus)}</select>
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("expiry"))}</span>
+        <input id="pantry-item-expiry" type="date" value="${escapeAttr(item?.expiry || "")}">
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("notes"))}</span>
+        <textarea id="pantry-item-notes" class="notes-grow" rows="3">${escapeHtml(item?.notes || "")}</textarea>
+      </label>
+      <button class="pill-btn primary" type="button" data-action="save-pantry-item">${escapeHtml(t("save"))}</button>
+    </div>`;
+}
+
+function saveAddOrEditPantryItem() {
+  const name = document.getElementById("pantry-item-name").value.trim();
+  if (!name) return;
+  const item = {
+    id: document.getElementById("pantry-item-id").value || `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    name,
+    category: document.getElementById("pantry-item-category").value || "Other",
+    amount: Number(document.getElementById("pantry-item-amount").value) || 1,
+    unit: document.getElementById("pantry-item-unit").value,
+    status: document.getElementById("pantry-item-status").value,
+    expiry: document.getElementById("pantry-item-expiry").value || null,
+    notes: document.getElementById("pantry-item-notes").value.trim(),
+  };
+  saveInventoryItem("cupboard", item);
+}
+
+// Expiry is required for every category except First aid (a plaster or a
+// bandage doesn't expire in any way that matters here) — enforced on save,
+// same as a recipe's title being required.
+const MEDICINE_EXPIRY_EXEMPT_CATEGORY = "First aid";
+
+function medicineFormHtml(item) {
+  const config = INVENTORY_KINDS.medicine;
+  const categories = state.medicineCategories.length ? state.medicineCategories : ["Other"];
+  const category = item?.category && categories.includes(item.category) ? item.category : categories[0];
+  return `
+    <div class="drawer-actions">
+      <button class="icon-btn" type="button" data-action="close-drawer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        ${escapeHtml(t("cancel"))}
+      </button>
+    </div>
+    <div class="recipe recipe-body">
+      <h2 style="margin-bottom:1.2rem;">${escapeHtml(item ? t("editMedicine") : t("addMedicine"))}</h2>
+      <input type="hidden" id="medicine-id" value="${escapeAttr(item?.id || "")}">
+      <label class="field">
+        <span>${escapeHtml(t("name"))}</span>
+        <input id="medicine-name" value="${escapeAttr(item?.name || "")}" placeholder="${escapeAttr(t("medicineNamePlaceholder"))}">
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("category"))}</span>
+        <select id="medicine-category">${categoryOptionsHtml(categories, category)}</select>
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("amount"))}</span>
+        <input id="medicine-amount" type="number" min="0" step="any" value="${escapeAttr(item?.amount ?? 1)}">
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("unit"))}</span>
+        <select id="medicine-unit">${unitOptionsHtml(config.units, item?.unit || config.defaultUnit)}</select>
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("status"))}</span>
+        <select id="medicine-status">${statusOptionsHtml(config.statuses, item?.status || config.defaultStatus)}</select>
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("expiry"))}</span>
+        <input id="medicine-expiry" type="date" value="${escapeAttr(item?.expiry || "")}">
+        <p class="field-note">${escapeHtml(t("expiryRequiredHint", { category: MEDICINE_EXPIRY_EXEMPT_CATEGORY }))}</p>
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("purpose"))}</span>
+        <input id="medicine-purpose" value="${escapeAttr(item?.purpose || "")}" placeholder="${escapeAttr(t("purposePlaceholder"))}">
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("notes"))}</span>
+        <textarea id="medicine-notes" class="notes-grow" rows="3">${escapeHtml(item?.notes || "")}</textarea>
+      </label>
+      <p id="medicine-error" class="edit-error" hidden></p>
+      <button class="pill-btn primary" type="button" data-action="save-medicine">${escapeHtml(t("save"))}</button>
+    </div>`;
+}
+
+function saveAddOrEditMedicine() {
+  const name = document.getElementById("medicine-name").value.trim();
+  const errorEl = document.getElementById("medicine-error");
+  if (!name) return;
+  const category = document.getElementById("medicine-category").value || "Other";
+  const expiry = document.getElementById("medicine-expiry").value || null;
+  if (!expiry && category !== MEDICINE_EXPIRY_EXEMPT_CATEGORY) {
+    errorEl.textContent = t("expiryRequiredHint", { category: MEDICINE_EXPIRY_EXEMPT_CATEGORY });
+    errorEl.hidden = false;
+    return;
+  }
+  errorEl.hidden = true;
+  const item = {
+    id: document.getElementById("medicine-id").value || `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    name,
+    category,
+    amount: Number(document.getElementById("medicine-amount").value) || 1,
+    unit: document.getElementById("medicine-unit").value,
+    status: document.getElementById("medicine-status").value,
+    expiry,
+    purpose: document.getElementById("medicine-purpose").value.trim(),
+    notes: document.getElementById("medicine-notes").value.trim(),
+  };
+  saveInventoryItem("medicine", item);
+}
+
 // Debounced like iOS's DebouncedTextField — filtering the full list (plus
 // pantry matching against "what I have") on every single keystroke is
 // wasted work while the user is still typing. Drives both the recipe grid
@@ -1518,6 +1931,15 @@ document.getElementById("sort-options").addEventListener("click", (event) => {
     .forEach((chip) => chip.classList.toggle("active", chip.dataset.sort === state.sort));
   renderGrid();
 });
+
+els.viewTabs.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-view]");
+  if (!btn) return;
+  switchView(btn.dataset.view);
+});
+
+els.cupboardSearch.addEventListener("input", () => renderInventory("cupboard"));
+els.medicinesSearch.addEventListener("input", () => renderInventory("medicine"));
 
 document.addEventListener("click", (event) => {
   if (els.filtersPanel.hidden) return;
@@ -1653,6 +2075,25 @@ document.addEventListener("click", (event) => {
       els.addRecipeMenu.hidden = true;
       els.photoInput.value = "";
       els.photoInput.click();
+      break;
+    case "open-add-pantry-item":
+      openAddInventoryItem("cupboard");
+      break;
+    case "open-add-medicine":
+      openAddInventoryItem("medicine");
+      break;
+    case "edit-inventory-item":
+      openEditInventoryItem(actionEl.dataset.kind, actionEl.dataset.id);
+      break;
+    case "delete-inventory-item":
+      event.stopPropagation();
+      deleteInventoryItem(actionEl.dataset.kind, actionEl.dataset.id);
+      break;
+    case "save-pantry-item":
+      saveAddOrEditPantryItem();
+      break;
+    case "save-medicine":
+      saveAddOrEditMedicine();
       break;
     default:
       break;

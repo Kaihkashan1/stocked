@@ -29,6 +29,9 @@
 		A20000000000000000000018 /* PantryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* PantryView.swift */; };
 		A20000000000000000000019 /* PantryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PantryStore.swift */; };
 		A2000000000000000000001A /* PantryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* PantryItemSheet.swift */; };
+		A20000000000000000000041 /* MedicineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* MedicineStore.swift */; };
+		A20000000000000000000042 /* MedicineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* MedicineView.swift */; };
+		A20000000000000000000043 /* MedicineItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* MedicineItemSheet.swift */; };
 		A2000000000000000000001C /* Connectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Connectivity.swift */; };
 		A2000000000000000000001E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* Assets.xcassets */; };
 		A40000000000000000000002 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000001 /* Localizable.xcstrings */; };
@@ -59,6 +62,9 @@
 		A20000000000000000000008 /* PantryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryView.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* PantryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryStore.swift; sourceTree = "<group>"; };
 		A2000000000000000000000A /* PantryItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryItemSheet.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* MedicineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicineStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000032 /* MedicineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicineView.swift; sourceTree = "<group>"; };
+		A20000000000000000000033 /* MedicineItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicineItemSheet.swift; sourceTree = "<group>"; };
 		A2000000000000000000000B /* Connectivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connectivity.swift; sourceTree = "<group>"; };
 		A2000000000000000000000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A40000000000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -98,6 +104,9 @@
 				A20000000000000000000007 /* PasteALinkView.swift */,
 				A20000000000000000000008 /* PantryView.swift */,
 				A2000000000000000000000A /* PantryItemSheet.swift */,
+				A20000000000000000000031 /* MedicineStore.swift */,
+				A20000000000000000000032 /* MedicineView.swift */,
+				A20000000000000000000033 /* MedicineItemSheet.swift */,
 				A2000000000000000000000D /* Assets.xcassets */,
 				A40000000000000000000001 /* Localizable.xcstrings */,
 				A40000000000000000000003 /* InfoPlist.xcstrings */,
@@ -252,6 +261,9 @@
 				A20000000000000000000019 /* PantryStore.swift in Sources */,
 				A2000000000000000000001A /* PantryItemSheet.swift in Sources */,
 				A2000000000000000000001C /* Connectivity.swift in Sources */,
+				A20000000000000000000041 /* MedicineStore.swift in Sources */,
+				A20000000000000000000042 /* MedicineView.swift in Sources */,
+				A20000000000000000000043 /* MedicineItemSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

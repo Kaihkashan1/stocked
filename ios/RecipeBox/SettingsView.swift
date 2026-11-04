@@ -4,6 +4,7 @@ import UIKit
 struct SettingsView: View {
     @Environment(RecipeStore.self) private var store
     @Environment(PantryStore.self) private var pantryStore
+    @Environment(MedicineStore.self) private var medicineStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var draftURL = ""
@@ -408,8 +409,9 @@ struct SettingsView: View {
         store.serverURL = draftURL.trimmingCharacters(in: .whitespacesAndNewlines)
         async let recipesOK = store.refresh()
         async let pantryOK = pantryStore.refresh()
+        async let medsOK = medicineStore.refresh()
         let ok = await recipesOK
-        _ = await pantryOK
+        _ = await (pantryOK, medsOK)
         if ok {
             dismiss()
         } else {

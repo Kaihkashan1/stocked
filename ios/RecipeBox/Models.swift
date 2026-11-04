@@ -139,6 +139,86 @@ struct PantryItem: Codable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Medicines
+
+/// Its own tab alongside Cupboard, same "what do I have in stock" shape —
+/// category grouping, amount/unit/status, expiry — as PantryItem, plus one
+/// extra field for what the medicine is for. No dosage/frequency/prescriber
+/// fields: this tracks stock, not a treatment plan. `status` reuses
+/// PantryItemStatus's open/unopened meaning (has this strip/bottle been
+/// started). Categories are a fixed list from the server
+/// (app.store.MEDICINE_CATEGORIES) rather than something the client can
+/// add/rename/delete — there's no reliable way to infer "Pain relief" vs
+/// "Allergy" from a name the way grocery aisles can be inferred.
+let defaultMedicineCategories = [
+    "Pain relief",
+    "Fever & cold",
+    "Cough & throat",
+    "Allergy",
+    "Digestive",
+    "Skin & topical",
+    "Eye & ear",
+    "Antibiotics",
+    "Vitamins & supplements",
+    "First aid",
+    "Prescription",
+    "Other",
+]
+
+enum MedicineUnit: String, CaseIterable, Identifiable, Codable {
+    case pills, ml, mg, pcs
+    var id: String { rawValue }
+    var localizedName: String {
+        L(String.LocalizationValue(rawValue))
+    }
+}
+
+struct MedicineItem: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var category: String
+    var amount: Double
+    var unit: MedicineUnit
+    var status: PantryItemStatus
+    /// ISO date-only string `YYYY-MM-DD` — required unless category is
+    /// "First aid" (enforced in MedicineItemSheet, not here).
+    var expiry: String?
+    var purpose: String
+    var notes: String
+
+    init(
+        id: String = UUID().uuidString,
+        name: String,
+        category: String = "Other",
+        amount: Double = 1,
+        unit: MedicineUnit = .pills,
+        status: PantryItemStatus = .unopened,
+        expiry: String? = nil,
+        purpose: String = "",
+        notes: String = ""
+    ) {
+        self.id = id
+        self.name = name
+        self.category = category
+        self.amount = amount
+        self.unit = unit
+        self.status = status
+        self.expiry = expiry
+        self.purpose = purpose
+        self.notes = notes
+    }
+}
+
+struct MedicinesResponse: Codable {
+    let items: [MedicineItem]
+    var categories: [String]?
+
+    init(items: [MedicineItem], categories: [String]? = nil) {
+        self.items = items
+        self.categories = categories
+    }
+}
+
 struct ToBuySource: Codable, Hashable {
     var recipeID: Int?
     var qty: String

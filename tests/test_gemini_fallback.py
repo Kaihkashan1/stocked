@@ -348,6 +348,45 @@ class PantryCategoryTests(TestCase):
         self.assertEqual(AISLE_CATEGORIES[-1], "Other")
 
 
+class MedicineNormalizationTests(TestCase):
+    def test_defaults_and_fixed_category_fallback(self):
+        from app.store import _normalize_medicine_item
+
+        item = _normalize_medicine_item({"name": "Paracetamol"})
+        self.assertEqual(item["category"], "Other")
+        self.assertEqual(item["unit"], "pills")
+        self.assertEqual(item["status"], "unopened")
+        self.assertEqual(item["amount"], 1.0)
+        self.assertIsNone(item["expiry"])
+
+    def test_honors_a_known_category_case_insensitively(self):
+        from app.store import _normalize_medicine_item
+
+        item = _normalize_medicine_item({"name": "Cetirizine", "category": "allergy"})
+        self.assertEqual(item["category"], "Allergy")
+
+    def test_unknown_category_falls_back_to_other_unlike_grocery_aisles(self):
+        # Medicine categories aren't inferred from the name like grocery
+        # aisles are — an unrecognized category is just "Other", not
+        # reclassified via keyword matching.
+        from app.store import _normalize_medicine_item
+
+        item = _normalize_medicine_item({"name": "Cough syrup", "category": "Respiratory"})
+        self.assertEqual(item["category"], "Other")
+
+    def test_keeps_purpose_and_status(self):
+        from app.store import _normalize_medicine_item
+
+        item = _normalize_medicine_item({"name": "Ibuprofen", "purpose": "Muscle pain", "status": "open"})
+        self.assertEqual(item["purpose"], "Muscle pain")
+        self.assertEqual(item["status"], "open")
+
+    def test_rejects_unnamed_item(self):
+        from app.store import _normalize_medicine_item
+
+        self.assertIsNone(_normalize_medicine_item({"name": "  "}))
+
+
 class ToBuySourceTests(TestCase):
     def test_merge_qty_sums_same_unit(self):
         from app.store import _merge_qty

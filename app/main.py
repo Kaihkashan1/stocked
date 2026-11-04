@@ -22,6 +22,7 @@ from app.fetch import extract_url, get_apify_usage
 from app.match import STAPLES, collapse_catalog, grouped_pantry
 from app.models import (
     FetchedPost,
+    MedicinesUpdate,
     PantryInventoryUpdate,
     PantryUpdate,
     RecipeCreate,
@@ -31,11 +32,13 @@ from app.models import (
 )
 from app.pipeline import jobs, process_recipe
 from app.store import (
+    MEDICINE_CATEGORIES,
     add_to_buy_source,
     create_recipe,
     delete_recipe,
     get_gemini_reads_today,
     get_have_items,
+    get_medicines,
     get_pantry_categories,
     get_pantry_inventory,
     get_recent_imports,
@@ -46,6 +49,7 @@ from app.store import (
     log_import,
     remove_to_buy_source,
     save_have_items,
+    save_medicines,
     save_pantry_inventory,
     save_to_buy_items,
     update_recipe,
@@ -249,6 +253,19 @@ async def api_add_to_buy_source(body: ToBuySourceChange):
 @app.post("/api/to-buy/source/remove", dependencies=[Depends(require_secret)])
 async def api_remove_to_buy_source(body: ToBuySourceChange):
     return {"items": remove_to_buy_source(body.text, recipe_id=body.recipe_id)}
+
+
+@app.get("/api/medicines")
+async def api_get_medicines():
+    """The Medicines-tab cabinet — a sibling of /api/pantry-inventory with
+    its own fields (dosage, prescriber, purpose) and a fixed category list
+    instead of the grocery aisle taxonomy."""
+    return {"items": get_medicines(), "categories": list(MEDICINE_CATEGORIES)}
+
+
+@app.put("/api/medicines", dependencies=[Depends(require_secret)])
+async def api_put_medicines(body: MedicinesUpdate):
+    return {"items": save_medicines(body.items), "categories": list(MEDICINE_CATEGORIES)}
 
 
 @app.get("/api/usage", dependencies=[Depends(require_secret)])

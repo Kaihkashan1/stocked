@@ -10,6 +10,7 @@ func L(_ value: String.LocalizationValue) -> String {
 struct RecipeBoxApp: App {
     @State private var store = RecipeStore()
     @State private var pantryStore = PantryStore()
+    @State private var medicineStore = MedicineStore()
     @State private var connectivity = Connectivity()
 
     init() {
@@ -21,6 +22,7 @@ struct RecipeBoxApp: App {
             RootView()
                 .environment(store)
                 .environment(pantryStore)
+                .environment(medicineStore)
                 .environment(connectivity)
                 .environment(\.locale, Locale(identifier: "en"))
                 .onOpenURL { url in

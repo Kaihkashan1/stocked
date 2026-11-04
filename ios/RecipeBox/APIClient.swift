@@ -310,6 +310,40 @@ struct APIClient {
         return try Self.decoder.decode(PantryInventoryResponse.self, from: data)
     }
 
+    func fetchMedicines() async throws -> MedicinesResponse {
+        try await decodeJSON(MedicinesResponse.self, from: get("/api/medicines"))
+    }
+
+    func updateMedicines(items: [MedicineItem], secret: String) async throws -> MedicinesResponse {
+        guard let base = URL(string: trimmedBase),
+              let url = URL(string: "/api/medicines", relativeTo: base)
+        else { throw APIError.badURL }
+
+        var request = URLRequest(url: url.absoluteURL)
+        request.httpMethod = "PUT"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSecret.isEmpty {
+            request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
+        }
+        request.httpBody = try JSONEncoder().encode(MedicinesResponse(items: items))
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: request)
+        } catch {
+            throw APIError.unreachable(trimmedBase)
+        }
+
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200 ..< 300).contains(status) else {
+            try throwForStatus(status, data: data)
+        }
+        return try Self.decoder.decode(MedicinesResponse.self, from: data)
+    }
+
     func fetchToBuy() async throws -> [ToBuyItem] {
         try await decodeJSON(ToBuyResponse.self, from: get("/api/to-buy")).items
     }

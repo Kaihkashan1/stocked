@@ -201,6 +201,32 @@ class ToBuySourceChange(BaseModel):
     recipe_id: int | None = None
 
 
+# Medicine cabinet — its own tab alongside Cupboard, and the same "what do
+# I have in stock" shape as PantryItem (amount/unit/status/expiry) rather
+# than a dosage tracker — no dosage/frequency/prescriber fields. `status`
+# reuses PantryStatus's open/unopened meaning (has this strip/bottle been
+# started). Categories are a fixed list (app.store.MEDICINE_CATEGORIES),
+# not inferred from the name the way grocery aisles are — there's no
+# reliable keyword map from a medicine's name to "Pain relief" vs "Allergy".
+MedicineUnit = Literal["pills", "ml", "mg", "pcs"]
+
+
+class MedicineItem(BaseModel):
+    id: str
+    name: str
+    category: str = "Other"
+    amount: float = 1
+    unit: MedicineUnit = "pills"
+    status: PantryStatus = "unopened"
+    expiry: str | None = None  # YYYY-MM-DD — required unless category is "First aid"
+    purpose: str = ""
+    notes: str = ""
+
+
+class MedicinesUpdate(BaseModel):
+    items: list[MedicineItem] = Field(default_factory=list)
+
+
 class RecipeCategory(BaseModel):
     cuisine: str = "Uncategorized"
     meal: Meal = "other"

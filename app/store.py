@@ -302,6 +302,98 @@ def save_pantry_inventory(items: list, categories: list[str] | None = None) -> d
     return {"items": cleaned, "categories": names}
 
 
+# Medicine cabinet — its own AppState key, same read/normalize/write shape
+# as pantry_inventory above. Unlike groceries, there's no reliable way to
+# infer "Pain relief" vs "Allergy" from a medicine's name, so this is a
+# fixed category list the client picks from (falling back to "Other")
+# rather than something derived via pantry_category()/canonical_ingredient.
+MEDICINE_CATEGORIES: tuple[str, ...] = (
+    "Pain relief",
+    "Fever & cold",
+    "Cough & throat",
+    "Allergy",
+    "Digestive",
+    "Skin & topical",
+    "Eye & ear",
+    "Antibiotics",
+    "Vitamins & supplements",
+    "First aid",
+    "Prescription",
+    "Other",
+)
+_MEDICINE_CATEGORY_BY_LOWER = {name.casefold(): name for name in MEDICINE_CATEGORIES}
+
+
+def _medicine_category(raw) -> str:
+    text = " ".join(str(raw or "").split())
+    return _MEDICINE_CATEGORY_BY_LOWER.get(text.casefold(), "Other")
+
+
+def _normalize_medicine_item(raw: dict) -> dict | None:
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        return None
+    item_id = str(raw.get("id") or "").strip() or str(uuid.uuid4())
+    unit = str(raw.get("unit") or "pills").strip().lower()
+    if unit not in ("pills", "ml", "mg", "pcs"):
+        unit = "pills"
+    status = str(raw.get("status") or "unopened").strip().lower()
+    if status not in ("open", "unopened"):
+        status = "unopened"
+    try:
+        amount = float(raw.get("amount", 1))
+    except (TypeError, ValueError):
+        amount = 1.0
+    if amount <= 0:
+        amount = 1.0
+    category = _medicine_category(raw.get("category"))
+    expiry = _normalize_expiry(raw.get("expiry"))
+    return {
+        "id": item_id,
+        "name": name,
+        "category": category,
+        "amount": amount,
+        "unit": unit,
+        "status": status,
+        # Required unless First aid — enforced in the add/edit forms (web
+        # and iOS); kept permissive here the same way other "required"
+        # fields in this app are (e.g. a recipe title) rather than
+        # rejecting a save server-side.
+        "expiry": expiry,
+        "purpose": str(raw.get("purpose") or "").strip(),
+        "notes": str(raw.get("notes") or "").strip(),
+    }
+
+
+def get_medicines() -> list[dict]:
+    raw_items = _read_app_state().get("medicines") or []
+    cleaned: list[dict] = []
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            continue
+        item = _normalize_medicine_item(raw)
+        if item:
+            cleaned.append(item)
+    return cleaned
+
+
+def save_medicines(items: list) -> list[dict]:
+    cleaned: list[dict] = []
+    seen_ids: set[str] = set()
+    for raw in items:
+        if hasattr(raw, "model_dump"):
+            raw = raw.model_dump()
+        if not isinstance(raw, dict):
+            continue
+        item = _normalize_medicine_item(raw)
+        if not item or item["id"] in seen_ids:
+            continue
+        seen_ids.add(item["id"])
+        cleaned.append(item)
+    _write_app_state(medicines=cleaned)
+    return cleaned
+
+
 _UNICODE_FRACTIONS = {
     "¼": 0.25,
     "½": 0.5,

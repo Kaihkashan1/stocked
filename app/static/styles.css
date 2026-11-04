@@ -1,18 +1,20 @@
+/* Same tokens as the iOS app's Theme.swift ("Organic" redesign) — one
+   palette, one pair of type families, shared across both platforms. */
 :root {
-  --bg: #edf0e6;
-  --surface: #f8f9f3;
-  --surface-2: #e3e7d8;
-  --ink: #202920;
-  --ink-soft: #55604f;
-  --line: #cdd2c0;
-  --accent: #3f6b49;
+  --bg: #f5ead8;
+  --surface: #ebddc5;
+  --surface-2: #dcd3c4;
+  --ink: #201e1d;
+  --ink-soft: #82796a;
+  --line: rgba(32, 30, 29, 0.16);
+  --accent: #c67139;
   --accent-ink: #ffffff;
-  --accent-soft: #dce7d8;
-  --warm: #a56a16;
-  --warm-soft: #f1e2c2;
-  --danger: #b6482f;
-  --danger-soft: #f1ddd4;
-  --shadow: 0 1px 2px rgba(32, 41, 32, 0.06), 0 10px 28px -12px rgba(32, 41, 32, 0.18);
+  --accent-soft: #fff2eb;
+  --warm: #d67f48;
+  --warm-soft: #fff2eb;
+  --danger: #643312;
+  --danger-soft: #ffe1d0;
+  --shadow: 0 1px 2px rgba(46, 43, 37, 0.14), 0 3px 10px rgba(46, 43, 37, 0.16);
 }
 
 * { box-sizing: border-box; }
@@ -22,18 +24,18 @@ html, body {
   min-height: 100%;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Public Sans", sans-serif;
+  font-family: "Figtree", sans-serif;
   line-height: 1.5;
 }
 
 h1, h2, h3 {
-  font-family: "Fraunces", Georgia, serif;
-  font-weight: 600;
+  font-family: "Caprasimo", Georgia, serif;
+  font-weight: 400;
   margin: 0;
 }
 
 .eyebrow {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -123,7 +125,7 @@ button { font-family: inherit; }
 .search-suggest[hidden] { display: none; }
 
 .search-suggest-label {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.68rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -140,7 +142,7 @@ button { font-family: inherit; }
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink-soft);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.78rem;
   font-weight: 600;
   border-radius: 999px;
@@ -160,7 +162,7 @@ button { font-family: inherit; }
   max-width: 90vw;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 22px;
   box-shadow: var(--shadow);
   padding: 1.1rem 1.2rem 1.2rem;
   display: flex;
@@ -195,7 +197,7 @@ button { font-family: inherit; }
   background: none;
   border: none;
   color: var(--ink-soft);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -326,9 +328,9 @@ button { font-family: inherit; }
 
 .import-log-title {
   margin: 0 0 8px;
-  font-family: "Fraunces", Georgia, serif;
+  font-family: "Caprasimo", Georgia, serif;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.25;
   color: var(--ink);
 }
@@ -383,7 +385,7 @@ a.import-log-url {
 }
 
 .pantry-heading {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.65rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -405,7 +407,7 @@ a.import-log-url {
 }
 
 .chip {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.72rem;
   font-weight: 600;
   border: 1px solid var(--line);
@@ -450,7 +452,7 @@ a.import-log-url {
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 22px;
   overflow: hidden;
   box-shadow: var(--shadow);
   color: inherit;
@@ -503,14 +505,14 @@ a.import-log-url {
 }
 
 .pill {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   background: var(--accent-soft);
   color: var(--accent);
-  border-radius: 4px;
+  border-radius: 999px;
   padding: 0.18rem 0.45rem;
 }
 
@@ -526,6 +528,48 @@ a.import-log-url {
 .pill.warm {
   background: var(--warm-soft);
   color: var(--warm);
+}
+
+.pill.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.view-tabs {
+  margin-bottom: 0.9rem;
+}
+
+.view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.view-header h2 {
+  margin: 0;
+}
+
+.view-search {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.view-search input {
+  width: 100%;
+}
+
+.notes-grow {
+  overflow: hidden;
+}
+
+.inventory-meta {
+  font-family: "Figtree", sans-serif;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  display: block;
+  margin-bottom: 0.3rem;
 }
 
 .empty {
@@ -578,7 +622,7 @@ a.import-log-url {
   border: none;
   background: none;
   color: var(--ink-soft);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -593,7 +637,7 @@ a.import-log-url {
 .pill-btn {
   border: none;
   border-radius: 999px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.76rem;
   font-weight: 600;
   padding: 0.5rem 0.9rem;
@@ -606,7 +650,9 @@ a.import-log-url {
 .pill-btn.favorite { background: var(--warm-soft); color: var(--warm); }
 .pill-btn.favorite svg { opacity: 0.5; }
 .pill-btn.favorite.active svg { opacity: 1; fill: currentColor; }
-.pill-btn.primary { background: var(--accent); color: #fff; }
+/* Caprasimo, like iOS's main CTA buttons (Theme.display) — secondary/menu
+   buttons below stay Figtree, matching iOS's segmented-toggle buttons. */
+.pill-btn.primary { background: var(--accent); color: #fff; font-family: "Caprasimo", Georgia, serif; font-weight: 400; font-size: 0.85rem; letter-spacing: 0.01em; }
 .pill-btn:disabled { opacity: 0.6; cursor: default; }
 
 .pill-btn.menu-btn { background: var(--surface-2); color: var(--ink); padding: 0.5rem 0.7rem; }
@@ -622,7 +668,7 @@ a.import-log-url {
   min-width: 11rem;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: var(--shadow);
   padding: 0.4rem;
   display: flex;
@@ -642,9 +688,9 @@ a.import-log-url {
   text-align: left;
   border: none;
   background: none;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 0.55rem 0.7rem;
-  font-family: "Public Sans", sans-serif;
+  font-family: "Figtree", sans-serif;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--ink);
@@ -690,7 +736,7 @@ a.import-log-url {
 .notes-box {
   margin: 0;
   padding: 0.9rem 1rem;
-  border-radius: 12px;
+  border-radius: 22px;
   background: rgba(241, 226, 194, 0.5); /* --warm-soft at 50% */
   color: var(--ink);
   white-space: pre-wrap;
@@ -717,7 +763,7 @@ ul.ingredients li.ingredient-section {
   display: block;
   padding: 20px 0 9px;
   border-bottom: none;
-  font-family: "Public Sans", sans-serif;
+  font-family: "Figtree", sans-serif;
   font-size: 12px;
   font-weight: 700;
   font-style: normal;
@@ -733,12 +779,12 @@ ul.ingredients li.ingredient-section.first {
 
 .qty {
   flex-shrink: 0;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-weight: 600;
   font-size: 0.8rem;
   color: #fff;
   background: var(--accent);
-  border-radius: 6px;
+  border-radius: 999px;
   padding: 0.2rem 0.55rem;
 }
 
@@ -771,7 +817,7 @@ ol.steps li {
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-family: "Public Sans", sans-serif;
+  font-family: "Figtree", sans-serif;
   font-weight: 700;
   font-size: 0.81rem;
   line-height: 1;
@@ -790,7 +836,7 @@ ol.steps li {
 }
 
 .field span {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -824,11 +870,20 @@ ol.steps li {
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--ink);
-  border-radius: 8px;
-  padding: 0.6rem 0.75rem;
+  padding: 0.6rem 0.9rem;
   font: inherit;
   font-size: 0.92rem;
   resize: vertical;
+}
+
+/* Single-line fields read as pills, like every text field on iOS; a
+   multi-line field stays a soft rounded rect (iOS's notes box shape). */
+.field input, .field select {
+  border-radius: 999px;
+}
+
+.field textarea {
+  border-radius: 22px;
 }
 
 .edit-error {
@@ -841,7 +896,7 @@ ol.steps li {
   background: none;
   border: none;
   color: var(--danger);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
@@ -864,10 +919,10 @@ ol.steps li {
   align-items: center;
   gap: 0.8rem;
   padding: 1.6rem 2rem;
-  border-radius: 14px;
+  border-radius: 22px;
   background: var(--surface);
   color: var(--ink);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "Figtree", sans-serif;
   font-size: 0.85rem;
   font-weight: 600;
   box-shadow: var(--shadow);
