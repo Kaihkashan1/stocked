@@ -33,7 +33,8 @@ private enum PendingAddAction {
 private enum AppTab: Hashable {
     case recipes
     case pantry
-    case medicines
+    case shop
+    case pack
 }
 
 struct RootView: View {
@@ -45,6 +46,7 @@ struct RootView: View {
     @State private var selectedTab: AppTab = .recipes
     @State private var activeSheet: ActiveSheet?
     @State private var addRecipePrefill: RecipeExtraction?
+    @State private var addRecipePhotoJPEG: Data?
     /// What to do once `activeSheet` has actually finished dismissing —
     /// only needed for handoffs to a different presentation kind (camera,
     /// photo library) than the ones `.sheet(item:)` covers. See the
@@ -73,11 +75,17 @@ struct RootView: View {
                 }
                 .tag(AppTab.pantry)
 
-            medicinesTab
+            shopTab
                 .tabItem {
-                    Label("Medicines", systemImage: "cross.case")
+                    Label("Shop", systemImage: "basket")
                 }
-                .tag(AppTab.medicines)
+                .tag(AppTab.shop)
+
+            packTab
+                .tabItem {
+                    Label("Pack", systemImage: "suitcase")
+                }
+                .tag(AppTab.pack)
         }
         .tint(Theme.accent)
         .toolbarBackground(Theme.surface, for: .tabBar)
@@ -307,8 +315,9 @@ struct RootView: View {
             recipesPath = NavigationPath()
             recipesPath.append(recipeID)
         case .photoReady(let extraction):
-            store.consumeImportJob(id: job.id)
             addRecipePrefill = extraction
+            addRecipePhotoJPEG = job.photoJPEG
+            store.consumeImportJob(id: job.id)
             activeSheet = .addRecipe
         case .failed:
             store.dismissImportBanner(id: job.id)
@@ -324,6 +333,7 @@ struct RootView: View {
             extracting = false
             guard !photoOverlayDismissed else { return }
             addRecipePrefill = extraction
+            addRecipePhotoJPEG = job.photoJPEG
             activeSheet = .addRecipe
             store.consumeImportJob(id: job.id)
         case .failed(let message):
@@ -373,9 +383,15 @@ struct RootView: View {
         }
     }
 
-    private var medicinesTab: some View {
+    private var shopTab: some View {
         NavigationStack {
-            MedicineView()
+            ShopView(mode: .shop)
+        }
+    }
+
+    private var packTab: some View {
+        NavigationStack {
+            ShopView(mode: .pack)
         }
     }
 
@@ -389,6 +405,7 @@ struct RootView: View {
                 onLibrary: { pendingAddAction = .library; activeSheet = nil },
                 onTyped: {
                     addRecipePrefill = nil
+                    addRecipePhotoJPEG = nil
                     activeSheet = .addRecipe
                 }
             )
@@ -398,7 +415,7 @@ struct RootView: View {
                 .environment(pantryStore)
                 .environment(medicineStore)
         case .addRecipe:
-            AddRecipeView(prefill: addRecipePrefill)
+            AddRecipeView(prefill: addRecipePrefill, photoJPEG: addRecipePhotoJPEG)
                 .environment(store)
         case .pasteLink:
             PasteALinkView(onOpenRecipe: { id in

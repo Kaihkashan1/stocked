@@ -120,25 +120,49 @@ struct APIClient {
     }
 
     /// Saves a recipe typed straight into the app — no capture pipeline.
-    func createRecipe(_ draft: RecipeCreate, secret: String) async throws -> Recipe {
+    /// Pass `photoJPEG` when this save is a reviewed photo extraction so the
+    /// original still is stored with the row.
+    func createRecipe(_ draft: RecipeCreate, secret: String, photoJPEG: Data? = nil) async throws -> Recipe {
         guard let base = URL(string: trimmedBase),
               let url = URL(string: "/api/recipes", relativeTo: base)
         else { throw APIError.badURL }
 
         var request = URLRequest(url: url.absoluteURL)
         request.httpMethod = "POST"
-        request.timeoutInterval = 15
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedSecret.isEmpty {
             request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
         }
-        request.httpBody = try JSONEncoder().encode(draft)
+
+        let session: URLSession
+        if let photoJPEG {
+            request.timeoutInterval = 60
+            session = Self.longSession
+            let boundary = "Boundary-\(UUID().uuidString)"
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            let recipeJSON = try JSONEncoder().encode(draft)
+            var body = Data()
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"recipe\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
+            body.append(recipeJSON)
+            body.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"photo\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+            body.append(photoJPEG)
+            body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+            request.httpBody = body
+        } else {
+            request.timeoutInterval = 15
+            session = Self.session
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(draft)
+        }
 
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await Self.session.data(for: request)
+            (data, response) = try await session.data(for: request)
         } catch {
             throw APIError.unreachable(trimmedBase)
         }
@@ -379,12 +403,12 @@ struct APIClient {
         return try Self.decoder.decode(ToBuyResponse.self, from: data).items
     }
 
-    func addToBuySource(text: String, qty: String, recipeID: Int?, secret: String) async throws -> [ToBuyItem] {
-        try await postToBuySource("/api/to-buy/source", text: text, qty: qty, recipeID: recipeID, secret: secret)
+    func addToBuySource(text: String, qty: String, recipeID: Int?, category: String? = nil, notes: String? = nil, secret: String) async throws -> [ToBuyItem] {
+        try await postToBuySource("/api/to-buy/source", text: text, qty: qty, recipeID: recipeID, category: category, notes: notes, secret: secret)
     }
 
     func removeToBuySource(text: String, recipeID: Int?, secret: String) async throws -> [ToBuyItem] {
-        try await postToBuySource("/api/to-buy/source/remove", text: text, qty: "", recipeID: recipeID, secret: secret)
+        try await postToBuySource("/api/to-buy/source/remove", text: text, qty: "", recipeID: recipeID, category: nil, notes: nil, secret: secret)
     }
 
     private func postToBuySource(
@@ -392,6 +416,8 @@ struct APIClient {
         text: String,
         qty: String,
         recipeID: Int?,
+        category: String?,
+        notes: String?,
         secret: String
     ) async throws -> [ToBuyItem] {
         guard let base = URL(string: trimmedBase),
@@ -407,7 +433,7 @@ struct APIClient {
         if !trimmedSecret.isEmpty {
             request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
         }
-        request.httpBody = try JSONEncoder().encode(ToBuySourceChange(text: text, qty: qty, recipeID: recipeID))
+        request.httpBody = try JSONEncoder().encode(ToBuySourceChange(text: text, qty: qty, recipeID: recipeID, category: category, notes: notes))
 
         let data: Data
         let response: URLResponse

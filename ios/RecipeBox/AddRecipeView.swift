@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Full-screen form for typing a recipe in by hand, or reviewing a photo
 /// extraction before it's saved. Servings, time and a free meal picker are
@@ -10,6 +11,7 @@ struct AddRecipeView: View {
     @Environment(\.dismiss) private var dismiss
 
     let prefill: RecipeExtraction?
+    let photoJPEG: Data?
 
     @State private var title: String
     @State private var ingredientsText: String
@@ -22,8 +24,9 @@ struct AddRecipeView: View {
 
     /// `prefill` comes from a photo extraction (POST /api/extract-photo) —
     /// nothing is saved until Save is tapped, same as typing it in by hand.
-    init(prefill: RecipeExtraction? = nil) {
+    init(prefill: RecipeExtraction? = nil, photoJPEG: Data? = nil) {
         self.prefill = prefill
+        self.photoJPEG = photoJPEG
         _title = State(initialValue: prefill?.title ?? "")
         _ingredientsText = State(initialValue: (prefill?.ingredients ?? []).joined(separator: "\n"))
         let steps = prefill?.steps ?? []
@@ -63,6 +66,12 @@ struct AddRecipeView: View {
                             .frame(height: 50)
                             .background(Theme.surface)
                             .clipShape(Capsule())
+                    }
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(Theme.body(12.5))
+                            .foregroundStyle(.red)
                     }
 
                     field(kicker: L("Ingredients"), hint: isFromPhoto ? nil : L("one per line, or ## Section for parts")) {
@@ -109,10 +118,12 @@ struct AddRecipeView: View {
                         .font(Theme.body(12))
                         .foregroundStyle(Theme.neutral600)
 
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(Theme.body(12.5))
-                            .foregroundStyle(.red)
+                    if let photoJPEG, let preview = UIImage(data: photoJPEG) {
+                        Image(uiImage: preview)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                     }
                 }
                 .padding(.horizontal, Theme.screenPadding)
@@ -154,7 +165,7 @@ struct AddRecipeView: View {
             }
             .font(Theme.body(14, weight: .bold))
             .foregroundStyle(Theme.accent700)
-            .disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(saving)
         }
         .padding(.horizontal, Theme.screenPadding)
         .padding(.vertical, 16)
@@ -197,15 +208,22 @@ struct AddRecipeView: View {
             steps = lines(from: stepsText)
         }
 
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            errorMessage = L("Title can't be empty.")
+            return
+        }
+
         let draft = RecipeCreate(
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: trimmedTitle,
             ingredients: lines(from: ingredientsText),
             steps: steps,
             course: course.rawValue,
             tags: Array(selectedTags),
-            notes: ""
+            notes: "",
+            source: isFromPhoto ? "(photo)" : ""
         )
-        if let failure = await store.addRecipe(draft) {
+        if let failure = await store.addRecipe(draft, photoJPEG: photoJPEG) {
             errorMessage = failure
         } else {
             dismiss()

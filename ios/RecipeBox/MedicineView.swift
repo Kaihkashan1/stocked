@@ -1,14 +1,20 @@
 import SwiftUI
 
-/// Medicines tab — same shape as Cupboard (PantryView) but simpler: just a
-/// searchable, category-grouped list with add/edit/delete. No to-buy
-/// checklist and no match-mode recipe suggestions (those are Cupboard-only
-/// features tied to cooking, not medicine).
+/// Medicines list — lives under Cupboard as a sub-category. Standalone
+/// header is kept for reuse; Cupboard embeds this without a nested scroll.
 struct MedicineView: View {
     @Environment(MedicineStore.self) private var medicines
 
+    var embedded = false
+    @Binding var externalAdd: Bool
+
     @State private var presentedSheet: MedicinePresentedSheet?
     @State private var query = ""
+
+    init(embedded: Bool = false, externalAdd: Binding<Bool> = .constant(false)) {
+        self.embedded = embedded
+        self._externalAdd = externalAdd
+    }
 
     private enum MedicinePresentedSheet: Identifiable {
         case addItem
@@ -23,21 +29,36 @@ struct MedicineView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                searchField
-                    .padding(.horizontal, Theme.screenPadding)
-                    .padding(.bottom, 12)
-                content
-                    .padding(.horizontal, Theme.screenPadding)
-                    .padding(.bottom, 16)
+        Group {
+            if embedded {
+                VStack(alignment: .leading, spacing: 0) {
+                    searchField
+                        .padding(.bottom, 12)
+                    content
+                }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        header
+                        searchField
+                            .padding(.horizontal, Theme.screenPadding)
+                            .padding(.bottom, 12)
+                        content
+                            .padding(.horizontal, Theme.screenPadding)
+                            .padding(.bottom, 16)
+                    }
+                }
+                .background(Theme.bg.ignoresSafeArea())
+                .scrollIndicators(.hidden)
+                .toolbar(.hidden, for: .navigationBar)
+                .refreshable { await medicines.refresh() }
             }
         }
-        .background(Theme.bg.ignoresSafeArea())
-        .scrollIndicators(.hidden)
-        .toolbar(.hidden, for: .navigationBar)
-        .refreshable { await medicines.refresh() }
+        .onChange(of: externalAdd) { _, requested in
+            guard requested else { return }
+            presentedSheet = .addItem
+            externalAdd = false
+        }
         .sheet(item: $presentedSheet) { sheet in
             sheetContent(for: sheet)
                 .presentationDetents([.large])

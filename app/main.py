@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from google.genai.errors import APIError as GeminiAPIError
 
@@ -122,15 +122,46 @@ async def api_get_recipe(row_id: int):
     return _public(recipe)
 
 
+MAX_PHOTO_BYTES = 4 * 1024 * 1024  # Vercel's request body limit is ~4.5MB; stay under it.
+
+
 @app.post("/api/recipes", dependencies=[Depends(require_secret)])
-async def api_create_recipe(body: RecipeCreate):
-    created = create_recipe(**body.model_dump())
+async def api_create_recipe(request: Request):
+    """JSON body for a typed-in recipe; multipart (`recipe` JSON + `photo`
+    file) when saving a photo extraction so the original still is kept."""
+    photo_bytes = None
+    ctype = request.headers.get("content-type", "")
+    try:
+        if "multipart/form-data" in ctype:
+            form = await request.form()
+            raw = form.get("recipe")
+            if not raw:
+                raise HTTPException(status_code=400, detail="Missing recipe")
+            payload = raw if isinstance(raw, str) else str(raw)
+            body = RecipeCreate.model_validate_json(payload)
+            upload = form.get("photo")
+            if upload is not None and hasattr(upload, "read"):
+                photo_bytes = await upload.read()
+                if len(photo_bytes) > MAX_PHOTO_BYTES:
+                    raise HTTPException(status_code=413, detail="That photo is too large. Please use a smaller image.")
+        else:
+            body = RecipeCreate.model_validate(await request.json())
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Could not read that recipe.") from exc
+
+    try:
+        created = create_recipe(**body.model_dump(), photo_bytes=photo_bytes)
+    except Exception as exc:
+        from app.photos import PhotoStoreError
+
+        if isinstance(exc, PhotoStoreError):
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise
     if not created:
         raise HTTPException(status_code=500, detail="Could not save recipe")
     return _public(created)
-
-
-MAX_PHOTO_BYTES = 4 * 1024 * 1024  # Vercel's request body limit is ~4.5MB; stay under it.
 
 
 @app.post("/api/extract-photo", dependencies=[Depends(require_secret)])
@@ -247,7 +278,11 @@ async def api_put_to_buy(body: ToBuyUpdate):
 
 @app.post("/api/to-buy/source", dependencies=[Depends(require_secret)])
 async def api_add_to_buy_source(body: ToBuySourceChange):
-    return {"items": add_to_buy_source(body.text, qty=body.qty, recipe_id=body.recipe_id)}
+    return {
+        "items": add_to_buy_source(
+            body.text, qty=body.qty, recipe_id=body.recipe_id, category=body.category, notes=body.notes
+        )
+    }
 
 
 @app.post("/api/to-buy/source/remove", dependencies=[Depends(require_secret)])
@@ -333,8 +368,36 @@ async def _ingest_watching_client(request: Request, content: str) -> dict:
     return task.result()
 
 
+@app.get("/api/recipes/{row_id}/photo")
+async def api_recipe_photo(row_id: int):
+    recipe = get_recipe(row_id)
+    photo_id = str((recipe or {}).get("photo_id") or "").strip()
+    if not recipe or not photo_id:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    try:
+        from app.photos import PhotoStoreError, download_recipe_photo
+
+        data, content_type = download_recipe_photo(photo_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Photo not found") from None
+    except Exception as exc:
+        from app.photos import PhotoStoreError
+
+        if isinstance(exc, PhotoStoreError):
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 def _public(recipe: dict) -> dict:
-    return {key: value for key, value in recipe.items() if not key.endswith("_text")}
+    out = {key: value for key, value in recipe.items() if not key.endswith("_text") and key != "photo_id"}
+    if recipe.get("photo_id"):
+        out["photo_url"] = f"/api/recipes/{recipe['id']}/photo"
+    return out
 
 
 async def _read_content(request: Request) -> str:

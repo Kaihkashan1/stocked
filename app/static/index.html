@@ -17,16 +17,8 @@
         <p class="eyebrow" data-i18n="personalCollection">Personal collection</p>
         <h1 data-i18n="recipeBox">Recipe Box</h1>
       </div>
-      <div class="menu-anchor">
-        <button id="add-recipe-btn" class="icon-round" type="button" data-i18n-aria="addRecipe" aria-label="Add recipe" aria-haspopup="true" aria-expanded="false">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-        <div id="add-recipe-menu" class="dropdown-menu" hidden>
-          <button type="button" data-action="open-add-recipe" data-i18n="typeItIn">Type it in</button>
-          <button type="button" data-action="open-add-photo" data-i18n="fromAPhoto">From a photo</button>
-        </div>
-      </div>
       <input id="photo-input" type="file" accept="image/*" hidden>
+      <input id="camera-input" type="file" accept="image/*" capture="environment" hidden>
       <button id="settings-btn" class="icon-round" type="button" data-i18n-aria="settings" aria-label="Settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a1.8 1.8 0 0 0 .36 1.98l.06.06a2.16 2.16 0 1 1-3.06 3.06l-.06-.06a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.09 1.65v.17a2.16 2.16 0 1 1-4.32 0v-.09a1.8 1.8 0 0 0-1.18-1.65 1.8 1.8 0 0 0-1.98.36l-.06.06a2.16 2.16 0 1 1-3.06-3.06l.06-.06a1.8 1.8 0 0 0 .36-1.98 1.8 1.8 0 0 0-1.65-1.09h-.17a2.16 2.16 0 1 1 0-4.32h.09a1.8 1.8 0 0 0 1.65-1.18 1.8 1.8 0 0 0-.36-1.98l-.06-.06a2.16 2.16 0 1 1 3.06-3.06l.06.06a1.8 1.8 0 0 0 1.98.36h.08a1.8 1.8 0 0 0 1.09-1.65v-.17a2.16 2.16 0 1 1 4.32 0v.09a1.8 1.8 0 0 0 1.09 1.65h.08a1.8 1.8 0 0 0 1.98-.36l.06-.06a2.16 2.16 0 1 1 3.06 3.06l-.06.06a1.8 1.8 0 0 0-.36 1.98v.08a1.8 1.8 0 0 0 1.65 1.09h.17a2.16 2.16 0 1 1 0 4.32h-.09a1.8 1.8 0 0 0-1.65 1.09z"/></svg>
       </button>
@@ -34,7 +26,8 @@
     <nav class="view-tabs chips" id="view-tabs">
       <button class="chip active" type="button" data-view="recipes" data-i18n="cookbookTab">Cookbook</button>
       <button class="chip" type="button" data-view="cupboard" data-i18n="cupboardTab">Cupboard</button>
-      <button class="chip" type="button" data-view="medicines" data-i18n="medicinesTab">Medicines</button>
+      <button class="chip" type="button" data-view="shop" data-i18n="shopTab">Shop</button>
+      <button class="chip" type="button" data-view="pack" data-i18n="packTab">Pack</button>
     </nav>
     <div class="search-row" id="search-row">
       <label class="search">
@@ -70,7 +63,22 @@
               <button class="chip" type="button" data-sort="za" data-i18n="za">Z–A</button>
             </div>
           </section>
+          <section>
+            <h2 class="eyebrow" data-i18n="source">Source</h2>
+            <div id="source-filters" class="chips"></div>
+          </section>
           <button id="filters-reset" class="link-btn" type="button" data-i18n="resetFilters">Reset filters</button>
+        </div>
+      </div>
+      <button id="view-mode-btn" class="icon-round view-mode-btn" type="button" data-i18n-aria="toggleViewMode" aria-label="Toggle grid or list view"></button>
+      <div class="menu-anchor">
+        <button id="add-recipe-btn" class="add-round" type="button" data-i18n-aria="addRecipe" aria-label="Add recipe" aria-haspopup="true" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <div id="add-recipe-menu" class="dropdown-menu" hidden>
+          <button type="button" data-action="open-add-recipe" data-i18n="typeItIn">Type it in</button>
+          <button type="button" data-action="open-add-camera" data-i18n="takeAPhoto">Take a photo</button>
+          <button type="button" data-action="open-add-photo" data-i18n="chooseFromLibrary">Choose from library</button>
         </div>
       </div>
     </div>
@@ -88,30 +96,78 @@
   <div class="shell" id="cupboard-view" hidden>
     <main>
       <div class="view-header">
-        <h2 data-i18n="cupboardTitle">Cupboard</h2>
-        <button class="pill-btn primary" type="button" data-action="open-add-pantry-item" data-i18n="addItem">+ Add item</button>
+        <div>
+          <h2 data-i18n="cupboardTitle">Cupboard</h2>
+          <p class="cupboard-kicker" id="cupboard-kicker"></p>
+        </div>
+        <button class="add-round" id="cupboard-add-btn" type="button" data-action="open-add-pantry-item" data-i18n-aria="addItem" aria-label="Add item">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
       </div>
-      <label class="search view-search">
+      <div class="segment-row" id="cupboard-segments">
+        <button class="chip active" type="button" data-cupboard-segment="groceries" data-i18n="groceries">Groceries</button>
+        <button class="chip" type="button" data-cupboard-segment="medicines" data-i18n="medicinesTab">Medicines</button>
+      </div>
+      <label class="search view-search" id="cupboard-stock-search-wrap">
         <span class="visually-hidden" data-i18n="searchCupboardAria">Search what's in the cupboard</span>
         <input id="cupboard-search" type="search" data-i18n-placeholder="searchCupboardPlaceholder" placeholder="Search what's in stock">
       </label>
-      <p id="cupboard-status" class="status"></p>
-      <div id="cupboard-list" class="grid"></div>
-    </main>
-  </div>
-
-  <div class="shell" id="medicines-view" hidden>
-    <main>
-      <div class="view-header">
-        <h2 data-i18n="medicinesTitle">Medicines</h2>
-        <button class="pill-btn primary" type="button" data-action="open-add-medicine" data-i18n="addMedicine">+ Add medicine</button>
-      </div>
-      <label class="search view-search">
+      <label class="search view-search" id="cupboard-medicines-search-wrap" hidden>
         <span class="visually-hidden" data-i18n="searchMedicinesAria">Search your medicines</span>
         <input id="medicines-search" type="search" data-i18n-placeholder="searchMedicinesPlaceholder" placeholder="Search your medicines">
       </label>
-      <p id="medicines-status" class="status"></p>
-      <div id="medicines-list" class="grid"></div>
+      <p id="cupboard-status" class="status"></p>
+      <div id="cupboard-list" class="grid"></div>
+      <p id="medicines-status" class="status" hidden></p>
+      <div id="medicines-list" class="grid" hidden></div>
+    </main>
+  </div>
+
+  <div class="shell" id="shop-view" hidden>
+    <main>
+      <div class="view-header">
+        <div>
+          <h2 data-i18n="shopTitle">Shop</h2>
+          <p class="cupboard-kicker" id="shop-kicker"></p>
+        </div>
+        <button class="add-round" id="shop-add-btn" type="button" data-action="open-add-to-buy" data-i18n-aria="addToBuy" aria-label="Add to buy">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div class="segment-row" id="shop-segments">
+        <button class="chip active" type="button" data-shop-segment="shop" data-i18n="groceries">Groceries</button>
+        <button class="chip" type="button" data-shop-segment="shop_medicines" data-i18n="medicinesTab">Medicines</button>
+      </div>
+      <label class="search view-search">
+        <span class="visually-hidden" data-i18n="searchToBuyAria">Search items to buy</span>
+        <input id="to-buy-search" type="search" data-i18n-placeholder="searchToBuyPlaceholder" placeholder="Search items to buy">
+      </label>
+      <p id="shop-status" class="status"></p>
+      <div id="to-buy-list" class="grid"></div>
+    </main>
+  </div>
+
+  <div class="shell" id="pack-view" hidden>
+    <main>
+      <div class="view-header">
+        <div>
+          <h2 data-i18n="packTitle">Pack</h2>
+          <p class="cupboard-kicker" id="pack-kicker"></p>
+        </div>
+        <button class="add-round" id="pack-add-btn" type="button" data-action="open-add-to-buy" data-i18n-aria="addForIndia" aria-label="Add for India">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div class="segment-row pack-segments" id="pack-segments">
+        <button class="chip active" type="button" data-pack-segment="take_to_india" data-i18n-aria="takeToIndia" aria-label="Take to India">🇮🇳</button>
+        <button class="chip" type="button" data-pack-segment="bring_to_germany" data-i18n-aria="bringToGermany" aria-label="Bring to Germany">🇩🇪</button>
+      </div>
+      <label class="search view-search">
+        <span class="visually-hidden" data-i18n="searchIndiaAria">Search items for India</span>
+        <input id="pack-search" type="search" data-i18n-placeholder="searchIndiaPlaceholder" placeholder="Search items for India">
+      </label>
+      <p id="pack-status" class="status"></p>
+      <div id="pack-list" class="grid"></div>
     </main>
   </div>
 

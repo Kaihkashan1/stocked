@@ -3,6 +3,7 @@ google-auth>=2.36.0
 google-genai>=1.14.0
 gspread>=6.1.0
 httpx>=0.27.0
+requests>=2.32.0
 pydantic-settings>=2.6.0
 python-dotenv>=1.0.1
 python-multipart>=0.0.20

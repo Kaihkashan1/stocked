@@ -32,10 +32,11 @@ logger = logging.getLogger(__name__)
 
 # Servings, Caption, Thumbnail, Cuisine, Meal and Time used to live here too.
 # Removed from the sheet by hand (they'd genuinely gone unused in the app —
-# see Course below for the one exception this created). "Course" is new:
+# see Course below for the one exception this created). New columns are
 # appended at the end rather than interleaved, so upgrading an older sheet
 # (see _ensure_headers) is a pure column addition, never a reshuffle of
-# columns that already hold real data.
+# columns that already hold real data. "Photo" holds a Drive file id for
+# camera/library stills kept with a photo-imported recipe.
 HEADERS = [
     "Title",
     "Ingredients",
@@ -47,6 +48,10 @@ HEADERS = [
     "Favorite",
     "Notes",
     "Course",
+    # Drive file id for a photo-imported recipe's original still. Empty for
+    # typed-in / link recipes. Appended (never reshuffled) so an older sheet
+    # upgrades the same way Course did — see _ensure_headers.
+    "Photo",
 ]
 TRUE_VALUES = {"true", "yes", "1", "y"}
 COURSES = ("Main course", "Appetizers", "Desserts", "Dips")
@@ -401,6 +406,14 @@ _UNICODE_FRACTIONS = {
 }
 
 
+SHOP_LISTS = ("shop", "shop_medicines", "take_to_india", "bring_to_germany")
+
+
+def _normalize_shop_list(raw) -> str:
+    value = str(raw or "").strip().lower()
+    return value if value in SHOP_LISTS else "shop"
+
+
 def _canonical_to_buy_key(text: str) -> str:
     name = canonical_ingredient(text)
     if name:
@@ -408,8 +421,11 @@ def _canonical_to_buy_key(text: str) -> str:
     return " ".join(str(text or "").split()).casefold()
 
 
-def _same_to_buy_row(item: dict, text: str) -> bool:
-    return _canonical_to_buy_key(item.get("text") or "") == _canonical_to_buy_key(text)
+def _same_to_buy_row(item: dict, text: str, list_key: str = "shop") -> bool:
+    return (
+        _normalize_shop_list(item.get("list")) == _normalize_shop_list(list_key)
+        and _canonical_to_buy_key(item.get("text") or "") == _canonical_to_buy_key(text)
+    )
 
 
 def _parse_qty_number(token: str) -> float | None:
@@ -552,6 +568,7 @@ def _normalize_to_buy_item(raw: dict) -> dict | None:
         "notes": str(raw.get("notes") or "").strip()[:200],
         "checked": bool(raw.get("checked", False)),
         "sources": sources,
+        "list": _normalize_shop_list(raw.get("list")),
     })
 
 
@@ -572,7 +589,7 @@ def save_to_buy_items(items: list) -> list[dict]:
     seen_ids: set[str] = set()
     for raw in items:
         if hasattr(raw, "model_dump"):
-            raw = raw.model_dump()
+            raw = raw.model_dump(by_alias=True)
         if not isinstance(raw, dict):
             continue
         item = _normalize_to_buy_item(raw)
@@ -584,7 +601,13 @@ def save_to_buy_items(items: list) -> list[dict]:
     return cleaned
 
 
-def add_to_buy_source(text: str, qty: str = "", recipe_id: int | None = None) -> list[dict]:
+def add_to_buy_source(
+    text: str,
+    qty: str = "",
+    recipe_id: int | None = None,
+    category: str | None = None,
+    notes: str | None = None,
+) -> list[dict]:
     trimmed = str(text or "").strip()
     if not trimmed:
         return get_to_buy_items()
@@ -598,10 +621,11 @@ def add_to_buy_source(text: str, qty: str = "", recipe_id: int | None = None) ->
         items.append({
             "id": str(uuid.uuid4()),
             "text": trimmed,
-            "category": _category_for_item(trimmed, None),
-            "notes": "",
+            "category": _category_for_item(trimmed, category),
+            "notes": str(notes or "").strip()[:200],
             "checked": False,
             "sources": [source],
+            "list": "shop",
         })
     else:
         target["sources"] = [
@@ -610,6 +634,13 @@ def add_to_buy_source(text: str, qty: str = "", recipe_id: int | None = None) ->
         ]
         target["sources"].append(source)
         target["checked"] = False
+        if notes is not None:
+            target["notes"] = str(notes).strip()[:200]
+        # A category picked explicitly this time overrides whatever an
+        # earlier recipe/add guessed — same "trust the client's named
+        # aisle" rule _category_for_item already applies elsewhere.
+        if category is not None:
+            target["category"] = _category_for_item(trimmed, category)
     return save_to_buy_items(items)
 
 
@@ -867,18 +898,18 @@ def save_recipe(recipe: Recipe, post: FetchedPost) -> None:
     ingredients = format_ingredient_lines(recipe.ingredients)
     steps = "\n".join(f"{i}. {step}" for i, step in enumerate(recipe.steps, start=1))
     saved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    row = [
-        recipe.title,
-        ingredients,
-        steps,
-        post.url,
-        recipe.confidence,
-        saved_at,
-        ", ".join(_clean_tag(tag) for tag in recipe.tags if _clean_tag(tag)),
-        "",  # Favorite: not set on save, toggled later from the app
-        "",  # Notes: added later from the app
-        _meal_to_course(recipe.meal),
-    ]
+    row = _recipe_cells(
+        title=recipe.title,
+        ingredients_text=ingredients,
+        steps_text=steps,
+        source=post.url,
+        confidence=recipe.confidence,
+        saved_at=saved_at,
+        tags_csv=", ".join(_clean_tag(tag) for tag in recipe.tags if _clean_tag(tag)),
+        favorite="",
+        notes="",
+        course=_meal_to_course(recipe.meal),
+    )
     # A plain append_row() lets the Sheets API auto-detect "the table" to
     # append after — which, in practice, sometimes appended a new row
     # shifted many columns to the right instead of at column A (confirmed
@@ -901,28 +932,43 @@ def create_recipe(
     course: str,
     tags: list[str],
     notes: str,
+    source: str = "",
+    photo_bytes: bytes | None = None,
 ) -> dict | None:
     """Adds a recipe typed straight into the app — no capture pipeline, no
     Gemini call, no source URL. Ingredients/steps are formatted the same
     way update_recipe re-serializes them, so a later edit round-trips
-    cleanly."""
+    cleanly.
+
+    `source` is "" for a genuinely hand-typed recipe, or the "(photo)"
+    sentinel when this save is really a photo extraction the user reviewed
+    and confirmed in the same Add-recipe form — both go through this one
+    endpoint, so without this the two were indistinguishable later (always
+    bucketed as "Typed in" in Filters)."""
+    clean_source = source if source == "(photo)" else ""
     ingredients_text = "\n".join(f"- {line}" for line in ingredients)
     steps_text = "\n".join(f"{i}. {line}" for i, line in enumerate(steps, start=1))
     saved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     clean_tags = [_clean_tag(tag) for tag in tags if _clean_tag(tag)]
     clean_course = _clean_course(course)
-    row = [
-        title,
-        ingredients_text,
-        steps_text,
-        "",  # Source: typed in by hand, no URL
-        "high",  # Confidence: user-authored, not a model guess
-        saved_at,
-        ", ".join(clean_tags),
-        "",  # Favorite
-        notes,
-        clean_course,
-    ]
+    photo_id = ""
+    if photo_bytes:
+        from app.photos import upload_recipe_photo
+
+        photo_id = upload_recipe_photo(photo_bytes)
+    row = _recipe_cells(
+        title=title,
+        ingredients_text=ingredients_text,
+        steps_text=steps_text,
+        source=clean_source,
+        confidence="high",
+        saved_at=saved_at,
+        tags_csv=", ".join(clean_tags),
+        favorite="",
+        notes=notes,
+        course=clean_course,
+        photo=photo_id,
+    )
     # See save_recipe for why this writes to an explicit row instead of
     # using append_row's auto-detected table range.
     worksheet = _worksheet()
@@ -938,7 +984,7 @@ def create_recipe(
         "ingredients": ingredients,
         "pantry": pantry_items(ingredients),
         "steps": steps,
-        "source": "",
+        "source": clean_source,
         "confidence": "high",
         "saved_at": saved_at,
         "course": clean_course,
@@ -947,6 +993,7 @@ def create_recipe(
         "notes": notes,
         "ingredients_text": ingredients_text,
         "steps_text": steps_text,
+        "photo_id": photo_id,
     }
 
 
@@ -957,10 +1004,19 @@ def delete_recipe(row_id: int) -> bool:
     silently break all of that until the next full refresh. list_recipes()
     and get_recipe() already skip blank-title rows, so a blanked row is
     simply invisible."""
-    if get_recipe(row_id) is None:
+    current = get_recipe(row_id)
+    if current is None:
         return False
     blank_row = [""] * len(HEADERS)
     _worksheet().update(f"A{row_id}:{LAST_COL_LETTER}{row_id}", [blank_row], value_input_option="RAW")
+    photo_id = str(current.get("photo_id") or "").strip()
+    if photo_id:
+        try:
+            from app.photos import delete_recipe_photo
+
+            delete_recipe_photo(photo_id)
+        except Exception:
+            logger.warning("Could not delete photo %s for row %s", photo_id, row_id, exc_info=True)
     logger.info("Cleared row %s", row_id)
     return True
 
@@ -987,18 +1043,19 @@ def update_recipe(row_id: int, **fields) -> dict | None:
     tags = [_clean_tag(tag) for tag in tags_in if _clean_tag(tag)] if tags_in is not None else current["tags"]
     course = _clean_course(fields["course"]) if fields.get("course") is not None else current["course"]
 
-    row = [
-        title,
-        ingredients_text,
-        steps_text,
-        current["source"],
-        current["confidence"],
-        current["saved_at"],
-        ", ".join(tags),
-        "TRUE" if favorite else "",
-        notes,
-        course,
-    ]
+    row = _recipe_cells(
+        title=title,
+        ingredients_text=ingredients_text,
+        steps_text=steps_text,
+        source=current["source"],
+        confidence=current["confidence"],
+        saved_at=current["saved_at"],
+        tags_csv=", ".join(tags),
+        favorite="TRUE" if favorite else "",
+        notes=notes,
+        course=course,
+        photo=str(current.get("photo_id") or ""),
+    )
     _update_recipe_row(_worksheet(), row_id, row)
     logger.info("Updated row %s (%r)", row_id, title)
 
@@ -1077,7 +1134,39 @@ def _record_to_recipe(row_id: int, record: dict) -> dict:
         "notes": str(record.get("Notes") or "").strip(),
         "ingredients_text": ingredients_text,
         "steps_text": steps_text,
+        "photo_id": str(record.get("Photo") or "").strip(),
     }
+
+
+def _recipe_cells(
+    *,
+    title: str,
+    ingredients_text: str,
+    steps_text: str,
+    source: str,
+    confidence: str,
+    saved_at: str,
+    tags_csv: str,
+    favorite: str,
+    notes: str,
+    course: str,
+    photo: str = "",
+) -> list[str]:
+    """One sheet row in HEADERS order. Keep this the only place that lists
+    those cells so a new trailing column cannot be forgotten on write."""
+    return [
+        title,
+        ingredients_text,
+        steps_text,
+        source,
+        confidence,
+        saved_at,
+        tags_csv,
+        favorite,
+        notes,
+        course,
+        photo,
+    ]
 
 
 def _parse_lines(text: str, bullets: bool = False, numbered: bool = False) -> list[str]:

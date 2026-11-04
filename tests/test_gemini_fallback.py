@@ -433,3 +433,59 @@ class ToBuySourceTests(TestCase):
         })
         self.assertEqual(item["qty"], "2")
         self.assertEqual(len(item["sources"]), 2)
+
+    def test_add_source_keeps_notes_and_named_aisle(self):
+        from app.store import add_to_buy_source
+
+        state = {"to_buy": []}
+
+        def read():
+            return dict(state)
+
+        def write(**updates):
+            state.update(updates)
+
+        with patch("app.store._read_app_state", side_effect=read), patch(
+            "app.store._write_app_state", side_effect=write
+        ):
+            items = add_to_buy_source(
+                "Soy sauce",
+                qty="1 bottle",
+                category="Sauces & condiments",
+                notes="Kikkoman",
+            )
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["notes"], "Kikkoman")
+        self.assertEqual(items[0]["qty"], "1 bottle")
+        self.assertEqual(items[0]["category"], "Sauces & condiments")
+        self.assertEqual(items[0]["list"], "shop")
+
+    def test_shop_lists_stay_separate(self):
+        from app.store import _normalize_to_buy_item, save_to_buy_items
+
+        state = {"to_buy": []}
+
+        def read():
+            return dict(state)
+
+        def write(**updates):
+            state.update(updates)
+
+        with patch("app.store._read_app_state", side_effect=read), patch(
+            "app.store._write_app_state", side_effect=write
+        ):
+            items = save_to_buy_items([
+                {"text": "Honey", "qty": "1", "list": "shop"},
+                {"text": "Honey", "qty": "2 jars", "list": "take_to_india"},
+                {"text": "Adapter", "list": "bring_to_germany"},
+                {"text": "Paracetamol", "list": "shop_medicines"},
+            ])
+
+        self.assertEqual(len(items), 4)
+        self.assertEqual(
+            {item["list"] for item in items},
+            {"shop", "shop_medicines", "take_to_india", "bring_to_germany"},
+        )
+        legacy = _normalize_to_buy_item({"text": "Soap"})
+        self.assertEqual(legacy["list"], "shop")

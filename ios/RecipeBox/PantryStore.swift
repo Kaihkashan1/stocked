@@ -40,7 +40,16 @@ final class PantryStore {
     }
 
     var itemCount: Int { items.count }
-    var toBuyCount: Int { toBuy.count }
+    var toBuyCount: Int { toBuyCount(in: "shop") }
+
+    func toBuyItems(in list: String) -> [ToBuyItem] {
+        let key = ToBuyItem.normalizedList(list)
+        return toBuy.filter { $0.list == key }
+    }
+
+    func toBuyCount(in list: String) -> Int {
+        toBuyItems(in: list).count
+    }
 
     var kickerLine: String {
         let itemPart = L("\(itemCount) items")
@@ -237,26 +246,32 @@ final class PantryStore {
         replaceInventory(nextItems, categories: nextCategories)
     }
 
-    func addToBuy(_ text: String, qty: String = "") {
-        addToBuySource(text: text, qty: qty, recipeID: nil)
+    func addToBuy(_ text: String, qty: String = "", category: String? = nil, notes: String? = nil, list: String = "shop") {
+        let listKey = ToBuyItem.normalizedList(list)
+        if listKey == "shop" {
+            addToBuySource(text: text, qty: qty, recipeID: nil, category: category, notes: notes)
+            return
+        }
+        let item = ToBuyItem(text: text, category: category ?? "Other", qty: qty, notes: notes ?? "", list: listKey)
+        replaceToBuy(toBuy + [item])
     }
 
     func removeToBuy(id: String) {
         replaceToBuy(toBuy.filter { $0.id != id })
     }
 
-    func addToBuySource(text: String, qty: String = "", recipeID: Int?) {
+    func addToBuySource(text: String, qty: String = "", recipeID: Int?, category: String? = nil, notes: String? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let qtyTrimmed = qty.trimmingCharacters(in: .whitespacesAndNewlines)
         let previous = toBuy
-        let optimistic = applyingSource(to: previous, text: trimmed, qty: qtyTrimmed, recipeID: recipeID)
+        let optimistic = applyingSource(to: previous, text: trimmed, qty: qtyTrimmed, recipeID: recipeID, category: category, notes: notes)
         toBuy = optimistic
         persistCache()
         Task {
             do {
                 let confirmed = try await APIClient(baseURLString: serverURL)
-                    .addToBuySource(text: trimmed, qty: qtyTrimmed, recipeID: recipeID, secret: serverSecret)
+                    .addToBuySource(text: trimmed, qty: qtyTrimmed, recipeID: recipeID, category: category, notes: notes, secret: serverSecret)
                 if toBuy == optimistic {
                     toBuy = confirmed
                     persistCache()
@@ -306,7 +321,7 @@ final class PantryStore {
 
     func isInToBuy(text: String, recipeID: Int?) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let row = toBuy.first(where: { toBuyMatchKey($0.text) == toBuyMatchKey(trimmed) }) else {
+        guard let row = toBuy.first(where: { $0.list == "shop" && toBuyMatchKey($0.text) == toBuyMatchKey(trimmed) }) else {
             return false
         }
         return row.sources.contains { $0.recipeID == recipeID }
@@ -419,24 +434,39 @@ final class PantryStore {
     }
 }
 
-private func applyingSource(to items: [ToBuyItem], text: String, qty: String, recipeID: Int?) -> [ToBuyItem] {
+private func applyingSource(
+    to items: [ToBuyItem],
+    text: String,
+    qty: String,
+    recipeID: Int?,
+    category: String? = nil,
+    notes: String? = nil
+) -> [ToBuyItem] {
     var next = items
     let source = ToBuySource(recipeID: recipeID, qty: qty)
-    if let index = next.firstIndex(where: { toBuyMatchKey($0.text) == toBuyMatchKey(text) }) {
+    if let index = next.firstIndex(where: { $0.list == "shop" && toBuyMatchKey($0.text) == toBuyMatchKey(text) }) {
         var item = next[index]
         item.sources.removeAll { $0.recipeID == recipeID }
         item.sources.append(source)
         item.qty = mergeToBuyQty(item.sources)
         item.checked = false
+        if let category { item.category = canonicalPantryCategory(category) }
+        if let notes { item.notes = notes }
         next[index] = item
         return next
     }
-    return next + [ToBuyItem(text: text, qty: qty, sources: [source])]
+    return next + [ToBuyItem(
+        text: text,
+        category: category.map(canonicalPantryCategory) ?? "Other",
+        qty: qty,
+        notes: notes ?? "",
+        sources: [source]
+    )]
 }
 
 private func removingSource(from items: [ToBuyItem], text: String, recipeID: Int?) -> [ToBuyItem] {
     items.compactMap { item in
-        guard toBuyMatchKey(item.text) == toBuyMatchKey(text) else { return item }
+        guard item.list == "shop", toBuyMatchKey(item.text) == toBuyMatchKey(text) else { return item }
         var next = item
         next.sources.removeAll { $0.recipeID == recipeID }
         guard !next.sources.isEmpty else { return nil }

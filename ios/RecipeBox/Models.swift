@@ -254,6 +254,8 @@ struct ToBuyItem: Codable, Hashable, Identifiable {
     var notes: String
     var checked: Bool
     var sources: [ToBuySource]
+    /// `shop`, `shop_medicines`, `take_to_india`, or `bring_to_germany`.
+    var list: String
 
     var recipeSourceCount: Int {
         sources.filter { $0.recipeID != nil }.count
@@ -266,13 +268,15 @@ struct ToBuyItem: Codable, Hashable, Identifiable {
         qty: String = "",
         notes: String = "",
         checked: Bool = false,
-        sources: [ToBuySource]? = nil
+        sources: [ToBuySource]? = nil,
+        list: String = "shop"
     ) {
         self.id = id
         self.text = text
         self.category = category
         self.notes = notes
         self.checked = checked
+        self.list = Self.normalizedList(list)
         let resolved = sources ?? [ToBuySource(recipeID: nil, qty: qty)]
         self.sources = resolved
         self.qty = mergeToBuyQty(resolved)
@@ -285,6 +289,7 @@ struct ToBuyItem: Codable, Hashable, Identifiable {
         category = try container.decodeIfPresent(String.self, forKey: .category) ?? "Other"
         notes = (try? container.decode(String.self, forKey: .notes)) ?? ""
         checked = try container.decodeIfPresent(Bool.self, forKey: .checked) ?? false
+        list = Self.normalizedList(try container.decodeIfPresent(String.self, forKey: .list))
         let decodedQty = try container.decodeIfPresent(String.self, forKey: .qty) ?? ""
         if let decoded = try container.decodeIfPresent([ToBuySource].self, forKey: .sources), !decoded.isEmpty {
             sources = decoded
@@ -303,10 +308,18 @@ struct ToBuyItem: Codable, Hashable, Identifiable {
         try container.encode(notes, forKey: .notes)
         try container.encode(checked, forKey: .checked)
         try container.encode(sources, forKey: .sources)
+        try container.encode(list, forKey: .list)
+    }
+
+    private static let shopLists: Set<String> = ["shop", "shop_medicines", "take_to_india", "bring_to_germany"]
+
+    static func normalizedList(_ raw: String?) -> String {
+        let value = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return shopLists.contains(value) ? value : "shop"
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, text, category, qty, notes, checked, sources
+        case id, text, category, qty, notes, checked, sources, list
     }
 }
 
@@ -409,9 +422,15 @@ struct ToBuySourceChange: Encodable {
     let text: String
     var qty: String = ""
     var recipeID: Int?
+    /// Only meaningful on the add endpoint — a category picked explicitly
+    /// when adding, instead of leaving it to be guessed from the name.
+    var category: String?
+    /// Also add-only — sets notes in the same request that creates the
+    /// item, so adding is a single round trip.
+    var notes: String?
 
     enum CodingKeys: String, CodingKey {
-        case text, qty
+        case text, qty, category, notes
         case recipeID = "recipe_id"
     }
 
@@ -424,6 +443,8 @@ struct ToBuySourceChange: Encodable {
         } else {
             try container.encodeNil(forKey: .recipeID)
         }
+        try container.encodeIfPresent(category, forKey: .category)
+        try container.encodeIfPresent(notes, forKey: .notes)
     }
 }
 
@@ -443,6 +464,9 @@ struct Recipe: Codable, Identifiable, Hashable {
     let pantry: [String]
     let favorite: Bool
     let notes: String
+    /// Relative `/api/recipes/{id}/photo` when this recipe was saved from a
+    /// camera/library still. Nil for typed-in and link imports.
+    let photoURL: String?
     /// Lowercased blob used for search so we do not rebuild it on every keystroke.
     let searchBlob: String
 
@@ -457,6 +481,7 @@ struct Recipe: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id, title, ingredients, steps, source, confidence, course, tags, pantry, favorite, notes
         case savedAt = "saved_at"
+        case photoURL = "photo_url"
     }
 
     /// Memberwise init for building a locally-modified copy (optimistic
@@ -465,7 +490,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         id: Int, title: String, ingredients: [String], steps: [String],
         source: String, confidence: String, savedAt: String?,
         course: Course, tags: [String], pantry: [String],
-        favorite: Bool, notes: String, searchBlob: String
+        favorite: Bool, notes: String, photoURL: String?, searchBlob: String
     ) {
         self.id = id
         self.title = title
@@ -479,6 +504,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         self.pantry = pantry
         self.favorite = favorite
         self.notes = notes
+        self.photoURL = photoURL
         self.searchBlob = searchBlob
     }
 
@@ -487,8 +513,14 @@ struct Recipe: Codable, Identifiable, Hashable {
             id: id, title: title, ingredients: ingredients, steps: steps,
             source: source, confidence: confidence,
             savedAt: savedAt, course: course, tags: tags, pantry: pantry,
-            favorite: value, notes: notes, searchBlob: searchBlob
+            favorite: value, notes: notes, photoURL: photoURL, searchBlob: searchBlob
         )
+    }
+
+    func resolvedPhotoURL(baseURLString: String) -> URL? {
+        guard let photoURL, !photoURL.isEmpty else { return nil }
+        if let absolute = URL(string: photoURL), absolute.scheme != nil { return absolute }
+        return URL(string: photoURL, relativeTo: URL(string: baseURLString))?.absoluteURL
     }
 
     init(from decoder: Decoder) throws {
@@ -506,6 +538,7 @@ struct Recipe: Codable, Identifiable, Hashable {
         pantry = collapsePantryItems(try container.decodeIfPresent([String].self, forKey: .pantry) ?? [])
         favorite = try container.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
         notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        photoURL = try container.decodeIfPresent(String.self, forKey: .photoURL)
         searchBlob = ([title, course.rawValue] + tags + ingredients).joined(separator: " ").lowercased()
     }
 
@@ -523,10 +556,14 @@ struct Recipe: Codable, Identifiable, Hashable {
         try container.encode(pantry, forKey: .pantry)
         try container.encode(favorite, forKey: .favorite)
         try container.encode(notes, forKey: .notes)
+        try container.encodeIfPresent(photoURL, forKey: .photoURL)
     }
 
+    /// nil for "" (typed in) and the "(photo)" sentinel — neither is a real
+    /// link to open.
     var sourceURL: URL? {
-        URL(string: source)
+        guard source != "(photo)" else { return nil }
+        return URL(string: source)
     }
 
     private static let savedAtFormatter: DateFormatter = {
@@ -550,9 +587,12 @@ struct Recipe: Codable, Identifiable, Hashable {
     }
 
     /// Short, human label for the meta row / detail footer — "INSTAGRAM",
-    /// "YOUTUBE", "TIKTOK", the bare host for any other link, or "Typed in"
-    /// for a hand-entered recipe (source is "" for those — see store.py).
+    /// "YOUTUBE", "TIKTOK", the bare host for any other link, "Photo" for a
+    /// photo extraction saved through the Add-recipe form (source is the
+    /// "(photo)" sentinel for those), or "Typed in" for a genuinely
+    /// hand-entered recipe (source is "" — see store.py).
     var sourceLabel: String {
+        if source == "(photo)" { return L("Photo") }
         guard let host = sourceURL?.host?.lowercased(), !host.isEmpty else {
             return L("Typed in")
         }
@@ -564,15 +604,10 @@ struct Recipe: Codable, Identifiable, Hashable {
 
     /// The Filters sheet's Source row bucket for this recipe. Instagram,
     /// YouTube and TikTok are read straight off the URL; anything else with
-    /// a URL is "Link". A recipe with no URL is "Typed in" — Photo and
-    /// Typed in are NOT actually distinguishable from stored data (both
-    /// save with an empty Source column; see store.py's "typed in by hand"
-    /// path, which a photo extraction also goes through once you hit Save),
-    /// so `.photo` never matches anything today. It's kept in the enum and
-    /// offered as its own chip because the handoff calls for both — should
-    /// the sheet ever grow a real Photo/Typed-in marker, only this switch
-    /// needs to change.
+    /// a URL is "Link"; the "(photo)" sentinel is "Photo"; a recipe with no
+    /// URL and no sentinel is "Typed in".
     var sourceCategory: SourceCategory {
+        if source == "(photo)" { return .photo }
         guard let host = sourceURL?.host?.lowercased(), !host.isEmpty else {
             return .typedIn
         }
@@ -582,14 +617,10 @@ struct Recipe: Codable, Identifiable, Hashable {
         return .link
     }
 
-    /// True if this recipe belongs to any of the selected Source chips. A
-    /// no-URL recipe matches both "Typed in" and "Photo" — see the doc
-    /// comment on `sourceCategory` — so picking either one surfaces it,
-    /// rather than "Photo" being a chip that can never match anything.
+    /// True if this recipe belongs to any of the selected Source chips.
     func matchesSourceFilter(_ selected: Set<SourceCategory>) -> Bool {
         guard !selected.isEmpty else { return true }
-        if selected.contains(sourceCategory) { return true }
-        return sourceCategory == .typedIn && selected.contains(.photo)
+        return selected.contains(sourceCategory)
     }
 }
 
@@ -704,6 +735,9 @@ struct BackgroundImportJob: Identifiable, Equatable {
     let id: UUID
     let kind: Kind
     var status: Status
+    /// JPEG bytes of the still being extracted, kept so Save can upload the
+    /// original photo with the reviewed recipe.
+    var photoJPEG: Data? = nil
 
     enum Kind: Equatable {
         case link(String)
@@ -900,6 +934,8 @@ struct RecipeCreate: Encodable {
     var course: String
     var tags: [String]
     var notes: String
+    /// "" or the "(photo)" sentinel — see app.store.create_recipe.
+    var source: String = ""
 }
 
 /// A recipebox:// deep link, e.g. from a Shortcuts action.

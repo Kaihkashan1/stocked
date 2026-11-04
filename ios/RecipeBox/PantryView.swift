@@ -1,27 +1,24 @@
 import SwiftUI
 
-/// Cupboard tab — inventory (Items) and shopping checklist (To buy), plus
-/// match-mode recipe suggestions. Stock lives in PantryStore; recipe fit %
-/// on the list screen stays on RecipeStore.have.
+/// Cupboard tab — groceries and medicines in one place. Shopping lives on
+/// the Shop tab. Recipe fit % on the list screen stays on RecipeStore.have.
 struct PantryView: View {
     @Environment(PantryStore.self) private var pantry
     @Environment(RecipeStore.self) private var recipes
+    @Environment(MedicineStore.self) private var medicines
 
     var onOpenRecipe: (Int) -> Void = { _ in }
 
-    @State private var segment: PantrySegment = .items
+    @State private var segment: CupboardSegment = .groceries
     @State private var matchMode = false
     @State private var matchSelectedIDs: Set<String> = []
     @State private var presentedSheet: CupboardPresentedSheet?
-    @State private var newToBuyText = ""
-    /// Independent of each other and of the Cookbook search; switching
-    /// Items ↔ To buy keeps both queries (handoff §11).
     @State private var stockQuery = ""
-    @State private var buyQuery = ""
+    @State private var requestMedicineAdd = false
 
-    private enum PantrySegment: String, CaseIterable, Identifiable {
-        case items = "In stock"
-        case toBuy = "To buy"
+    private enum CupboardSegment: String, CaseIterable, Identifiable {
+        case groceries = "Groceries"
+        case medicines = "Medicines"
         var id: String { rawValue }
         var localizedName: String {
             L(String.LocalizationValue(rawValue))
@@ -50,7 +47,7 @@ struct PantryView: View {
                     .padding(.horizontal, Theme.screenPadding)
                     .padding(.bottom, 12)
 
-                if segment == .items {
+                if segment == .groceries {
                     stockSearchField
                         .padding(.horizontal, Theme.screenPadding)
                         .padding(.bottom, 10)
@@ -61,13 +58,7 @@ struct PantryView: View {
                         .padding(.horizontal, Theme.screenPadding)
                         .padding(.bottom, 16)
                 } else {
-                    buySearchField
-                        .padding(.horizontal, Theme.screenPadding)
-                        .padding(.bottom, 10)
-                    toBuyToolbar
-                        .padding(.horizontal, Theme.screenPadding)
-                        .padding(.bottom, 12)
-                    toBuyContent
+                    MedicineView(embedded: true, externalAdd: $requestMedicineAdd)
                         .padding(.horizontal, Theme.screenPadding)
                         .padding(.bottom, 16)
                 }
@@ -76,7 +67,10 @@ struct PantryView: View {
         .background(Theme.bg.ignoresSafeArea())
         .scrollIndicators(.hidden)
         .toolbar(.hidden, for: .navigationBar)
-        .refreshable { await pantry.refresh() }
+        .refreshable {
+            await pantry.refresh()
+            await medicines.refresh()
+        }
         .sheet(item: $presentedSheet) { sheet in
             sheetContent(for: sheet)
                 .presentationDetents([.large])
@@ -121,18 +115,36 @@ struct PantryView: View {
                 Text("Cupboard")
                     .font(Theme.display(36))
                     .foregroundStyle(Theme.ink)
-                Text(pantry.kickerLine)
+                Text(cupboardKicker)
                     .font(Theme.body(10.5, weight: .semibold))
                     .tracking(1.47)
                     .textCase(.uppercase)
                     .foregroundStyle(Theme.accent700)
             }
             Spacer()
-            if segment == .items {
-                CircleIconButton(lucide: .gear) {
-                    presentedSheet = .categories
+            HStack(spacing: 8) {
+                if segment == .groceries {
+                    CircleIconButton(lucide: .gear) {
+                        presentedSheet = .categories
+                    }
+                    .accessibilityLabel(L("Cupboard categories"))
                 }
-                .accessibilityLabel(L("Cupboard categories"))
+
+                Button {
+                    if segment == .groceries {
+                        presentedSheet = .addItem
+                    } else {
+                        requestMedicineAdd = true
+                    }
+                } label: {
+                    LucideIcon(.plus, size: 19)
+                        .foregroundStyle(Theme.bg)
+                        .frame(width: 44, height: 44)
+                        .background(Theme.accent)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(segment == .groceries ? L("Add cupboard item") : L("Add medicine"))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -141,12 +153,14 @@ struct PantryView: View {
         .padding(.bottom, 16)
     }
 
-    private var stockSearchField: some View {
-        cupboardSearchField(placeholder: L("Search what's in stock"), text: $stockQuery)
+    private var cupboardKicker: String {
+        let groceries = L("\(pantry.itemCount) items")
+        let meds = L("\(medicines.itemCount) medicines")
+        return "\(groceries) · \(meds)"
     }
 
-    private var buySearchField: some View {
-        cupboardSearchField(placeholder: L("Search items to buy"), text: $buyQuery)
+    private var stockSearchField: some View {
+        cupboardSearchField(placeholder: L("Search what's in stock"), text: $stockQuery)
     }
 
     private func cupboardSearchField(placeholder: String, text: Binding<String>) -> some View {
@@ -178,49 +192,13 @@ struct PantryView: View {
         }
     }
 
-    private var filteredToBuy: [ToBuyItem] {
-        let q = buyQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let rows = q.isEmpty
-            ? pantry.toBuy
-            : pantry.toBuy.filter {
-                $0.text.lowercased().contains(q)
-                    || $0.notes.lowercased().contains(q)
-                    || $0.category.lowercased().contains(q)
-            }
-        return rows
-    }
-
-    private var groupedToBuy: [(category: String, items: [ToBuyItem])] {
-        var order: [String] = []
-        var seen = Set<String>()
-        for name in pantry.categories + filteredToBuy.map(\.category) {
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            let key = trimmed.lowercased()
-            guard !trimmed.isEmpty, !seen.contains(key) else { continue }
-            seen.insert(key)
-            order.append(trimmed)
-        }
-        return order.compactMap { name in
-            let rows = filteredToBuy.filter {
-                $0.category.caseInsensitiveCompare(name) == .orderedSame
-            }
-            .sorted { $0.text.localizedCaseInsensitiveCompare($1.text) == .orderedAscending }
-            guard !rows.isEmpty else { return nil }
-            return (name, rows)
-        }
-    }
-
     private var stockFilterActive: Bool {
         !stockQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var buyFilterActive: Bool {
-        !buyQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
     private var segmentRow: some View {
         HStack(spacing: 7) {
-            ForEach(PantrySegment.allCases) { option in
+            ForEach(CupboardSegment.allCases) { option in
                 Button {
                     segment = option
                 } label: {
@@ -245,37 +223,23 @@ struct PantryView: View {
     // MARK: - Items
 
     private var itemsToolbar: some View {
-        HStack(spacing: 8) {
-            Button {
-                matchMode.toggle()
-            } label: {
-                Text(matchMode ? L("Done matching") : L("Select items to match"))
-                    .font(Theme.body(13, weight: .semibold))
-                    .foregroundStyle(matchMode ? .white : Theme.neutral800)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background(matchMode ? Theme.accent : Theme.surface)
-                    .overlay {
-                        if !matchMode {
-                            Capsule().strokeBorder(Theme.divider, lineWidth: 1)
-                        }
+        Button {
+            matchMode.toggle()
+        } label: {
+            Text(matchMode ? L("Done matching") : L("Select items to match"))
+                .font(Theme.body(13, weight: .semibold))
+                .foregroundStyle(matchMode ? .white : Theme.neutral800)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background(matchMode ? Theme.accent : Theme.surface)
+                .overlay {
+                    if !matchMode {
+                        Capsule().strokeBorder(Theme.divider, lineWidth: 1)
                     }
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                presentedSheet = .addItem
-            } label: {
-                LucideIcon(.plus, size: 19)
-                    .foregroundStyle(Theme.bg)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.accent)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L("Add cupboard item"))
+                }
+                .clipShape(Capsule())
         }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -459,134 +423,6 @@ struct PantryView: View {
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
-    // MARK: - To buy
-
-    private var toBuyToolbar: some View {
-        HStack(spacing: 9) {
-            TextField("Add something to buy…", text: $newToBuyText)
-                .font(Theme.body(14))
-                .padding(.horizontal, 18)
-                .frame(height: 46)
-                .background(Theme.surface)
-                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
-                .clipShape(Capsule())
-                .onSubmit(addToBuyFromField)
-
-            Button(action: addToBuyFromField) {
-                LucideIcon(.plus, size: 18)
-                    .foregroundStyle(Theme.bg)
-                    .frame(width: 46, height: 46)
-                    .background(Theme.accent)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L("Add to buy"))
-        }
-    }
-
-    private func addToBuyFromField() {
-        pantry.addToBuy(newToBuyText)
-        newToBuyText = ""
-    }
-
-    private func toBuyRow(_ item: ToBuyItem) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(alignment: .center, spacing: 12) {
-                Button {
-                    pantry.toggleChecked(id: item.id)
-                } label: {
-                    Circle()
-                        .strokeBorder(item.checked ? Theme.sage500 : Theme.neutral400, lineWidth: 2)
-                        .background(Circle().fill(item.checked ? Theme.sage500 : .clear))
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(item.checked ? L("Uncheck \(item.text)") : L("Check \(item.text)"))
-
-                Text(item.text)
-                    .font(Theme.body(14.5, weight: .semibold))
-                    .strikethrough(item.checked)
-                    .foregroundStyle(item.checked ? Theme.neutral500 : Theme.neutral900)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if item.recipeSourceCount > 1 {
-                    Text(L("\(item.recipeSourceCount) recipes"))
-                        .font(Theme.body(10.5, weight: .semibold))
-                        .foregroundStyle(Theme.neutral500)
-                        .fixedSize()
-                }
-
-                LucideTrashButton(accessibilityLabel: L("Remove \(item.text)")) {
-                    pantry.removeToBuy(id: item.id)
-                }
-            }
-
-            HStack(spacing: 8) {
-                TextField("qty", text: Binding(
-                    get: { pantry.toBuy.first(where: { $0.id == item.id })?.qty ?? "" },
-                    set: { pantry.setToBuyQty(id: item.id, qty: $0) }
-                ))
-                .font(Theme.body(12.5, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 12)
-                .frame(width: 76, height: 34)
-                .background(Theme.bg)
-                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
-                .clipShape(Capsule())
-                .accessibilityLabel(L("Quantity for \(item.text)"))
-
-                TextField(
-                    L("Notes"),
-                    text: Binding(
-                        get: { pantry.toBuy.first(where: { $0.id == item.id })?.notes ?? "" },
-                        set: { pantry.setToBuyNotes(id: item.id, notes: $0) }
-                    )
-                )
-                .font(Theme.body(12.5, weight: .semibold))
-                .padding(.horizontal, 14)
-                .frame(height: 34)
-                .background(Theme.bg)
-                .overlay(Capsule().strokeBorder(Theme.divider, lineWidth: 1))
-                .clipShape(Capsule())
-                .accessibilityLabel(L("Notes for \(item.text)"))
-            }
-            .padding(.leading, 34)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .cardBackground(radius: 22)
-    }
-
-    @ViewBuilder
-    private var toBuyContent: some View {
-        if pantry.toBuy.isEmpty {
-            Text("Your to-buy list is empty.")
-                .font(Theme.body(14))
-                .foregroundStyle(Theme.neutral600)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 44)
-        } else if filteredToBuy.isEmpty {
-            Text(buyFilterActive ? L("Nothing matches that yet.") : L("Your to-buy list is empty."))
-                .font(Theme.body(14))
-                .foregroundStyle(Theme.neutral600)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 44)
-        } else {
-            ForEach(groupedToBuy, id: \.category) { group in
-                VStack(alignment: .leading, spacing: 9) {
-                    Text(group.category.uppercased(with: Locale(identifier: "en")))
-                        .font(Theme.body(10.5, weight: .semibold))
-                        .tracking(1.26)
-                        .foregroundStyle(Theme.neutral600)
-                    ForEach(group.items) { item in
-                        toBuyRow(item)
-                    }
-                }
-                .padding(.bottom, 18)
-            }
-        }
-    }
 }
 
 /// Add, rename, and delete cupboard groups — opened from the Cupboard gear.

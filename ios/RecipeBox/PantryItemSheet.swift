@@ -50,7 +50,7 @@ struct PantryItemSheet: View {
 
     private var isEditing: Bool { item != nil }
     private var title: String { isEditing ? L("Edit cupboard item") : L("Add cupboard item") }
-    private var saveLabel: String { isEditing ? L("Save changes") : L("Add to cupboard") }
+    private var saveLabel: String { L("Save") }
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

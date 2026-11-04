@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Meal = Literal["breakfast", "lunch", "dinner", "snack", "dessert", "drink", "other"]
 
@@ -131,6 +131,10 @@ class RecipeCreate(BaseModel):
     course: str = "Main course"
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
+    # "" (typed by hand) or the "(photo)" sentinel (prefilled from a photo
+    # extraction, then saved through this same manual-entry endpoint) — see
+    # app.store.create_recipe. Anything else is treated as "".
+    source: str = ""
 
     _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_user_tags(v))
 
@@ -182,6 +186,8 @@ class ToBuySource(BaseModel):
 
 
 class ToBuyItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
     text: str
     category: str = "Other"
@@ -189,6 +195,8 @@ class ToBuyItem(BaseModel):
     notes: str = ""
     checked: bool = False
     sources: list[ToBuySource] = Field(default_factory=list)
+    # JSON key stays `list` (shop / shop_medicines / take_to_india / bring_to_germany).
+    shop_list: str = Field(default="shop", alias="list")
 
 
 class ToBuyUpdate(BaseModel):
@@ -199,6 +207,12 @@ class ToBuySourceChange(BaseModel):
     text: str
     qty: str = ""
     recipe_id: int | None = None
+    # Honored only on the add endpoint (and only when it names a real aisle
+    # — see app.store._category_for_item); ignored for remove.
+    category: str | None = None
+    # Also add-only — lets a to-buy item's notes be set in the same request
+    # that creates it, instead of a separate PUT /api/to-buy right after.
+    notes: str | None = None
 
 
 # Medicine cabinet — its own tab alongside Cupboard, and the same "what do

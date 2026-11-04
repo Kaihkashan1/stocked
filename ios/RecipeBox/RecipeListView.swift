@@ -463,6 +463,7 @@ private struct EmptyState: View {
 // MARK: - Recipe card
 
 struct RecipeCard: View, Equatable {
+    @Environment(RecipeStore.self) private var store
     let recipe: Recipe
     var match: RecipeMatch?
     var viewMode: ViewMode = .list
@@ -472,6 +473,7 @@ struct RecipeCard: View, Equatable {
         lhs.recipe.id == rhs.recipe.id
             && lhs.recipe.title == rhs.recipe.title
             && lhs.recipe.favorite == rhs.recipe.favorite
+            && lhs.recipe.photoURL == rhs.recipe.photoURL
             && lhs.match?.label == rhs.match?.label
             && lhs.viewMode == rhs.viewMode
     }
@@ -483,47 +485,65 @@ struct RecipeCard: View, Equatable {
     /// screen. Grid mode additionally drops the source label, keeping the
     /// fit pill and favorite star.
     var body: some View {
-        VStack(alignment: .leading, spacing: isGrid ? 8 : 10) {
-            HStack(spacing: 8) {
-                if !isGrid {
-                    Text(recipe.sourceLabel.uppercased(with: Locale(identifier: "en")))
-                        .font(Theme.body(10, weight: .semibold))
-                        .tracking(1.2)
-                        .foregroundStyle(Theme.neutral600)
+        VStack(alignment: .leading, spacing: 0) {
+            if let url = recipe.resolvedPhotoURL(baseURLString: store.serverURL) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        Theme.neutral200
+                    }
                 }
-                if let match {
-                    let fit = match.score.formatted(
-                        .percent.precision(.fractionLength(0)).locale(Locale(identifier: "en"))
-                    )
-                    Text("\(fit) \(L("FIT"))")
-                        .font(Theme.body(10, weight: .semibold))
-                        .tracking(0.4)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Theme.sage500)
-                        .foregroundStyle(.white)
-                        .clipShape(Capsule())
-                }
-                Spacer()
-                Button(action: onToggleFavorite) {
-                    LucideIcon(.star, size: 18, stroke: 2.4, filled: recipe.favorite)
-                        .foregroundStyle(recipe.favorite ? Theme.accent : Theme.neutral400)
-                }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .frame(height: isGrid ? 96 : 140)
+                .clipped()
             }
+            VStack(alignment: .leading, spacing: isGrid ? 8 : 10) {
+                HStack(spacing: 8) {
+                    if !isGrid {
+                        Text(recipe.sourceLabel.uppercased(with: Locale(identifier: "en")))
+                            .font(Theme.body(10, weight: .semibold))
+                            .tracking(1.2)
+                            .foregroundStyle(Theme.neutral600)
+                    }
+                    if let match {
+                        let fit = match.score.formatted(
+                            .percent.precision(.fractionLength(0)).locale(Locale(identifier: "en"))
+                        )
+                        Text("\(fit) \(L("FIT"))")
+                            .font(Theme.body(10, weight: .semibold))
+                            .tracking(0.4)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.sage500)
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                    Button(action: onToggleFavorite) {
+                        LucideIcon(.star, size: 18, stroke: 2.4, filled: recipe.favorite)
+                            .foregroundStyle(recipe.favorite ? Theme.accent : Theme.neutral400)
+                    }
+                    .buttonStyle(.plain)
+                }
 
-            Text(recipe.title)
-                .font(Theme.display(isGrid ? 16 : 21))
-                .lineSpacing(3)
-                .foregroundStyle(Theme.ink)
-                .lineLimit(2)
+                Text(recipe.title)
+                    .font(Theme.display(isGrid ? 16 : 21))
+                    .lineSpacing(3)
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(2)
+            }
+            .padding(
+                isGrid
+                    ? EdgeInsets(top: 15, leading: 16, bottom: 14, trailing: 16)
+                    : EdgeInsets(top: 18, leading: 20, bottom: 17, trailing: 20)
+            )
         }
-        .padding(
-            isGrid
-                ? EdgeInsets(top: 15, leading: 16, bottom: 14, trailing: 16)
-                : EdgeInsets(top: 18, leading: 20, bottom: 17, trailing: 20)
-        )
         .frame(maxWidth: .infinity, alignment: .leading)
+        .roundedCorners(isGrid ? Theme.radiusCardGrid : Theme.radiusCard)
         .cardBackground(radius: isGrid ? Theme.radiusCardGrid : Theme.radiusCard)
     }
 }

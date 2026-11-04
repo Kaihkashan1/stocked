@@ -73,7 +73,7 @@ struct MedicineItemSheet: View {
 
     private var isEditing: Bool { item != nil }
     private var title: String { isEditing ? L("Edit medicine") : L("Add medicine") }
-    private var saveLabel: String { isEditing ? L("Save changes") : L("Add medicine") }
+    private var saveLabel: String { L("Save") }
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

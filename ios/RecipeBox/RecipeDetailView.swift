@@ -265,6 +265,7 @@ struct RecipeDetailView: View {
                         tags(for: recipe)
                     }
                     sourceLine(for: recipe)
+                    originalPhoto(for: recipe)
                 }
                 .padding(Theme.screenPadding)
                 .padding(.bottom, 40)
@@ -297,6 +298,25 @@ struct RecipeDetailView: View {
         }
         .clipShape(Rectangle())
         .cardBackground(radius: Theme.radiusContainer)
+    }
+
+    @ViewBuilder
+    private func originalPhoto(for recipe: Recipe) -> some View {
+        if let url = recipe.resolvedPhotoURL(baseURLString: store.serverURL) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                default:
+                    Theme.neutral200
+                        .frame(height: 160)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
     }
 
     private var cookButton: some View {

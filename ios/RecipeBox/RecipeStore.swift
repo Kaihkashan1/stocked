@@ -306,7 +306,7 @@ final class RecipeStore {
 
     func startPhotoImport(_ imageData: Data) -> UUID {
         let id = UUID()
-        importJobs.append(BackgroundImportJob(id: id, kind: .photo, status: .running))
+        importJobs.append(BackgroundImportJob(id: id, kind: .photo, status: .running, photoJPEG: imageData))
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             let (extraction, error) = await self.extractRecipePhoto(imageData)
@@ -427,9 +427,9 @@ final class RecipeStore {
     /// Returns an error message on failure, nil on success. Not optimistic —
     /// there's no local id to assign until the server hands back the row
     /// number, so the new recipe only appears once it's actually saved.
-    func addRecipe(_ draft: RecipeCreate) async -> String? {
+    func addRecipe(_ draft: RecipeCreate, photoJPEG: Data? = nil) async -> String? {
         do {
-            let created = try await APIClient(baseURLString: serverURL).createRecipe(draft, secret: serverSecret)
+            let created = try await APIClient(baseURLString: serverURL).createRecipe(draft, secret: serverSecret, photoJPEG: photoJPEG)
             recipesByID[created.id] = created
             recipes.insert(created, at: 0)
             updateDerived()
