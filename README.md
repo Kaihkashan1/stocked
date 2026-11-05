@@ -1,6 +1,6 @@
-# Stocked
+# Anything I want
 
-Share a recipe reel, video, or blog link from your iPhone. The hosted backend fetches it, asks Gemini to extract the recipe, and appends a row to a Google Sheet. Browse and cook in the personal iPhone app (**Stocked** — Cookbook + Cupboard tabs), at the Vercel URL, or in the Sheets app.
+Share a recipe reel, video, or blog link from your iPhone. The hosted backend fetches it, asks Gemini to extract the recipe, and appends a row to a Google Sheet. Browse and cook in the personal iPhone app (**Anything I want** — Cookbook + Cupboard tabs), at the Vercel URL, or in the Sheets app.
 
 This is the free-tier MVP: Google Sheets storage, Vercel in production (optional local Mac for development). Production: `https://stocked-cookbook-cupboard.vercel.app/`. Local: `http://127.0.0.1:8000/`. iPhone app: [`ios/`](ios/).
 
@@ -43,7 +43,7 @@ The backend writes as a bot, so it needs a Google Cloud *service account* that y
 
 ### Create the spreadsheet
 
-1. Open [Google Sheets](https://sheets.google.com) and create a blank spreadsheet. Name it **Stocked** (or keep an existing “Recipe Box” sheet — only the id matters).
+1. Open [Google Sheets](https://sheets.google.com) and create a blank spreadsheet. Name it **Anything I want** (or keep an existing sheet — only the id matters).
 2. Copy the long id from the URL:
 
 ```
@@ -100,7 +100,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 On this Mac, open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) for the web UI. Health check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health).
 
-For day-to-day use, point the iPhone Shortcut and Stocked app at the hosted URL instead of this Mac:
+For day-to-day use, point the iPhone Shortcut and Anything I want app at the hosted URL instead of this Mac:
 
 ```
 https://stocked-cookbook-cupboard.vercel.app
@@ -134,10 +134,10 @@ On the iPhone:
    - **Inside the If (has "status" — a real response came back):**
      - Add **Get Dictionary Value**. Key: `status`. Dictionary: **Contents of URL**.
      - Add a nested **If**. Input: **Dictionary Value**. Condition: **is** `error`.
-       - Inside: **Show Notification** — Title: `Stocked`, Body: **Get Dictionary Value**, key `error`, dictionary **Contents of URL**. This is where the Gemini-quota and Apify-limit messages actually show up — each has distinct wording (see section below), so the notification itself tells you which one it was.
+       - Inside: **Show Notification** — Title: `Anything I want`, Body: **Get Dictionary Value**, key `error`, dictionary **Contents of URL**. This is where the Gemini-quota and Apify-limit messages actually show up — each has distinct wording (see section below), so the notification itself tells you which one it was.
        - Leave that inner **Otherwise** empty — a successful save or a duplicate stays silent.
    - **In the outer If's Otherwise (no "status" — the request never got a real response):**
-     - Add **Show Notification** — Title: `Stocked`, Body: `Request timed out or failed before the server could respond. The recipe probably wasn't saved. Try again in a bit.`
+     - Add **Show Notification** — Title: `Anything I want`, Body: `Request timed out or failed before the server could respond. The recipe probably wasn't saved. Try again in a bit.`
 5. Tap **i** on the shortcut and turn **off Show When Run**.
 6. In Instagram: Reel → Share → **More** → enable **Save Recipe**.
 
@@ -177,11 +177,11 @@ Two specific messages worth knowing about, since both are common on a personal/f
 
 Create a unique topic name at [ntfy.sh](https://ntfy.sh), subscribe in the ntfy iOS app, and set `NTFY_TOPIC` in `.env`. You’ll get a ping when a save fails (or when a duplicate is skipped).
 
-## 8. iPhone app — Stocked (personal, not App Store)
+## 8. iPhone app — Anything I want (personal, not App Store)
 
-A SwiftUI app lives in `ios/` (Xcode project and scheme are both named **Stocked**, matching the home-screen name). Two tabs: **Cookbook** (recipes) and **Cupboard** (inventory + to-buy). After a sync, the phone keeps a local copy so you can browse and cook offline; opening the app again refreshes from the server. There are no logins or household invites — sharing means the same Vercel host and Edit key (one kitchen). Full steps: [`ios/README.md`](ios/README.md).
+A SwiftUI app lives in `ios/` (Xcode project and scheme are both named **Anything I want**, matching the home-screen name). Two tabs: **Cookbook** (recipes) and **Cupboard** (inventory + to-buy). After a sync, the phone keeps a local copy so you can browse and cook offline; opening the app again refreshes from the server. There are no logins or household invites — sharing means the same Vercel host and Edit key (one kitchen). Full steps: [`ios/README.md`](ios/README.md).
 
-Short version: open `ios/Stocked.xcodeproj` in **Xcode.app**, sign with your Personal Team, plug in the iPhone, press Run. The app defaults to `https://stocked-cookbook-cupboard.vercel.app` — the Mac does not need to be running.
+Short version: open `ios/Anything I want.xcodeproj` in **Xcode.app**, sign with your Personal Team, plug in the iPhone, press Run. The app defaults to `https://stocked-cookbook-cupboard.vercel.app` — the Mac does not need to be running.
 
 ## 9. Deploy to Vercel
 
@@ -208,8 +208,8 @@ Browsing the box works well on Vercel. Ingest may run up to **300 seconds** on H
 
 ## Notes
 
-- **The app.** Production is `https://stocked-cookbook-cupboard.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install **Stocked** — see [`ios/README.md`](ios/README.md). Google Sheets remains the recipe database; Cupboard inventory and to-buy live in App State JSON on the server (not Sheet rows).
-- **Offline and refresh.** Stocked keeps the last successful Cookbook and Cupboard sync on the phone. Browsing, filtering, and cook mode work without a network; adding, favoriting, editing, deleting, and cupboard writes still need the server. The app refreshes when you open it, when you return from the background (so a Shortcut/web save while it was away is picked up), when connectivity comes back, or when you pull to refresh. iOS does not let it poll the server while it is fully suspended.
+- **The app.** Production is `https://stocked-cookbook-cupboard.vercel.app/`. On this Mac, `http://127.0.0.1:8000/` is for local development. On iPhone, install **Anything I want** — see [`ios/README.md`](ios/README.md). Google Sheets remains the recipe database; Cupboard inventory and to-buy live in App State JSON on the server (not Sheet rows).
+- **Offline and refresh.** Anything I want keeps the last successful Cookbook and Cupboard sync on the phone. Browsing, filtering, and cook mode work without a network; adding, favoriting, editing, deleting, and cupboard writes still need the server. The app refreshes when you open it, when you return from the background (so a Shortcut/web save while it was away is picked up), when connectivity comes back, or when you pull to refresh. iOS does not let it poll the server while it is fully suspended.
 - **Duplicates.** The same source URL is not ingested twice. One carousel post can still create several recipe rows on the first save (same URL on each row).
 - **Rate limits and busy responses.** On Vercel Hobby, the function may run up to 300s; Gemini itself is given about 140s for one `generate_content` so a slow save still counts as one request. A daily-quota 429 or a 503/504 capacity blip first retries once on the fallback model (same API key). If that also fails, a quota 429 surfaces the quota message below and a 503/504 surfaces "Gemini is busy right now. Wait a few seconds and try again." If the Shortcut timeout is shorter than the server, the phone can still show a 499.
 - **Sources.** Instagram goes through Apify — required, no fallback (see section 4). Reels are downloaded and uploaded to Gemini (Files API) so a post with no caption can still be extracted from the video; if the video download fails, the cover still is used instead. Carousel posts send every still (up to 20) or short video clip per slide (up to 10, Gemini's video cap) so a recipe split across frames can be read; distinct dishes in one carousel are saved as separate rows. YouTube, TikTok, and anything else `yt-dlp` recognizes are fetched as video/caption directly — no login needed for those, since they don't require it the way Instagram does. Anything else — a recipe blog link, for example — is fetched as a plain page and its text is sent to Gemini instead. Neither yt-dlp nor the Apify actor is an official API for any of these sites; keep this as a personal tool and expect occasional breakage. If yt-dlp fetches start failing (YouTube/TikTok/blog links, not Instagram), update with `pip install -U yt-dlp`.
@@ -233,7 +233,7 @@ app/
   extract.py    Gemini video/image/text → structured JSON
   store.py      Google Sheets + App State (inventory, to-buy, flat pantry filter)
   models.py     Recipe, PantryItem, ToBuyItem, …
-ios/            Stocked (SwiftUI) — Cookbook + Cupboard
+ios/            Anything I want (SwiftUI) — Cookbook + Cupboard
 design_handoff_recipe_box/   Interactive prototype + app icon
 vercel.json     Vercel function timeout
 ```

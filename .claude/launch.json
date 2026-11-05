@@ -2,8 +2,8 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "recipe-box-web",
-      "runtimeExecutable": "/Users/kaihkashan/Documents/recipe-box/.venv/bin/uvicorn",
+      "name": "anything-i-want-web",
+      "runtimeExecutable": "/Users/kaihkashan/Documents/Anything I want/.venv/bin/uvicorn",
       "runtimeArgs": ["app.main:app", "--host", "127.0.0.1", "--port", "8000"],
       "port": 8000
     }

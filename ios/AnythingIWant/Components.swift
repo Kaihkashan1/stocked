@@ -273,7 +273,7 @@ extension View {
     }
 }
 
-/// Strokes from `Recipe Box.dc.html` — Lucide-style, 24pt grid, round caps.
+/// Strokes from the design handoff — Lucide-style, 24pt grid, round caps.
 struct LucideIcon: View {
     enum Kind {
         case trash, gear, plus, search, sliders, grid, list

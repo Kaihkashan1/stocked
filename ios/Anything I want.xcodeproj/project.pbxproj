@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10000000000000000000010 /* RecipeBoxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000030 /* RecipeBoxApp.swift */; };
+		A10000000000000000000010 /* AnythingIWantApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000030 /* AnythingIWantApp.swift */; };
 		A10000000000000000000011 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000031 /* Models.swift */; };
 		A10000000000000000000012 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000032 /* APIClient.swift */; };
 		A10000000000000000000013 /* RecipeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000033 /* RecipeStore.swift */; };
@@ -41,8 +41,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A10000000000000000000020 /* Stocked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Stocked.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000000000000000000030 /* RecipeBoxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeBoxApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000020 /* Anything I want.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Anything I want.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000030 /* AnythingIWantApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnythingIWantApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000031 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		A10000000000000000000032 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		A10000000000000000000033 /* RecipeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeStore.swift; sourceTree = "<group>"; };
@@ -86,10 +86,10 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A10000000000000000000050 /* RecipeBox */ = {
+		A10000000000000000000050 /* AnythingIWant */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000030 /* RecipeBoxApp.swift */,
+				A10000000000000000000030 /* AnythingIWantApp.swift */,
 				A10000000000000000000031 /* Models.swift */,
 				A10000000000000000000032 /* APIClient.swift */,
 				A10000000000000000000033 /* RecipeStore.swift */,
@@ -118,13 +118,13 @@
 				A40000000000000000000003 /* InfoPlist.xcstrings */,
 				A20000000000000000000005 /* Fonts */,
 			);
-			path = RecipeBox;
+			path = AnythingIWant;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000051 = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000050 /* RecipeBox */,
+				A10000000000000000000050 /* AnythingIWant */,
 				A10000000000000000000052 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -132,7 +132,7 @@
 		A10000000000000000000052 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000020 /* Stocked.app */,
+				A10000000000000000000020 /* Anything I want.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -151,9 +151,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A10000000000000000000060 /* Stocked */ = {
+		A10000000000000000000060 /* Anything I want */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A10000000000000000000080 /* Build configuration list for PBXNativeTarget "Stocked" */;
+			buildConfigurationList = A10000000000000000000080 /* Build configuration list for PBXNativeTarget "Anything I want" */;
 			buildPhases = (
 				A10000000000000000000070 /* Sources */,
 				A10000000000000000000040 /* Frameworks */,
@@ -164,9 +164,9 @@
 			);
 			dependencies = (
 			);
-			name = Stocked;
-			productName = RecipeBox;
-			productReference = A10000000000000000000020 /* Stocked.app */;
+			name = "Anything I want";
+			productName = "Anything I want";
+			productReference = A10000000000000000000020 /* Anything I want.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -184,7 +184,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A10000000000000000000081 /* Build configuration list for PBXProject "Stocked" */;
+			buildConfigurationList = A10000000000000000000081 /* Build configuration list for PBXProject "Anything I want" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -198,7 +198,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A10000000000000000000060 /* Stocked */,
+				A10000000000000000000060 /* Anything I want */,
 			);
 		};
 /* End PBXProject section */
@@ -248,7 +248,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000010 /* RecipeBoxApp.swift in Sources */,
+				A10000000000000000000010 /* AnythingIWantApp.swift in Sources */,
 				A10000000000000000000011 /* Models.swift in Sources */,
 				A10000000000000000000012 /* APIClient.swift in Sources */,
 				A10000000000000000000013 /* RecipeStore.swift in Sources */,
@@ -443,7 +443,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A10000000000000000000080 /* Build configuration list for PBXNativeTarget "Stocked" */ = {
+		A10000000000000000000080 /* Build configuration list for PBXNativeTarget "Anything I want" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A10000000000000000000092 /* Debug */,
@@ -452,7 +452,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A10000000000000000000081 /* Build configuration list for PBXProject "Stocked" */ = {
+		A10000000000000000000081 /* Build configuration list for PBXProject "Anything I want" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A10000000000000000000090 /* Debug */,

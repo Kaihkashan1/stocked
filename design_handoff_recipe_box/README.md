@@ -1,7 +1,7 @@
-# Handoff: Stocked (formerly Recipe Box) iOS redesign
+# Handoff: Anything I want iOS redesign
 
 ## Overview
-A warm visual redesign of the personal Recipe Box iPhone app (`ios/RecipeBox/`, SwiftUI), renamed **Stocked**,
+A warm visual redesign of the personal Anything I want iPhone app (`ios/AnythingIWant/`, SwiftUI),
 plus a paste-a-link add flow, a course filter (Main course / Appetizers / Desserts), and a new second tab —
 a personal pantry inventory called **Cupboard**, alongside the recipes tab now called **Cookbook**. Backend is
 unchanged except where noted under "API / data".
@@ -52,7 +52,7 @@ header is inline content.
 
 - **Header**, 66pt top padding, 22pt sides. Decorative accent-200 circle, 210pt, positioned top -70 / right -60,
   clipped by the screen. Kicker (Figtree 10.5pt, uppercase, tracking 0.14em, accent-700): "6 RECIPES · 1 FAVORITE".
-  Title "Stocked" — Caprasimo 36pt, ink.
+  Title "Anything I want" — Caprasimo 36pt, ink.
 - **Header buttons**, top-right, 42×42 circles, 8pt apart: settings (gear, sage-neutral icon, surface fill,
   1pt divider border) and add (plus, cream glyph on accent fill, shadow-sm). Lucide icons, stroke width 2.75.
 - **Search row**, 18pt below the title: pill 46pt tall, surface fill, 1pt divider border, 16pt inner padding,
@@ -360,9 +360,8 @@ instead of a `border` — a uniform stroke at any render scale, where the border
 
 ## Assets
 - `AppIcon-1024.png` — the app icon, square 1024×1024, no transparency, no pre-rounded corners. Drop it on the
-  1024 slot of the AppIcon set in `ios/RecipeBox/Assets.xcassets`. Icon artwork is a stylized cooking pot with
-  sprouts, unrelated to the cupboard/cookbook tab icons used inside the app — kept intentionally simple as a
-  1024px mark rather than illustrating the two-tab structure.
+  1024 slot of the AppIcon set in `ios/AnythingIWant/Assets.xcassets`. Icon artwork is an open box with a
+  question mark on sage, kept intentionally simple as a 1024px mark rather than illustrating the two-tab structure.
 - `AppIcon.dc.html` — the icon's source, parametric by size, if any other size is needed.
 - Icons: Lucide (https://lucide.dev) at stroke width 2.75, or the closest SF Symbol at `.semibold`.
 - Fonts: Caprasimo and Figtree, both from Google Fonts, both OFL.

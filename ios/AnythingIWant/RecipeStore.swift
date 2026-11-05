@@ -72,7 +72,7 @@ final class RecipeStore {
     /// Transient error from a favorite toggle or edit save — separate from
     /// errorMessage, which is reserved for "couldn't load the list at all".
     var actionError: String?
-    /// Set by RecipeBoxApp's onOpenURL; consumed once by RootView.
+    /// Set by AnythingIWantApp's onOpenURL; consumed once by RootView.
     var pendingRoute: DeepLinkRoute?
     /// Link and photo imports that outlive the add sheet / camera overlay.
     var importJobs: [BackgroundImportJob] = []
@@ -656,7 +656,7 @@ final class RecipeStore {
         // separate one — typing something that matches a known ingredient
         // surfaces it as a suggestion right alongside the filtered recipe
         // results, rather than needing a whole separate Pantry search.
-        // Gated behind actually typing something — as the recipe box grows,
+        // Gated behind actually typing something — as the cookbook grows,
         // the full catalog is too long to skim, so this is a search, not a
         // browsable list.
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

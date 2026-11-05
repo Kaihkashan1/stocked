@@ -7,7 +7,7 @@ func L(_ value: String.LocalizationValue) -> String {
 }
 
 @main
-struct RecipeBoxApp: App {
+struct AnythingIWantApp: App {
     @State private var store = RecipeStore()
     @State private var pantryStore = PantryStore()
     @State private var medicineStore = MedicineStore()

@@ -1275,7 +1275,7 @@ def _clean_course(value: str) -> str:
     Main course — the same shape as app/models.py's _RECIPE_TAGS_LOWER tag
     lookup, via a precomputed dict rather than a linear scan. Mirrored (not
     shared — no code-sharing path across Python/Swift for this) by
-    ios/RecipeBox/Models.swift's Course.resolve()."""
+    ios/AnythingIWant/Models.swift's Course.resolve()."""
     return _COURSES_CASEFOLDED.get((value or "").strip().casefold(), "Main course")
 
 

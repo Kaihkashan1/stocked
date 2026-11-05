@@ -37,7 +37,7 @@ def _clean_user_tags(tags: list[str] | None) -> list[str]:
     This server-side function is the canonical spec for what a "clean" user
     tag is. It's mirrored — not shared, there's no code-sharing path across
     Python/JS/Swift for this — by app/static/app.js's normalizeUserTag() and
-    ios/RecipeBox/Models.swift's normalizeRecipeTag(). All three must agree
+    ios/AnythingIWant/Models.swift's normalizeRecipeTag(). All three must agree
     on: strip commas → collapse whitespace → clip to _MAX_TAG_LEN chars →
     case-fold against the known vocabulary, else lowercase; and the caller
     enforces the _MAX_TAGS cap and case-insensitive dedup. If you change any

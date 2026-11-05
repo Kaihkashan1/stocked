@@ -1,6 +1,6 @@
-# Stocked for iPhone
+# Anything I want for iPhone
 
-Personal iOS app (home-screen name **Stocked**). It is not set up for the App Store. You install it on your own iPhone from Xcode.
+Personal iOS app (home-screen name **Anything I want**). It is not set up for the App Store. You install it on your own iPhone from Xcode.
 
 The phone loads data from the hosted backend (`https://stocked-cookbook-cupboard.vercel.app`). Your Mac does not need to be running. Saving from Instagram still uses the Shortcut; this app is for browsing, filtering, cooking, and managing your cupboard.
 
@@ -16,19 +16,19 @@ Those are separate on purpose. Marking ingredients on the Cookbook list does **n
 ## Install on your iPhone
 
 1. Open **Xcode.app** (the full app, not only Command Line Tools).
-2. Open `ios/Stocked.xcodeproj`. The Xcode project, scheme, and home-screen name are all **Stocked**. In the toolbar scheme menu, choose **Stocked**. If that menu is empty: **Product → Scheme → Manage Schemes…** → tick **Stocked** (shared) → Close.
+2. Open `ios/Anything I want.xcodeproj`. The Xcode project, scheme, and home-screen name are all **Anything I want**. In the toolbar scheme menu, choose **Anything I want**. If that menu is empty: **Product → Scheme → Manage Schemes…** → tick **Anything I want** (shared) → Close.
 3. In the project editor → **Signing & Capabilities** → **Team**, choose **Add Account…** and sign in with your Apple ID. Use your Personal Team. You do not need a paid developer program for this.
 4. Plug in the iPhone, unlock it, and tap **Trust** if asked. On the phone: **Settings → Privacy & Security → Developer Mode** (iOS 16+) if Xcode asks you to enable it.
 5. In the Xcode toolbar, pick your iPhone as the run destination, then press **Run**.
 6. The app talks to Vercel over the internet. If the list is empty, tap the gear and confirm the server is `https://stocked-cookbook-cupboard.vercel.app`.
 
-With a free Personal Team, Apple’s signature on the app lasts about **7 days**. After that, tapping Stocked on the phone does nothing (or says the developer is untrusted) until you plug in and **Run** from Xcode again — that only renews the signature; it does not wipe recipes. A paid Apple Developer account / TestFlight is needed if someone else should keep the app without weekly Xcode. There are no user accounts or household invites: one Vercel URL and Edit key is one shared cookbook.
+With a free Personal Team, Apple’s signature on the app lasts about **7 days**. After that, tapping Anything I want on the phone does nothing (or says the developer is untrusted) until you plug in and **Run** from Xcode again — that only renews the signature; it does not wipe recipes. A paid Apple Developer account / TestFlight is needed if someone else should keep the app without weekly Xcode. There are no user accounts or household invites: one Vercel URL and Edit key is one shared cookbook.
 
-The Home Screen icon is the book-over-shelf mark in `Assets.xcassets`. If an install shows a blank glyph, delete Stocked from the phone, clean the build folder, and Run again.
+The Home Screen icon is the open box with a question mark in `Assets.xcassets`. If an install shows a blank glyph, delete Anything I want from the phone, clean the build folder, and Run again.
 
 ## Cookbook
 
-- Opening the app again (from the home screen or after it sat in the background) refreshes Cookbook and Cupboard from the server, so a recipe saved via the Shortcut or the website shows up without a manual pull. Coming back online after a drop does the same. Pull down to refresh if you added something while Stocked stayed in the foreground.
+- Opening the app again (from the home screen or after it sat in the background) refreshes Cookbook and Cupboard from the server, so a recipe saved via the Shortcut or the website shows up without a manual pull. Coming back online after a drop does the same. Pull down to refresh if you added something while Anything I want stayed in the foreground.
 - After a successful sync, recipes and cupboard data stay on the phone. You can browse, filter, and cook **offline**. A sage banner reads **Offline — showing recipes saved on this phone**. Adding recipes, favoriting, editing, deleting, and cupboard writes still need the network.
 - **Search recipes** filters the list by title/text as you type. If what you typed also matches an ingredient name, a row under search lets you **filter by ingredient** — tap a suggestion, or **+ Add "…"** for a custom name.
 - Next to search: a **filter** button (fills accent when any list filter is active) and a **grid/list toggle** for recipe cards (remembered on this phone).
@@ -76,4 +76,4 @@ For "what can I make with ___":
 
 ## Design reference
 
-Interactive prototype and tokens live in [`design_handoff_recipe_box/`](../design_handoff_recipe_box/) (`Recipe Box.dc.html`, `AppIcon.dc.html`, README). The SwiftUI app under `ios/RecipeBox/` is the implementation.
+Interactive prototype and tokens live in [`design_handoff_recipe_box/`](../design_handoff_recipe_box/) (`Recipe Box.dc.html`, `AppIcon.dc.html`, README). The SwiftUI app under `ios/AnythingIWant/` is the implementation.
