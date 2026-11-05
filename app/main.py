@@ -93,6 +93,11 @@ async def home():
     return FileResponse(STATIC / "index.html")
 
 
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse(STATIC / "favicon.png")
+
+
 @app.get("/health")
 async def health():
     return {
