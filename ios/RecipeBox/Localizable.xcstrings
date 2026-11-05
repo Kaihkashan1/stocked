@@ -898,7 +898,7 @@
     "Recipes load from the hosted server. Your Mac does not need to be running." : {
       "extractionState" : "manual"
     },
-    "Recipes load from the hosted Curry and Cask server. You do not need your Mac running. Only change this if you are testing a local backend." : {
+    "Recipes load from the hosted Anything I want server. You do not need your Mac running. Only change this if you are testing a local backend." : {
       "extractionState" : "manual"
     },
     "Remove %@" : {
@@ -1041,7 +1041,7 @@
     "Steps" : {
       "extractionState" : "manual"
     },
-    "Curry and Cask" : {
+    "Anything I want" : {
       "extractionState" : "manual"
     },
     "System" : {

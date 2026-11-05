@@ -1,7 +1,7 @@
 const I18N = {
   en: {
     personalCollection: "Personal collection",
-    appName: "Curry and Cask",
+    appName: "Anything I want",
     recipeBox: "Cookbook",
     addRecipe: "Add recipe",
     typeItIn: "Type it in",

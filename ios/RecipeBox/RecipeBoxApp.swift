@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Catalog lookup forced to English — Curry and Cask does not ship in-app
+/// Catalog lookup forced to English — Anything I want does not ship in-app
 /// translations. `Text("Save")` also follows `.environment(\.locale)`.
 func L(_ value: String.LocalizationValue) -> String {
     String(localized: value, locale: Locale(identifier: "en"))

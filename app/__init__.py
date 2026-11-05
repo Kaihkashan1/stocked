@@ -1,1 +1,1 @@
-"""Curry and Cask — share an Instagram reel, get a structured recipe in Sheets."""
+"""Anything I want — share an Instagram reel, get a structured recipe in Sheets."""
