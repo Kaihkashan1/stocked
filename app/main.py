@@ -164,9 +164,10 @@ async def api_create_recipe(request: Request):
 
         if isinstance(exc, PhotoStoreError):
             raise HTTPException(status_code=502, detail=str(exc)) from exc
-        raise
+        logger.exception("Could not save recipe")
+        raise HTTPException(status_code=502, detail="Could not save that recipe. Try again.") from exc
     if not created:
-        raise HTTPException(status_code=500, detail="Could not save recipe")
+        raise HTTPException(status_code=502, detail="Could not save recipe")
     return _public(created)
 
 
@@ -233,10 +234,42 @@ async def api_extract_photo(photo: UploadFile = File(...)):
 
 
 @app.patch("/api/recipes/{row_id}", dependencies=[Depends(require_secret)])
-async def api_update_recipe(row_id: int, body: RecipeUpdate):
-    # update_recipe() does its own get_recipe() existence check internally —
-    # checking again here would be a second full-sheet read for nothing.
-    updated = update_recipe(row_id, **body.model_dump(exclude_unset=True))
+async def api_update_recipe(row_id: int, request: Request):
+    # JSON for a normal edit; multipart when replacing or removing the
+    # original photo (`recipe` JSON + optional `photo` file + `clear_photo`).
+    photo_bytes = None
+    clear_photo = False
+    ctype = request.headers.get("content-type", "")
+    try:
+        if "multipart/form-data" in ctype:
+            form = await request.form()
+            raw = form.get("recipe") or "{}"
+            payload = raw if isinstance(raw, str) else str(raw)
+            body = RecipeUpdate.model_validate_json(payload)
+            clear_photo = str(form.get("clear_photo") or "").strip().lower() in {"1", "true", "yes"}
+            upload = form.get("photo")
+            if upload is not None and hasattr(upload, "read"):
+                photo_bytes = await upload.read()
+                if len(photo_bytes) > MAX_PHOTO_BYTES:
+                    raise HTTPException(status_code=413, detail="That photo is too large. Please use a smaller image.")
+        else:
+            body = RecipeUpdate.model_validate(await request.json())
+            clear_photo = bool(body.clear_photo)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Could not read that recipe.") from exc
+
+    fields = body.model_dump(exclude_unset=True, exclude={"clear_photo"})
+    try:
+        updated = update_recipe(row_id, **fields, photo_bytes=photo_bytes, clear_photo=clear_photo)
+    except Exception as exc:
+        from app.photos import PhotoStoreError
+
+        if isinstance(exc, PhotoStoreError):
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        logger.exception("Could not update recipe %s", row_id)
+        raise HTTPException(status_code=502, detail="Could not save that recipe. Try again.") from exc
     if not updated:
         raise HTTPException(status_code=404, detail="Recipe not found")
     return _public(updated)

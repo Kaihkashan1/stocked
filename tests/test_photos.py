@@ -13,6 +13,7 @@ from app.photos import (
     pick_photos_folder,
     upload_recipe_photo,
 )
+from app.store import retry_sheets_call
 
 
 class PhotoFolderPickerTests(unittest.TestCase):
@@ -53,6 +54,18 @@ class PhotoFolderPickerTests(unittest.TestCase):
 class FakePhotosSheet:
     def __init__(self):
         self.rows = [["id", "content_type", "part", "data"]]
+
+    @property
+    def row_count(self):
+        return len(self.rows)
+
+    @property
+    def col_count(self):
+        return 4
+
+    def resize(self, rows=None, cols=None):
+        while len(self.rows) < (rows or 0):
+            self.rows.append(["", "", "", ""])
 
     def col_values(self, _index):
         return [row[0] for row in self.rows]
@@ -99,3 +112,26 @@ class SheetPhotoFallbackTests(unittest.TestCase):
             self.assertGreater(len(sheet.rows), 2)
             self.assertEqual(download_recipe_photo(photo_id)[0], payload)
             self.assertEqual("".join(row[3] for row in sheet.rows[1:]), encoded)
+
+    def test_spreadsheet_errors_become_photo_store_errors(self):
+        with (
+            patch("app.photos.settings.google_photos_folder_id", ""),
+            patch("app.photos._upload_sheet", side_effect=RuntimeError("Sheets 500")),
+        ):
+            with self.assertRaises(PhotoStoreError):
+                upload_recipe_photo(b"jpeg-bytes")
+
+
+class SheetsRetryTests(unittest.TestCase):
+    def test_retries_transient_failures_then_succeeds(self):
+        calls = {"n": 0}
+
+        def flaky():
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise RuntimeError("500 Internal Error")
+            return "ok"
+
+        with patch("app.store.time.sleep"):
+            self.assertEqual(retry_sheets_call(flaky, attempts=4, delay=0), "ok")
+        self.assertEqual(calls["n"], 3)

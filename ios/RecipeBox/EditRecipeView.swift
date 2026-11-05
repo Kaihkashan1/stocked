@@ -1,4 +1,6 @@
+import PhotosUI
 import SwiftUI
+import UIKit
 
 /// Full-screen edit form for a saved recipe. Field order and the
 /// `qty | item` ingredient lines match the handoff edit sheet.
@@ -16,6 +18,10 @@ struct EditRecipeView: View {
     @State private var course: Course
     @State private var saving = false
     @State private var errorMessage: String?
+    @State private var replacementJPEG: Data?
+    @State private var removeExistingPhoto = false
+    @State private var showPhotoPicker = false
+    @State private var photoPickerItem: PhotosPickerItem?
 
     init(recipe: Recipe) {
         self.recipe = recipe
@@ -88,6 +94,10 @@ struct EditRecipeView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
 
+                    field(kicker: L("Photo")) {
+                        photoEditor
+                    }
+
                     if let errorMessage {
                         Text(errorMessage)
                             .font(Theme.body(12.5))
@@ -99,6 +109,66 @@ struct EditRecipeView: View {
             }
         }
         .background(Theme.bg.ignoresSafeArea())
+        .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerItem, matching: .images)
+        .onChange(of: photoPickerItem) { _, item in
+            guard let item else { return }
+            Task {
+                defer { photoPickerItem = nil }
+                guard let data = try? await item.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data),
+                      let jpeg = image.recipePhotoJPEGData()
+                else { return }
+                replacementJPEG = jpeg
+                removeExistingPhoto = false
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var photoEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let replacementJPEG, let preview = UIImage(data: replacementJPEG) {
+                Image(uiImage: preview)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            } else if let url = recipe.resolvedPhotoURL(baseURLString: store.serverURL), !removeExistingPhoto {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                    default:
+                        Theme.neutral200
+                            .frame(height: 120)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            }
+
+            HStack(spacing: 8) {
+                Button(showsPhoto ? L("Replace photo") : L("Add photo")) {
+                    showPhotoPicker = true
+                }
+                .font(Theme.body(13, weight: .semibold))
+                .foregroundStyle(Theme.accent700)
+                if showsPhoto {
+                    Button(L("Remove photo")) {
+                        replacementJPEG = nil
+                        removeExistingPhoto = true
+                    }
+                    .font(Theme.body(13, weight: .semibold))
+                    .foregroundStyle(Theme.accent800)
+                }
+            }
+        }
+    }
+
+    private var showsPhoto: Bool {
+        replacementJPEG != nil || (recipe.photoURL != nil && !recipe.photoURL!.isEmpty && !removeExistingPhoto)
     }
 
     private var header: some View {
@@ -146,7 +216,9 @@ struct EditRecipeView: View {
             steps: lines(from: stepsText),
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
             tags: Array(selectedTags),
-            course: course
+            course: course,
+            photoJPEG: replacementJPEG,
+            clearPhoto: removeExistingPhoto && replacementJPEG == nil
         )
         if let failure {
             errorMessage = failure

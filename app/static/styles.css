@@ -639,6 +639,22 @@ a.import-log-url {
   margin-bottom: 1.2rem;
 }
 
+.photo-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.photo-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.photo-editor-actions .link-btn {
+  padding: 0;
+}
+
 .recipe-photo-btn {
   display: block;
   width: 100%;

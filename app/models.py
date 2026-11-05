@@ -149,6 +149,7 @@ class RecipeUpdate(BaseModel):
     notes: str | None = None
     tags: list[str] | None = None
     course: str | None = None
+    clear_photo: bool | None = None
 
     _clean_tags_validator = field_validator("tags")(lambda cls, v: _clean_user_tags(v) if v is not None else v)
 

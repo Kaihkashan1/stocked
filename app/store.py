@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -166,22 +167,51 @@ def _ensure_course_validation(worksheet, headers: list[str]) -> None:
         logger.warning("Could not refresh the Course column dropdown", exc_info=True)
 
 
+def _is_retryable_sheets_error(exc: BaseException) -> bool:
+    if isinstance(exc, gspread.exceptions.APIError) and getattr(exc, "code", None) in {429, 500, 502, 503}:
+        return True
+    text = str(exc).lower()
+    return any(
+        token in text
+        for token in ("429", "500", "502", "503", "timeout", "timed out", "internal error", "backend", "unavailable", "rate limit")
+    )
+
+
+def retry_sheets_call(op, *, attempts: int = 4, delay: float = 0.7):
+    """Google Sheets occasionally answers 429/5xx; a short backoff is enough."""
+    last: BaseException | None = None
+    wait = delay
+    for attempt in range(attempts):
+        try:
+            return op()
+        except Exception as exc:
+            last = exc
+            if not _is_retryable_sheets_error(exc) or attempt == attempts - 1:
+                raise
+            logger.warning("Google Sheets retry %s/%s: %s", attempt + 1, attempts, exc)
+            time.sleep(wait)
+            wait *= 1.7
+    raise last  # pragma: no cover
+
+
 def _update_recipe_row(worksheet, row_id: int, row: list) -> None:
     """Writes one recipe row. USER_ENTERED is the usual path; a RAW retry
     covers a leftover strict Course dropdown that still rejects Dips.
 
-    Only retried when the API actually rejects the request (code 400,
-    e.g. a data-validation failure) — a rate limit, auth problem, or other
-    APIError is a real failure and should propagate rather than be masked
-    by a silent retry in a different (less type-aware) input mode."""
+    400 validation errors fall through to RAW. Transient 429/5xx answers
+    are retried in the original mode first."""
     range_name = f"A{row_id}:{LAST_COL_LETTER}{row_id}"
+
+    def write(option: str) -> None:
+        worksheet.update(range_name, [row], value_input_option=option)
+
     try:
-        worksheet.update(range_name, [row], value_input_option="USER_ENTERED")
+        retry_sheets_call(lambda: write("USER_ENTERED"))
     except gspread.exceptions.APIError as exc:
         if exc.code != 400:
             raise
         logger.warning("USER_ENTERED write rejected for row %s (code %s); retrying RAW", row_id, exc.code)
-        worksheet.update(range_name, [row], value_input_option="RAW")
+        retry_sheets_call(lambda: write("RAW"))
 
 
 STATE_SHEET_TITLE = "AppState"
@@ -975,10 +1005,15 @@ def create_recipe(
     clean_course = _clean_course(course)
     photo_id = ""
     if photo_bytes:
-        from app.photos import upload_recipe_photo
+        from app.photos import PhotoStoreError, upload_recipe_photo
 
-        photo_id = upload_recipe_photo(photo_bytes)
-        clean_source = PHOTO_SOURCE_STORED
+        try:
+            photo_id = upload_recipe_photo(photo_bytes)
+            clean_source = PHOTO_SOURCE_STORED
+        except PhotoStoreError:
+            raise
+        except Exception as exc:
+            raise PhotoStoreError("Could not keep that photo. Try again.") from exc
     row = _recipe_cells(
         title=title,
         ingredients_text=ingredients_text,
@@ -1065,19 +1100,42 @@ def update_recipe(row_id: int, **fields) -> dict | None:
     tags_in = fields.get("tags")
     tags = [_clean_tag(tag) for tag in tags_in if _clean_tag(tag)] if tags_in is not None else current["tags"]
     course = _clean_course(fields["course"]) if fields.get("course") is not None else current["course"]
+    photo_id = str(current.get("photo_id") or "").strip()
+    source = current["source"]
+    photo_bytes = fields.get("photo_bytes")
+    clear_photo = bool(fields.get("clear_photo"))
+    if clear_photo or photo_bytes:
+        if photo_id:
+            try:
+                from app.photos import delete_recipe_photo
+
+                delete_recipe_photo(photo_id)
+            except Exception:
+                logger.warning("Could not delete photo %s for row %s", photo_id, row_id, exc_info=True)
+            photo_id = ""
+        if photo_bytes:
+            from app.photos import PhotoStoreError, upload_recipe_photo
+
+            try:
+                photo_id = upload_recipe_photo(photo_bytes)
+                source = PHOTO_SOURCE_STORED
+            except PhotoStoreError:
+                raise
+            except Exception as exc:
+                raise PhotoStoreError("Could not keep that photo. Try again.") from exc
 
     row = _recipe_cells(
         title=title,
         ingredients_text=ingredients_text,
         steps_text=steps_text,
-        source=current["source"],
+        source=source,
         confidence=current["confidence"],
         saved_at=current["saved_at"],
         tags_csv=", ".join(tags),
         favorite="TRUE" if favorite else "",
         notes=notes,
         course=course,
-        photo=str(current.get("photo_id") or ""),
+        photo=photo_id,
     )
     _update_recipe_row(_worksheet(), row_id, row)
     logger.info("Updated row %s (%r)", row_id, title)
@@ -1086,7 +1144,7 @@ def update_recipe(row_id: int, **fields) -> dict | None:
     # one Sheets API round trip per edit instead of two.
     ingredients_list = ingredients if ingredients is not None else current["ingredients"]
     steps_list = steps if steps is not None else current["steps"]
-    return {
+    updated = {
         **current,
         "title": title,
         "ingredients": ingredients_list,
@@ -1096,9 +1154,16 @@ def update_recipe(row_id: int, **fields) -> dict | None:
         "notes": notes,
         "tags": tags,
         "course": course,
+        "source": public_photo_source(source, photo_id),
         "ingredients_text": ingredients_text,
         "steps_text": steps_text,
+        "photo_id": photo_id,
     }
+    if photo_id:
+        updated["photo_url"] = f"/api/recipes/{row_id}/photo"
+    else:
+        updated.pop("photo_url", None)
+    return updated
 
 
 def replace_ingredient_lines(row_id: int, lines: list[str]) -> None:

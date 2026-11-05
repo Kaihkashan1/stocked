@@ -117,6 +117,9 @@ const state = {
   logShown: 5,
   pendingPhoto: null,
   pendingPhotoURL: null,
+  editPhotoFile: null,
+  editPhotoURL: null,
+  editPhotoRemoved: false,
   revealedLogKeys: new Set(),
   copiedLogKey: null,
   settingsSecretDraft: "",
@@ -157,6 +160,7 @@ const els = {
   addRecipeMenu: document.getElementById("add-recipe-menu"),
   photoInput: document.getElementById("photo-input"),
   cameraInput: document.getElementById("camera-input"),
+  editPhotoInput: document.getElementById("edit-photo-input"),
   offlineBanner: document.getElementById("offline-banner"),
   viewTabs: document.getElementById("view-tabs"),
   searchRow: document.getElementById("search-row"),
@@ -312,12 +316,22 @@ async function createRecipeRequest(draft, photo) {
   return response.json();
 }
 
-async function patchRecipe(id, patch) {
-  const response = await fetch(`/api/recipes/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(patch),
-  });
+async function patchRecipe(id, patch, { photo, clearPhoto } = {}) {
+  const headers = authHeaders();
+  let response;
+  if (photo || clearPhoto) {
+    const formData = new FormData();
+    formData.append("recipe", JSON.stringify(patch));
+    if (clearPhoto) formData.append("clear_photo", "1");
+    if (photo) formData.append("photo", photo, "photo.jpg");
+    response = await fetch(`/api/recipes/${id}`, { method: "PATCH", headers, body: formData });
+  } else {
+    response = await fetch(`/api/recipes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(patch),
+    });
+  }
   if (!response.ok) throw await errorForResponse(response);
   return response.json();
 }
@@ -1370,6 +1384,7 @@ function editFormHtml(recipe) {
         <div id="edit-tag-chips" class="chips">${existingTagChips("pick-edit-tag", recipe.tags || [])}</div>
         ${tagDraftRow("edit")}
       </div>
+      ${editPhotoEditorHtml(recipe)}
       <p id="edit-error" class="edit-error" hidden></p>
       <button class="pill-btn primary" type="button" data-action="save-edit" data-id="${recipe.id}">${escapeHtml(t("save"))}</button>
     </div>`;
@@ -1574,12 +1589,47 @@ async function toggleFavorite(id) {
   refreshOpenRecipe();
 }
 
+function resetEditPhoto() {
+  if (state.editPhotoURL) URL.revokeObjectURL(state.editPhotoURL);
+  state.editPhotoFile = null;
+  state.editPhotoURL = null;
+  state.editPhotoRemoved = false;
+  if (els.editPhotoInput) els.editPhotoInput.value = "";
+}
+
+function editPhotoEditorHtml(recipe) {
+  const src = state.editPhotoURL || (!state.editPhotoRemoved && recipe.photo_url) || "";
+  const hasPhoto = Boolean(src);
+  return `
+      <div class="field">
+        <span>${escapeHtml(t("Photo"))}</span>
+        <div class="photo-editor">
+          <img class="recipe-photo" id="edit-photo-preview" src="${escapeAttr(src)}" alt=""${hasPhoto ? "" : " hidden"}>
+          <div class="photo-editor-actions">
+            <button class="link-btn" type="button" data-action="replace-edit-photo">${escapeHtml(t(hasPhoto ? "replacePhoto" : "addPhoto"))}</button>
+            <button class="link-btn" id="remove-edit-photo-btn" type="button" data-action="remove-edit-photo"${hasPhoto ? "" : " hidden"}>${escapeHtml(t("removePhoto"))}</button>
+          </div>
+        </div>
+      </div>`;
+}
+
+function syncEditPhotoButtons() {
+  const preview = document.getElementById("edit-photo-preview");
+  const replaceBtn = document.querySelector("[data-action='replace-edit-photo']");
+  const removeBtn = document.getElementById("remove-edit-photo-btn");
+  const hasPhoto = Boolean(preview && !preview.hidden && preview.getAttribute("src"));
+  if (replaceBtn) replaceBtn.textContent = t(hasPhoto ? "replacePhoto" : "addPhoto");
+  if (removeBtn) removeBtn.hidden = !hasPhoto;
+}
+
 function startEdit(id) {
+  resetEditPhoto();
   state.editingId = Number(id);
   refreshOpenRecipe();
 }
 
 function cancelEdit() {
+  resetEditPhoto();
   state.editingId = null;
   refreshOpenRecipe();
 }
@@ -1614,10 +1664,15 @@ async function saveEdit(id) {
   saveBtn.disabled = true;
   saveBtn.textContent = t("saving");
   try {
-    const updated = await patchRecipe(id, patch);
+    const updated = await patchRecipe(id, patch, {
+      photo: state.editPhotoFile,
+      clearPhoto: state.editPhotoRemoved && !state.editPhotoFile,
+    });
+    resetEditPhoto();
     const recipe = state.recipes.find((item) => item.id === id);
     if (recipe) {
       Object.assign(recipe, updated);
+      if (!updated.photo_url) delete recipe.photo_url;
       recipe.searchBlob = computeSearchBlob(recipe);
     }
     state.editingId = null;
@@ -1668,6 +1723,7 @@ function closeRecipePhoto() {
 
 function closeDrawer() {
   closeRecipePhoto();
+  resetEditPhoto();
   els.drawer.hidden = true;
   state.openRecipeId = null;
   state.editingId = null;
@@ -2795,6 +2851,26 @@ document.addEventListener("click", (event) => {
 
 els.photoInput.addEventListener("change", handlePhotoSelected);
 els.cameraInput?.addEventListener("change", handlePhotoSelected);
+els.editPhotoInput?.addEventListener("change", async (event) => {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  try {
+    const blob = await resizeImageFile(file);
+    if (state.editPhotoURL) URL.revokeObjectURL(state.editPhotoURL);
+    state.editPhotoFile = blob;
+    state.editPhotoURL = URL.createObjectURL(blob);
+    state.editPhotoRemoved = false;
+    const preview = document.getElementById("edit-photo-preview");
+    if (preview) {
+      preview.src = state.editPhotoURL;
+      preview.hidden = false;
+    }
+    syncEditPhotoButtons();
+  } catch (err) {
+    window.alert(t("couldntReadPhoto", { error: err.message }));
+  }
+});
 
 document.addEventListener("click", (event) => {
   const pantry = event.target.closest("[data-pantry]");
@@ -2833,6 +2909,25 @@ document.addEventListener("click", (event) => {
     case "close-recipe-photo":
       event.stopPropagation();
       closeRecipePhoto();
+      break;
+    case "replace-edit-photo":
+      event.stopPropagation();
+      els.editPhotoInput?.click();
+      break;
+    case "remove-edit-photo":
+      event.stopPropagation();
+      if (state.editPhotoURL) URL.revokeObjectURL(state.editPhotoURL);
+      state.editPhotoFile = null;
+      state.editPhotoURL = null;
+      state.editPhotoRemoved = true;
+      {
+        const preview = document.getElementById("edit-photo-preview");
+        if (preview) {
+          preview.removeAttribute("src");
+          preview.hidden = true;
+        }
+      }
+      syncEditPhotoButtons();
       break;
     case "close-drawer":
       closeDrawer();

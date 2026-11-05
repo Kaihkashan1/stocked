@@ -441,10 +441,26 @@ final class RecipeStore {
     }
 
     /// Returns an error message on failure, nil on success.
-    func saveEdits(id: Int, title: String, ingredients: [String], steps: [String], notes: String, tags: [String], course: Course) async -> String? {
+    func saveEdits(
+        id: Int,
+        title: String,
+        ingredients: [String],
+        steps: [String],
+        notes: String,
+        tags: [String],
+        course: Course,
+        photoJPEG: Data? = nil,
+        clearPhoto: Bool = false
+    ) async -> String? {
         let patch = RecipePatch(title: title, ingredients: ingredients, steps: steps, notes: notes, tags: tags, course: course.rawValue)
         do {
-            let saved = try await APIClient(baseURLString: serverURL).updateRecipe(id: id, patch: patch, secret: serverSecret)
+            let saved = try await APIClient(baseURLString: serverURL).updateRecipe(
+                id: id,
+                patch: patch,
+                secret: serverSecret,
+                photoJPEG: photoJPEG,
+                clearPhoto: clearPhoto
+            )
             replace(saved)
             return nil
         } catch {

@@ -329,6 +329,9 @@
     "Add medicine to buy" : {
       "extractionState" : "manual"
     },
+    "Add photo" : {
+      "extractionState" : "manual"
+    },
     "Add recipe" : {
       "extractionState" : "manual"
     },
@@ -905,6 +908,12 @@
       "extractionState" : "manual"
     },
     "Remove from favorites" : {
+      "extractionState" : "manual"
+    },
+    "Remove photo" : {
+      "extractionState" : "manual"
+    },
+    "Replace photo" : {
       "extractionState" : "manual"
     },
     "Reset" : {

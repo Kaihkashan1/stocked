@@ -210,32 +210,45 @@ def _sheet_photo_key(file_id: str) -> str:
 @lru_cache(maxsize=1)
 def _photos_worksheet():
     import gspread
-    from app.store import _worksheet
+    from app.store import _worksheet, retry_sheets_call
 
     spreadsheet = _worksheet().spreadsheet
     try:
-        worksheet = spreadsheet.worksheet(PHOTOS_SHEET_TITLE)
+        worksheet = retry_sheets_call(lambda: spreadsheet.worksheet(PHOTOS_SHEET_TITLE))
     except gspread.WorksheetNotFound:
-        worksheet = spreadsheet.add_worksheet(title=PHOTOS_SHEET_TITLE, rows=2, cols=len(PHOTOS_SHEET_HEADERS))
-        worksheet.update("A1:D1", [PHOTOS_SHEET_HEADERS], value_input_option="RAW")
+        worksheet = retry_sheets_call(
+            lambda: spreadsheet.add_worksheet(title=PHOTOS_SHEET_TITLE, rows=2, cols=len(PHOTOS_SHEET_HEADERS))
+        )
+        retry_sheets_call(lambda: worksheet.update("A1:D1", [PHOTOS_SHEET_HEADERS], value_input_option="RAW"))
         return worksheet
     if worksheet.col_count < len(PHOTOS_SHEET_HEADERS):
-        worksheet.resize(rows=max(worksheet.row_count, 2), cols=len(PHOTOS_SHEET_HEADERS))
+        retry_sheets_call(
+            lambda: worksheet.resize(rows=max(worksheet.row_count, 2), cols=len(PHOTOS_SHEET_HEADERS))
+        )
     return worksheet
 
 
 def _upload_sheet(data: bytes, filename: str | None = None) -> str:
+    from app.store import retry_sheets_call
+
     photo_id = uuid.uuid4().hex
     encoded = base64.b64encode(data).decode("ascii")
     chunks = [encoded[i : i + SHEET_CELL_CHARS] for i in range(0, len(encoded), SHEET_CELL_CHARS)] or [""]
     worksheet = _photos_worksheet()
-    start = max(len(worksheet.col_values(1)) + 1, 2)
+    start = max(len(retry_sheets_call(lambda: worksheet.col_values(1))) + 1, 2)
     rows = [[photo_id, "image/jpeg", str(index), chunk] for index, chunk in enumerate(chunks)]
+    needed = start + len(rows) - 1
+    if worksheet.row_count < needed:
+        retry_sheets_call(lambda: worksheet.resize(rows=needed, cols=max(worksheet.col_count, len(PHOTOS_SHEET_HEADERS))))
     for offset in range(0, len(rows), SHEET_WRITE_BATCH):
         batch = rows[offset : offset + SHEET_WRITE_BATCH]
         first = start + offset
         last = first + len(batch) - 1
-        worksheet.update(f"A{first}:D{last}", batch, value_input_option="RAW")
+        retry_sheets_call(
+            lambda batch=batch, first=first, last=last: worksheet.update(
+                f"A{first}:D{last}", batch, value_input_option="RAW"
+            )
+        )
     logger.info("Kept recipe photo in the spreadsheet (%s, %s chunks)", filename or photo_id, len(chunks))
     return f"{SHEET_PREFIX}{photo_id}"
 
@@ -310,11 +323,20 @@ def _upload_drive(data: bytes, filename: str | None) -> str:
 def upload_recipe_photo(data: bytes, *, filename: str | None = None) -> str:
     if not data:
         raise PhotoStoreError("That photo was empty.")
+    if settings.google_photos_folder_id.strip():
+        try:
+            return _upload_drive(data, filename)
+        except PhotoStoreError:
+            logger.warning("Google Drive cannot store the photo; keeping it in the spreadsheet instead")
+        except Exception:
+            logger.exception("Google Drive photo upload failed; keeping it in the spreadsheet instead")
     try:
-        return _upload_drive(data, filename)
-    except PhotoStoreError:
-        logger.warning("Google Drive cannot store the photo; keeping it in the spreadsheet instead")
         return _upload_sheet(data, filename)
+    except PhotoStoreError:
+        raise
+    except Exception as exc:
+        logger.exception("Spreadsheet photo upload failed")
+        raise PhotoStoreError("Could not keep that photo. Try again.") from exc
 
 
 def download_recipe_photo(file_id: str) -> tuple[bytes, str]:

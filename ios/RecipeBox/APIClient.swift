@@ -174,25 +174,54 @@ struct APIClient {
         return try Self.decoder.decode(Recipe.self, from: data)
     }
 
-    func updateRecipe(id: Int, patch: RecipePatch, secret: String) async throws -> Recipe {
+    func updateRecipe(id: Int, patch: RecipePatch, secret: String, photoJPEG: Data? = nil, clearPhoto: Bool = false) async throws -> Recipe {
         guard let base = URL(string: trimmedBase),
               let url = URL(string: "/api/recipes/\(id)", relativeTo: base)
         else { throw APIError.badURL }
 
         var request = URLRequest(url: url.absoluteURL)
         request.httpMethod = "PATCH"
-        request.timeoutInterval = 15
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let trimmedSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedSecret.isEmpty {
             request.setValue(trimmedSecret, forHTTPHeaderField: "X-Recipe-Box-Key")
         }
-        request.httpBody = try JSONEncoder().encode(patch)
+
+        let session: URLSession
+        if photoJPEG != nil || clearPhoto {
+            request.timeoutInterval = 60
+            session = Self.longSession
+            let boundary = "Boundary-\(UUID().uuidString)"
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            let recipeJSON = try JSONEncoder().encode(patch)
+            var body = Data()
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"recipe\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
+            body.append(recipeJSON)
+            if clearPhoto {
+                body.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Disposition: form-data; name=\"clear_photo\"\r\n\r\n".data(using: .utf8)!)
+                body.append("1".data(using: .utf8)!)
+            }
+            if let photoJPEG {
+                body.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Disposition: form-data; name=\"photo\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!)
+                body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+                body.append(photoJPEG)
+            }
+            body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+            request.httpBody = body
+        } else {
+            request.timeoutInterval = 15
+            session = Self.session
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(patch)
+        }
 
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await Self.session.data(for: request)
+            (data, response) = try await session.data(for: request)
         } catch {
             throw APIError.unreachable(trimmedBase)
         }
